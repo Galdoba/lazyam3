@@ -1,0 +1,111 @@
+{{{false C:\Users\pemaltynov\.local\share\ffquery\storage.json    }} {C:\Users\pemaltynov\.local\state\ffquery\ffquery.log false 0 false }}
+Name: 63506.mp4
+Format
+  FormatName: mov,mp4,m4a,3gp,3g2,mj2
+  FormatLongName: QuickTime / MOV
+  Duration: 1364.800000
+  StartTime: 0.000000
+  BitRate: 9400755
+  Size: 1603768919
+  ProbeScore: 100
+  NbStreams: 3
+  NbPrograms: 0
+  Tags: 
+    compatible_brands: isomiso2avc1mp41
+    encoder: Lavf61.9.100
+    major_brand: isom
+    minor_version: 512
+Video
+#Stream: [:v:0]
+  Index: 0
+  TypeIndex: 0
+  Codec: h264
+  CodecLongName: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+  Profile: High
+  Width: 1920
+  Height: 1080
+  PixFmt: yuv420p
+  FrameRate: 25/1
+  AvgFrameRate: 25/1
+  BitRate: 9264141
+  Duration: 1364.800000
+  NbFrames: 34120
+  CodecTag: avc1
+  CodecType: video
+  CodecTagHex: 0x31637661
+  CodedWidth: 1920
+  CodedHeight: 1080
+  HasBFrames: 2
+  SampleAspectRatio: 1:1
+  DisplayAspectRatio: 16:9
+  Level: 40
+  ColorRange: tv
+  ColorTransfer: bt709
+  ColorPrimaries: bt709
+  ChromaLocation: left
+  FieldOrder: progressive
+  IsAvc: true
+  NalLengthSize: 4
+  BitsPerRawSample: 8
+  ID: 0x1
+  TimeBase: 1/12800
+  StartTime: 0.000000
+  DurationTS: 17469440
+  Disposition: 
+    default: 1
+  Tags: 
+    encoder: Lavc61.26.100 h264_nvenc
+    handler_name: VideoHandler
+    language: und
+    timecode: 01:00:00:00
+Audio
+#Stream: [:a:0]
+  Index: 1
+  TypeIndex: 0
+  Codec: aac
+  CodecLongName: AAC (Advanced Audio Coding)
+  Profile: LC
+  FrameRate: 0/0
+  AvgFrameRate: 0/0
+  BitRate: 130515
+  Duration: 1364.800000
+  NbFrames: 63976
+  ChannelLayout: stereo
+  SampleRate: 48000
+  Channels: 2
+  CodecTag: mp4a
+  CodecType: audio
+  CodecTagHex: 0x6134706d
+  SampleFmt: fltp
+  ID: 0x2
+  TimeBase: 1/48000
+  StartTime: 0.000000
+  DurationTS: 65510400
+  Disposition: 
+    default: 1
+  Tags: 
+    handler_name: Русский
+    language: rus
+    name: Русский
+Data
+#Stream: [:d:0]
+  Index: 2
+  TypeIndex: 0
+  FrameRate: 0/0
+  AvgFrameRate: 12800/512
+  Duration: 1364.800000
+  NbFrames: 1
+  CodecTag: tmcd
+  CodecType: data
+  CodecTagHex: 0x64636d74
+  ID: 0x3
+  TimeBase: 1/12800
+  StartTime: 0.000000
+  DurationTS: 17469440
+  Disposition: 
+  Tags: 
+    handler_name: TimeCodeHandler
+    language: eng
+    timecode: 01:00:00:00
+
+{C:\Users\pemaltynov\go\src\github.com\Galdoba\lazyam3\assets\examples\AS_A_REINCARNATED_ARISTOCRAT_ILL_USE_MY_APPRAISA_S02E001_3S_AA_EPS_XX_0000130_20261015_224646_anylhbab\63506.mp4 <nil> [] [] [] [] [] [] [{0 h264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 High video  avc1 0x31637661 1920 1080 1920 1080 0 2 1:1 16:9 yuv420p 40 tv  bt709 bt709 left progressive 0 true 4 8   0  0 0x1 25/1 25/1 1/12800 0 0.000000 17469440 1364.800000 9264141  34120   map[attached_pic:0 captions:0 clean_effects:0 comment:0 default:1 dependent:0 descriptions:0 dub:0 forced:0 hearing_impaired:0 karaoke:0 lyrics:0 metadata:0 multilayer:0 non_diegetic:0 original:0 still_image:0 timed_thumbnails:0 visual_impaired:0] map[encoder:Lavc61.26.100 h264_nvenc handler_name:VideoHandler language:und timecode:01:00:00:00]} {1 aac AAC (Advanced Audio Coding) LC audio  mp4a 0x6134706d 0 0 0 0 0 0    0       0    fltp 48000 2 stereo 0 0x2 0/0 0/0 1/48000 0 0.000000 65510400 1364.800000 130515  63976   map[attached_pic:0 captions:0 clean_effects:0 comment:0 default:1 dependent:0 descriptions:0 dub:0 forced:0 hearing_impaired:0 karaoke:0 lyrics:0 metadata:0 multilayer:0 non_diegetic:0 original:0 still_image:0 timed_thumbnails:0 visual_impaired:0] map[handler_name:Русский language:rus name:Русский]} {2    data  tmcd 0x64636d74 0 0 0 0 0 0    0       0      0  0 0x3 0/0 12800/512 1/12800 0 0.000000 17469440 1364.800000   1   map[attached_pic:0 captions:0 clean_effects:0 comment:0 default:0 dependent:0 descriptions:0 dub:0 forced:0 hearing_impaired:0 karaoke:0 lyrics:0 metadata:0 multilayer:0 non_diegetic:0 original:0 still_image:0 timed_thumbnails:0 visual_impaired:0] map[handler_name:TimeCodeHandler language:eng timecode:01:00:00:00]}] 0x2b449501c1b0 [] <nil>}

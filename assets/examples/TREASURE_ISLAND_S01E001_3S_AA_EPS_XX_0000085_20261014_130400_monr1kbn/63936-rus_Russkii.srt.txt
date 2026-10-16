@@ -1,0 +1,24 @@
+{{{false C:\Users\pemaltynov\.local\share\ffquery\storage.json    }} {C:\Users\pemaltynov\.local\state\ffquery\ffquery.log false 0 false }}
+Name: 63936-rus_Russkii.srt
+Format
+  FormatName: srt
+  FormatLongName: SubRip subtitle
+  Size: 40516
+  ProbeScore: 100
+  NbStreams: 1
+  NbPrograms: 0
+Subtitle
+#Stream: [:s:0]
+  Index: 0
+  TypeIndex: 0
+  Codec: subrip
+  CodecLongName: SubRip subtitle
+  FrameRate: 0/0
+  AvgFrameRate: 0/0
+  CodecTag: [0][0][0][0]
+  CodecType: subtitle
+  CodecTagHex: 0x0000
+  TimeBase: 1/1000
+  Disposition: 
+
+{C:\Users\pemaltynov\go\src\github.com\Galdoba\lazyam3\assets\examples\TREASURE_ISLAND_S01E001_3S_AA_EPS_XX_0000085_20261014_130400_monr1kbn\63936-rus_Russkii.srt <nil> [] [] [] [] [] [] [{0 subrip SubRip subtitle  subtitle  [0][0][0][0] 0x0000 0 0 0 0 0 0    0       0      0  0  0/0 0/0 1/1000 0  0       map[attached_pic:0 captions:0 clean_effects:0 comment:0 default:0 dependent:0 descriptions:0 dub:0 forced:0 hearing_impaired:0 karaoke:0 lyrics:0 metadata:0 multilayer:0 non_diegetic:0 original:0 still_image:0 timed_thumbnails:0 visual_impaired:0] map[]}] 0x343d68c221b0 [] <nil>}
