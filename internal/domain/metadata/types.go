@@ -51,7 +51,7 @@ type SeriesItem struct {
 	Id              int64         `json:"id"`
 	OriginalTitle   string        `json:"originalTitle"`
 	Title           string        `json:"title"`
-	StartDate       time.Time     `json:"start_date"` //time.Time? 2021-07-15T00:00:00+03:00
+	StartDate       time.Time     `json:"start_date"` // time.Time? 2021-07-15T00:00:00+03:00
 	EndDate         string        `json:"end_date,omitempty"`
 	MainGenre       string        `json:"mainGenre"`
 	AgeRestrictions *int64        `json:"ageRestrictions,omitempty"`

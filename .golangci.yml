@@ -1,0 +1,51 @@
+version: "2"
+run:
+  timeout: 5m
+  issues-exit-code: 0
+
+linters:
+  enable:
+    - errcheck
+    - staticcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+  disable:
+    - lll
+    - gocritic
+    - gochecknoglobals
+    - nolintlint
+  fast: false
+
+linters-settings:
+  errcheck:
+    check-type-assertions: false
+    check-blank: false
+  govet:
+    enable-all: true
+    disable:
+      - fieldtype
+  staticcheck:
+    checks: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
+  unused:
+    check-exported: false
+
+issues:
+  exclude-use-default: false
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - govet
+    - path: cmd/
+      linters:
+        - errcheck
+    - text: "Error return value of `resp.Body.Close` is not checked"
+      linters:
+        - errcheck
+    - text: "fieldalignment:"
+      linters:
+        - govet
+  exclude-dirs:
+    - .crush

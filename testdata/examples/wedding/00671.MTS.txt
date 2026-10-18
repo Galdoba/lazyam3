@@ -1,0 +1,89 @@
+{{{false /home/galdoba/.local/share/ffquery/storage.json    }} {/home/galdoba/.local/state/ffquery/ffquery.log false 0 false }}
+Name: 00671.MTS
+Format
+  FormatName: mpegts
+  FormatLongName: MPEG-TS (MPEG-2 Transport Stream)
+  Duration: 7.808000
+  StartTime: 1.040000
+  BitRate: 21529180
+  Size: 21012480
+  ProbeScore: 50
+  NbStreams: 3
+  NbPrograms: 1
+Video
+#Stream: [:v:0]
+  Index: 0
+  TypeIndex: 0
+  Codec: h264
+  CodecLongName: H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+  Profile: High
+  Width: 1920
+  Height: 1080
+  PixFmt: yuv420p
+  FrameRate: 50/1
+  AvgFrameRate: 25/1
+  Duration: 7.660000
+  CodecTag: HDMV
+  CodecType: video
+  CodecTagHex: 0x564d4448
+  CodedWidth: 1920
+  CodedHeight: 1080
+  HasBFrames: 1
+  SampleAspectRatio: 1:1
+  DisplayAspectRatio: 16:9
+  Level: 40
+  ChromaLocation: left
+  FieldOrder: tt
+  Refs: 1
+  IsAvc: false
+  NalLengthSize: 0
+  BitsPerRawSample: 8
+  ID: 0x1011
+  TimeBase: 1/90000
+  StartPts: 100800
+  StartTime: 1.120000
+  DurationTS: 689400
+  Disposition: 
+Audio
+#Stream: [:a:0]
+  Index: 1
+  TypeIndex: 0
+  Codec: ac3
+  CodecLongName: ATSC A/52A (AC-3)
+  FrameRate: 0/0
+  AvgFrameRate: 0/0
+  BitRate: 256000
+  Duration: 7.808000
+  ChannelLayout: stereo
+  SampleRate: 48000
+  Channels: 2
+  CodecTag: AC-3
+  CodecType: audio
+  CodecTagHex: 0x332d4341
+  SampleFmt: fltp
+  ID: 0x1100
+  TimeBase: 1/90000
+  StartPts: 93600
+  StartTime: 1.040000
+  DurationTS: 702720
+  Disposition: 
+Subtitle
+#Stream: [:s:0]
+  Index: 2
+  TypeIndex: 0
+  Codec: hdmv_pgs_subtitle
+  CodecLongName: HDMV Presentation Graphic Stream subtitles
+  Width: 1920
+  Height: 1080
+  FrameRate: 0/0
+  AvgFrameRate: 0/0
+  CodecTag: [144][0][0][0]
+  CodecType: subtitle
+  CodecTagHex: 0x0090
+  ID: 0x1200
+  TimeBase: 1/90000
+  StartPts: 93600
+  StartTime: 1.040000
+  Disposition: 
+
+{00671.MTS <nil> [] [] [] [] [] [] [{0 h264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 High video  HDMV 0x564d4448 1920 1080 1920 1080 0 1 1:1 16:9 yuv420p 40     left tt 1 false 0 8   0  0 0x1011 50/1 25/1 1/90000 100800 1.120000 689400 7.660000      map[attached_pic:0 captions:0 clean_effects:0 comment:0 default:0 dependent:0 descriptions:0 dub:0 forced:0 hearing_impaired:0 karaoke:0 lyrics:0 metadata:0 original:0 still_image:0 timed_thumbnails:0 visual_impaired:0] map[]} {1 ac3 ATSC A/52A (AC-3)  audio  AC-3 0x332d4341 0 0 0 0 0 0    0       0    fltp 48000 2 stereo 0 0x1100 0/0 0/0 1/90000 93600 1.040000 702720 7.808000 256000     map[attached_pic:0 captions:0 clean_effects:0 comment:0 default:0 dependent:0 descriptions:0 dub:0 forced:0 hearing_impaired:0 karaoke:0 lyrics:0 metadata:0 original:0 still_image:0 timed_thumbnails:0 visual_impaired:0] map[]} {2 hdmv_pgs_subtitle HDMV Presentation Graphic Stream subtitles  subtitle  [144][0][0][0] 0x0090 1920 1080 0 0 0 0    0       0      0  0 0x1200 0/0 0/0 1/90000 93600 1.040000 0       map[attached_pic:0 captions:0 clean_effects:0 comment:0 default:0 dependent:0 descriptions:0 dub:0 forced:0 hearing_impaired:0 karaoke:0 lyrics:0 metadata:0 original:0 still_image:0 timed_thumbnails:0 visual_impaired:0] map[]}] 0x3c8e046101b0 [] <nil>}

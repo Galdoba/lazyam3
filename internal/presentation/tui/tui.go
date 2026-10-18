@@ -1,5 +1,5 @@
-// Package tui — базовая модель для bubbletea v2.
-// Модель показывает список элементов с курсором и возвращает выбранный.
+// Package tui provides a basic model for bubbletea v2.
+// The model shows a list of items with a cursor and returns the selected one.
 package tui
 
 import (
@@ -9,8 +9,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// Model — минимальная модель: список элементов с курсором.
-// Расширяй под свою задачу (добавляй поля, секции, ввод и т.п.).
+// Model is a minimal model: a list of items with a cursor.
+// Extend it for your task (add fields, sections, input, etc.).
 type Model struct {
 	Title  string
 	Items  []string
@@ -18,7 +18,7 @@ type Model struct {
 	quit   bool
 }
 
-// NewModel создаёт модель с заголовком и элементами.
+// NewModel creates a model with a title and items.
 func NewModel(title string, items []string) Model {
 	return Model{
 		Title: title,
@@ -26,12 +26,12 @@ func NewModel(title string, items []string) Model {
 	}
 }
 
-// Init — обязательный метод tea.Model. Возвращает команду запуска.
+// Init is a required tea.Model method. Returns the startup command.
 func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-// Update обрабатывает сообщения и возвращает обновлённую модель.
+// Update processes messages and returns the updated model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
@@ -52,7 +52,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// View формирует строку для отрисовки.
+// View formats the string for rendering.
 func (m Model) View() tea.View {
 	var b strings.Builder
 
@@ -73,8 +73,8 @@ func (m Model) View() tea.View {
 	return tea.NewView(b.String())
 }
 
-// Selected возвращает текущий выбранный элемент.
-// Пустая строка — если список пуст.
+// Selected returns the currently selected item.
+// Empty string if the list is empty.
 func (m Model) Selected() string {
 	if m.cursor < 0 || m.cursor >= len(m.Items) {
 		return ""
@@ -82,19 +82,19 @@ func (m Model) Selected() string {
 	return m.Items[m.cursor]
 }
 
-// Cursor возвращает индекс текущего элемента.
+// Cursor returns the index of the current item.
 func (m Model) Cursor() int {
 	return m.cursor
 }
 
-// Quit сообщает, завершилась ли модель по запросу пользователя
-// (а не по ошибке или внешнему сигналу).
+// Quit reports whether the model was terminated by user request
+// (not by an error or external signal).
 func (m Model) Quit() bool {
 	return m.quit
 }
 
-// Run запускает модель в отдельной программе bubbletea
-// и возвращает финальную модель.
+// Run starts the model in a separate bubbletea program
+// and returns the final model.
 func Run(m Model) (Model, error) {
 	final, err := tea.NewProgram(m).Run()
 	if err != nil {

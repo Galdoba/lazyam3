@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/Galdoba/lazyam3/internal/app"
-	"github.com/Galdoba/lazyam3/internal/app/commands"
+	"github.com/Galdoba/lazyam3/internal/infra/commands"
 	"github.com/urfave/cli/v3"
 )
 
@@ -15,8 +15,8 @@ func main() {
 }
 
 func run() int {
-	// Пустой контейнер. Config и Logger наполнятся в Root.Before
-	// после парсинга флагов. Остальные модули — ленивые аксессоры.
+	// Empty container. Config and Logger will be populated in Root.Before
+	// after flag parsing. Other modules are lazy accessors.
 	modules := app.New()
 
 	root := &cli.Command{
@@ -29,26 +29,25 @@ func run() int {
 			},
 		},
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			// Здесь флаги корня уже распарсены, --config доступен.
-			// Создаём ровно то, что нужно для логирования ошибок запуска:
-			// конфиг и логгер. Всё остальное — по требованию из команд.
+			// Root flags are already parsed here, --config is available.
+			// Create exactly what is needed for logging startup errors:
+			// config and logger. Everything else — on demand from commands.
 			if err := modules.Init(cmd.String("config")); err != nil {
 				return ctx, err
 			}
 			return ctx, nil
 		},
 		After: func(ctx context.Context, cmd *cli.Command) error {
-			// Закрывает всё, что было реально создано ленивыми аксессорами.
+			// Closes everything that was actually created by lazy accessors.
 			return modules.Shutdown()
 		},
 		Commands: []*cli.Command{
-			commands.CMD1(modules),
-			commands.CMD2(modules),
+			commands.CMDProcess(),
 		},
 	}
 
 	if err := root.Run(context.Background(), os.Args); err != nil {
-		// Before мог упасть до того, как Logger появился.
+		// Before may have failed before Logger appeared.
 		if modules.Logger != nil {
 			modules.Logger.Error("execution failed", "error", err)
 		} else {

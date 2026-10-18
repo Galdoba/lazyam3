@@ -5,20 +5,20 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Galdoba/lazyam3/internal/app/cache"
-	"github.com/Galdoba/lazyam3/internal/app/config"
-	"github.com/Galdoba/lazyam3/internal/app/logging"
-	"github.com/Galdoba/lazyam3/internal/app/storage/jsonstore"
+	"github.com/Galdoba/lazyam3/internal/infra/cache"
+	"github.com/Galdoba/lazyam3/internal/infra/config"
+	"github.com/Galdoba/lazyam3/internal/infra/logging"
+	"github.com/Galdoba/lazyam3/internal/infra/persistence/jsonstore"
 )
 
-// AppModules — контейнер общих зависимостей приложения.
+// AppModules is a container for shared application dependencies.
 //
-// Правило: eager только Config и Logger — они нужны до бизнес-логики,
-// чтобы можно было логировать ошибки запуска. Всё остальное создаётся
-// лениво при первом обращении через соответствующий метод.
+// Rule: only Config and Logger are eagerly initialized — they are needed
+// before business logic so that startup errors can be logged. Everything else
+// is lazily created on first access through the corresponding method.
 //
-// Команды объявляют потребности, вызывая методы в Action.
-// Before в командах — только для fail-fast, если это реально нужно.
+// Commands declare their needs by calling methods in Action.
+// Before in commands is used only for fail-fast when it's truly needed.
 type AppModules struct {
 	Config config.Config
 	Logger *logging.Logger
@@ -31,16 +31,16 @@ type AppModules struct {
 	storeErr  error
 }
 
-// New создаёт пустой контейнер. Init наполняет его после парсинга флагов.
+// New creates an empty container. Init populates it after flag parsing.
 func New() *AppModules {
 	return &AppModules{}
 }
 
-// Init загружает конфиг (с учётом явного пути из флага) и создаёт логгер.
-// Вызывается один раз из Root.Before. Идемпотентен.
+// Init loads the config (respecting the explicit path from the flag) and creates the logger.
+// Called once from Root.Before. Idempotent.
 func (m *AppModules) Init(configPath string) error {
 	if m.Logger != nil {
-		return nil // уже инициализировано
+		return nil // already initialized
 	}
 
 	cfg, err := config.Load(configPath)
@@ -58,7 +58,7 @@ func (m *AppModules) Init(configPath string) error {
 	return nil
 }
 
-// Cache возвращает in-memory кэш, создавая его при первом обращении.
+// Cache returns the in-memory cache, creating it on first access.
 func (m *AppModules) Cache() *cache.Cache {
 	m.cacheOnce.Do(func() {
 		m.cache = cache.New()
@@ -66,8 +66,8 @@ func (m *AppModules) Cache() *cache.Cache {
 	return m.cache
 }
 
-// Store возвращает хранилище, создавая его при первом обращении.
-// Возвращает ту же ошибку при повторных вызовах, если инициализация упала.
+// Store returns the store, creating it on first access.
+// Returns the same error on subsequent calls if initialization failed.
 func (m *AppModules) Store() (*jsonstore.Store, error) {
 	m.storeOnce.Do(func() {
 		if m.Logger == nil {
@@ -79,9 +79,9 @@ func (m *AppModules) Store() (*jsonstore.Store, error) {
 	return m.store, m.storeErr
 }
 
-// Shutdown закрывает всё, что было реально создано.
-// Порядок: сначала ресурсы (store), потом логгер — чтобы логгер мог
-// записать ошибки закрытия. Идемпотентен.
+// Shutdown closes everything that was actually created.
+// Order: resources first (store), then logger — so the logger can
+// write shutdown errors. Idempotent.
 func (m *AppModules) Shutdown() error {
 	if m == nil {
 		return nil

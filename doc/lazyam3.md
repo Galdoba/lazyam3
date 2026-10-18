@@ -1,46 +1,48 @@
 ---
-updated_at: 2026-04-29T10:52:21.403+10:00
 tags:
   - project
   - tool
-aliases:
 ---
-## Logic
 
-1. Сканируем папку входящих, находим файлы и афдишники
-2. Проверяем файл на готовность
-	- Что мы считаем готовым файлом?
-		- можем открыть его на запись.
-3. Собираем технические данные
-	- получаем ffprobe.RawData
-4. Собираем метаданные контента
-	- получаем metadata.Found
-5. Собираем скрипт обработки
-	- Что нас интересует?
-		- Количество и координаты субтитров/видео/аудиодорожек
-			- под координатами понимаем код стрима для отсортированного по алфавиту списка файлов (`[0:a:1]`, `[1:s:0]`)
-		- для видео
-			- Размер
-			- Интерлейс
-		- для аудио:
-			- Язык
-			- Формат (layout)
-		- для субтитров
-6. уходим в начало
+## Workflow
+
+1. Scan input directory for media files
+2. Collect technical metadata — run ffprobe to extract stream information
+3. Extract product ID from filename (`63603.mp4` → `63603`)
+4. Resolve content metadata — look up product info by ID from counterparty's metadata
+5. Build processing script — generate bash/ffmpeg commands based on streams and metadata
+6. Render script to output directory
+
+**Implementation status (task 1 complete):** the ingest domain is defined with types, pure functions, and 24 unit tests. `Pipeline.Run` currently performs ingest only; `app/ingest` is a stub. Metadata resolution, script generation, and rendering are wired at the type/port level but not yet connected (see `doc/tasks.json`).
 
 ## Domain Modules
 
-### Injest (3 - точно, 1 и 2 - не уверен)
-Работает с метаданными физических файлов, их путями и ffmpeg-структурой.
+### Ingest (physical files)
 
+Language of physical files and streams. Pure data and functions — no IO.
 
+Types:
+- `MediaUnit` — aggregated product info: `ID`, `Filepaths`, `Streams`, `Validation`
+- `Stream` — single stream: kind, codec, video/audio/subtitle/data attributes
+- `StreamKind` (`video`, `audio`, `subtitle`, `data`), `Layout`, `Language`, `Rational`
+- `ValidationIssue` / `ValidationIssues` — problems found during ingest
 
-### Metadata (4)
-Работает с метаданными медиапродукта - поставляется Амедией.
+Pure functions:
+- `ExtractID(filename)` — product ID from filename (`63603.mp4` → `63603`)
+- `ParseStreams(ffprobeJSON)` — ffprobe JSON output → `[]Stream`
+- `ValidateMediaUnit(streams)` / `ValidateMediaUnitWithFilepaths(unit)` — domain validation rules
+- `Stream.Coordinate()` — ffmpeg stream selector (`[0:a:1]`, `[1:s:0]`)
 
-Определения:
-id - айдишник идет на запись. может попасть на сериал, сезон, эпизод сериала, фильм и эпизод фильма.
-Kind - тип объекта в базе имеющий `id`. Варианты:
+Port: `IngestPort` — `Ingest(dir string) ([]MediaUnit, error)`. Implemented in `app/ingest` (currently a stub; real scan/probe/parse logic is task 2).
+
+### Metadata (product catalog)
+
+Works with media product metadata from the counterparty.
+
+Definitions:
+- **id** — unique identifier written to the file name. Can refer to a series, season, series episode, movie, or movie episode.
+- **Kind** — type of object in the catalog that has an `id`.
+
 ```go
 type Kind string
 
@@ -51,167 +53,154 @@ const (
 	KindSeason        Kind = "series.season"
 	KindSeriesEpisode Kind = "series.season.episode"
 )
-
 ```
 
+Types: `Root`, `SeriesItem`, `SeasonsItem`, `EpisodesItem`, `MoviesItem`, `PersonsItem`, `Found`, `Descendants`.
 
-Что сделали:
-- распарсили `metadata.json`
-- ищем по `id`
+Implemented:
+- Tree search: `Root.FindByID(id, WithDescendants)` returns a self-contained `*Found` copy
+- Port: `ProductRepository` — `FindByID(id int64) (*Found, error)`
 
-### Script (5)
-Пишем скрипт по логике "Передали конфиг (DTO) - получили текст файла"
+JSON parsing of `metadata.json` currently lives in `infra/metadata` (`json.Unmarshal` into `Root`).
+
+### Script (rendering)
+
+Language of rendering script generation.
+
+Types: `Script`, `Text` (script body value object), `ScriptConfig`, `StreamSelection`.
+
+Port: `Renderer` — `Write(dest string, content Text) error`. Implemented by `infra/fs.ScriptWriter`.
+
+Logic: "Pass config (DTO) → receive file text". The pure builder (`BuildScript`) is not implemented yet (task 5). Note: `ScriptConfig.Files` is `[]ingest.Stream` — the script domain currently imports the ingest domain.
 
 ---
 
-# Дерево репозитория
+## Repository Tree
 
 ```
 .
 ├── cmd/
-│   └── amedia-pipeline/
-│       └── main.go                 # сборка графа: config → logger → infra → use cases → cli.App
-│
-├── internal/
-│   │
-│   ├── presentation/               # СЛОЙ ПРЕДСТАВЛЕНИЯ (вход)
-│   │   └── cli/                    # urfave/cli/v3. Одна команда — один файл.
-│   │       ├── app.go              # *cli.Command, глобальные флаги (--config, --log-level), регистрация подкоманд
-│   │       └── run.go              # единственная команда: флаги → RunInput → app/pipeline.Run → RunOutput
-│   │
-│   ├── app/                        # ЯДРО (Application): оркестрация, работает на портах и DTO
-│   │   ├── pipeline/
-│   │   │   ├── run.go              # оркестратор: ingest.Scan → metadata.Resolve → script.Build → renderer.Render
-│   │   │   └── dto.go              # RunInput / RunOutput — DTO на границе presentation ↔ app
-│   │   ├── ingest/
-│   │   │   └── scan.go             # use case: дёрнуть FileScanner, прогнать readiness-фильтр, собрать tech
-│   │   └── script/
-│   │       └── build.go            # use case: принять доменные входы, вызвать domain/script.Build
-│   │
-│   ├── domain/                     # ДОМЕН: модели и правила. Никакого os/net/yaml. Никаких DTO.
-│   │   ├── ingest/                 # язык физических файлов и потоков
-│   │   │   ├── file.go             # RawFile, ReadyFile, Sidecar
-│   │   │   ├── stream.go           # Stream, StreamKind, Layout, Language
-│   │   │   ├── index.go            # построение координат [0:a:1], [1:s:0]
-│   │   │   ├── readiness.go        # ReadinessPolicy (если правило стало нетривиальным; иначе пусто)
-│   │   │   └── port.go             # порты: FileScanner, ReadinessChecker, TechnicalProbe
-│   │   │
-│   │   ├── metadata/               # язык медиапродукта Амедии
-│   │   │   ├── kind.go             # Kind: movie, movie.episode, series, series.season, series.season.episode
-│   │   │   ├── product.go          # Product, Season, Episode, EpisodeRef
-│   │   │   └── port.go             # порт: ProductRepository
-│   │   │
-│   │   ├── script/                 # язык генерации bash-скрипта
-│   │   │   ├── script.go           # Script, StreamSelection
-│   │   │   ├── text.go             # type Text string — value object с телом скрипта
-│   │   │   ├── config.go           # ScriptConfig — доменный вход
-│   │   │   └── port.go             # порт: Renderer (принимает Destination + Text)
-│   │   │
-│   │   └── shared/                 # (опционально) общие value objects для доменов
-│   │       └── taskid.go           # TaskID — если ingest и metadata используют один и тот же id
-│   │
-│   ├── infra/                      # РЕАЛИЗАЦИИ ПОРТОВ. Знает про внешний мир. Зависит от domain.
-│   │   ├── config/
-│   │   │   └── yaml.go             # загрузка YAML/ENV в типизированный Config
-│   │   ├── logging/
-│   │   │   └── slog.go             # slog-обёртка под лог-порт
-│   │   ├── fs/                     # файловая система
-│   │   │   ├── scanner.go          # реализует ingest.FileScanner (WalkDir, маски, sidecar)
-│   │   │   ├── readiness_open.go   # реализует ingest.ReadinessChecker (O_WRONLY, вся правда про NFS/SMB)
-│   │   │   ├── sidecar.go          # поиск sidecar-артефактов
-│   │   │   └── script_writer.go    # реализует script.Renderer: пишет script.Text в Destination
-│   │   ├── ffprobe/
-│   │   │   ├── client.go           # запуск ffprobe -show_streams -print_format json → RawData
-│   │   │   └── mapper.go           # RawData → доменные ingest.Stream
-│   │   ├── amedia/
-│   │   │   ├── http_client.go      # HTTP-клиент к API Амедии
-│   │   │   ├── auth.go             # токены, mTLS
-│   │   │   └── mapper.go           # JSON Амедии → metadata.Product
-│   │   └── persistence/
-│   │       └── postgres/
-│   │           ├── product_repo.go # реализует metadata.ProductRepository
-│   │           └── migrations/
-│   │
-│   └── platform/                   # STATELESS-СЕРВИСЫ. Не реализуют портов домена. Ничего не хранят.
-│       ├── retry/
-│       │   └── retry.go            # backoff, jitter — используется в amedia/ и ffprobe/
-│       ├── httpx/
-│       │   └── client.go           # http.Client с таймаутами, трейсингом, дефолтными заголовками
-│       └── clock/
-│           └── clock.go            # абстракция времени для тестов (readiness-таймауты, retry)
-│
-├── pkg/                            # только то, что реально переиспользуется снаружи. По умолчанию пусто.
-│   └── ffmpeg/
-│       └── coordinate.go           # формат [0:a:1] — если правда нужен вне репо
-│
-├── api/                            # контракты внешних систем (не код)
-│   ├── amedia/
-│   │   └── openapi.yaml
-│   └── ffprobe/
-│       └── schema.json
+│   └── lazyam3/
+│       └── main.go                 # entry point: AppModules → config/logger → commands
 │
 ├── configs/
-│   ├── config.yaml
+│   ├── config.yaml                 # placeholder — real format will be TOML (task 10)
 │   └── config.local.yaml
 │
-├── testdata/
-│   ├── incoming/                   # примеры входящей папки с файлами + sidecars
-│   └── ffprobe/                    # фикстуры RawData для mapper-тестов
+├── doc/
+│   ├── architecture.md             # architecture overview and development guidelines
+│   ├── lazyam3.md                  # this file
+│   └── tasks.json                  # implementation tasks and status
 │
+├── internal/
+│   ├── app/                        # APPLICATION LAYER: orchestration, works on ports and DTOs
+│   │   ├── app.go                  # AppModules: shared deps (Config, Logger; lazy Cache, Store)
+│   │   ├── ingest/
+│   │   │   └── ingest.go           # Ingest — stub implementing domain ingest.IngestPort
+│   │   ├── pipeline/
+│   │   │   ├── dto.go              # RunInput / RunOutput — DTOs at presentation ↔ app boundary
+│   │   │   └── pipeline.go         # Pipeline{Ingest}; Run = ingest only (TODO: metadata, script)
+│   │   └── script/
+│   │       └── build.go            # Build — use case; currently writes placeholder text
+│   │
+│   ├── domain/                     # DOMAIN LAYER: models and rules. Pure Go. No os/net.
+│   │   ├── ingest/                 # language of physical files and streams
+│   │   │   ├── unit.go             # MediaUnit, ValidationIssue(s), ValidateMediaUnit*
+│   │   │   ├── stream.go           # Stream, StreamKind, Layout, Language, Rational, Coordinate
+│   │   │   ├── parse.go            # ParseStreams: ffprobe JSON → []Stream
+│   │   │   ├── extract.go          # ExtractID: filename → product ID
+│   │   │   ├── port.go             # port: IngestPort
+│   │   │   └── unit_test.go        # 24 unit tests
+│   │   │
+│   │   ├── metadata/               # language of media products from counterparty
+│   │   │   ├── types.go            # Root, Found, Kind, Descendants, Series/Season/Episode/Movies/Persons
+│   │   │   ├── search.go           # Root.FindByID(id, Descendants) — tree search logic
+│   │   │   └── port.go             # port: ProductRepository
+│   │   │
+│   │   ├── script/                 # language of rendering script generation
+│   │   │   ├── script.go           # Script, StreamSelection
+│   │   │   ├── text.go             # type Text string — value object with script body
+│   │   │   ├── config.go           # ScriptConfig — domain input (uses ingest.Stream)
+│   │   │   └── port.go             # port: Renderer
+│   │
+│   ├── infra/                      # PORT IMPLEMENTATIONS. Knows about the outside world. Depends on domain.
+│   │   ├── cache/
+│   │   │   └── cache.go            # in-memory cache
+│   │   ├── commands/
+│   │   │   └── cmd_process.go      # process command: wires app/ingest → Pipeline
+│   │   ├── config/
+│   │   │   └── config.go           # Config via appcontext configmanager (JSON stub; TOML planned)
+│   │   ├── ffprobe/
+│   │   │   ├── client.go           # runs ffprobe -show_streams -print_format json → RawData
+│   │   │   ├── mapper.go           # Mapper.MapStream → domain ingest.Stream (stub)
+│   │   │   └── probe_client.go     # ProbeClient: ffprobe → []ingest.Stream
+│   │   ├── fs/
+│   │   │   └── script_writer.go    # ScriptWriter implements script.Renderer
+│   │   ├── logging/
+│   │   │   └── logger.go           # structured logging (slog facade)
+│   │   ├── metadata/
+│   │   │   └── repository.go       # implements ProductRepository (loads metadata.json)
+│   │   └── persistence/
+│   │       └── jsonstore/          # JSON key-value store
+│   │
+│   ├── platform/                   # STATELESS SERVICES. No domain dependencies.
+│   │   ├── clock/
+│   │   │   └── clock.go            # time abstraction
+│   │   └── retry/
+│   │       └── retry.go            # backoff, jitter
+│   │
+│   └── presentation/
+│       ├── cli/                    # empty — CLI commands currently live in infra/commands
+│       └── tui/
+│           └── tui.go              # bubbletea TUI model (not wired into cmd yet)
+│
+├── scrips/                         # standalone helper tools (note: directory name is misspelled)
+│   ├── asses/                      # JSON querying tool (gjson)
+│   └── find/
+│
+├── testdata/
+│   ├── metadata.json               # product catalog snapshot
+│   └── examples/                   # ffprobe output dumps and sample media
+│
+├── .golangci.yml
+├── AGENTS.md
 ├── go.mod
+├── go.sum
 └── README.md
 ```
 
-## Пометки по связям
+## Dependency Notes
 
-**Направление зависимостей**
+**Dependency direction**
 ```
-presentation → app → domain
-infra        → domain (реализует порты)
-platform     → никого из домена
-cmd          → всё (единственное место склейки)
+cmd                → app, infra, domain (only place that wires dependencies)
+infra/commands     → app, domain (acts as CLI presentation entry point)
+app                → domain
+infra              → domain (implements ports)
+platform           → no domain dependencies
+domain             → (ingest, metadata: no internal deps; script → ingest)
 ```
 
-**Кто кого не знает**
-- `domain/ingest` не знает `domain/metadata` и `domain/script`.
-- `domain/metadata` не знает `domain/ingest` и `domain/script`.
-- `domain/script` не знает `domain/ingest` и `domain/metadata`.
-- Все три знают только `domain/shared` (если он есть).
-- `presentation/cli` знает только про `app/pipeline.Run` и его DTO.
-- `infra/*` знает только про порты соответствующего домена.
+**Who doesn't know whom**
+- `domain/ingest` doesn't know `domain/metadata` or `domain/script`.
+- `domain/metadata` doesn't know any other domain.
+- `domain/script` imports `domain/ingest` (`ScriptConfig.Files []ingest.Stream`) — current, accepted cross-domain dependency.
+- `infra/*` only knows about the ports of its corresponding domain (plus `infra/commands`, which wires app and domain together).
 
-**Где DTO, а где доменные типы**
+**Where DTOs, where domain types**
 
-| Граница | Что передаётся |
+| Boundary | What's passed |
 |---|---|
-| presentation ↔ app | DTO (`RunInput`, `RunOutput`) |
-| app ↔ domain | доменные типы (`ReadyFile`, `Product`, `ScriptConfig`, `Text`) |
-| app ↔ infra | доменные типы через порты |
-| domain → domain | только через оркестратор, замапленные в термины получателя |
+| presentation ↔ app | DTOs (`RunInput`, `RunOutput`) |
+| app ↔ domain | domain types (`MediaUnit`, `Found`, `ScriptConfig`, `Text`) |
+| app ↔ infra | domain types through ports |
+| domain → domain | only `script → ingest` (via `ScriptConfig`); otherwise none |
 
-**Где `os`, `net`, `database/sql`, YAML**
-Только в `internal/infra/*` и `internal/platform/*`.
+**Where `os`, `net`, `database/sql`**
+Only in `internal/infra/*` and `internal/platform/*`.
 
-**Где циклы, вызовы портов, фильтрация**
-Только в `internal/app/*`.
+**Where loops, port calls, filtering**
+Only in `internal/app/*` (Pipeline orchestrator, use cases).
 
-**Где чистые правила и модели**
-Только в `internal/domain/*`.
-
-**Проверка на вшивость**
-
-| Вопрос | Ответ |
-|---|---|
-| `os.OpenFile(O_WRONLY)` | `infra/fs/readiness_open.go` |
-| `for _, f := range files` | `app/ingest/scan.go` |
-| `type Kind string` | `domain/metadata/kind.go` |
-| `[0:a:1]` | `domain/ingest/index.go` |
-| `ffprobe -show_streams` | `infra/ffprobe/client.go` |
-| `--input-dir` | `presentation/cli/run.go` |
-| `pipeline = scan → build → render` | `app/pipeline/run.go` |
-| `Renderer` интерфейс | `domain/script/port.go` |
-| запись `Text` в файл | `infra/fs/script_writer.go` |
-| retry с backoff | `platform/retry/retry.go` |
-| склейка всего | `cmd/amedia-pipeline/main.go` |
-
-Если что-то не влезает в таблицу — это либо новый домен (тогда своя папка в `domain/`, `app/`, `infra/`), либо platform-сервис, либо сигнал, что слой выбран неверно.
+**Where pure rules and models**
+Only in `internal/domain/*`.

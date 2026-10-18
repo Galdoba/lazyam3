@@ -5,7 +5,7 @@ func (r *Root) FindByID(id int64, d Descendants) (*Found, bool) {
 		return nil, false
 	}
 
-	// --- Фильмы ---
+	// --- Movies ---
 	for i := range r.Movies {
 		m := &r.Movies[i]
 		if m.Id == id {
@@ -24,7 +24,7 @@ func (r *Root) FindByID(id int64, d Descendants) (*Found, bool) {
 		}
 	}
 
-	// --- Сериалы ---
+	// --- Series ---
 	for i := range r.Series {
 		s := &r.Series[i]
 		if s.Id == id {
@@ -132,8 +132,8 @@ func cloneSeries(s *SeriesItem, d Descendants) SeriesItem {
 	if d == WithDescendants {
 		c.Seasons = make([]SeasonsItem, len(s.Seasons))
 		for i := range s.Seasons {
-			// Сезоны — уже как часть «поддерева сериала»,
-			// поэтому их эпизоды берём целиком.
+			// Seasons are already part of the series subtree,
+			// so their episodes are taken in full.
 			c.Seasons[i] = cloneSeason(&s.Seasons[i], WithDescendants)
 		}
 	}
