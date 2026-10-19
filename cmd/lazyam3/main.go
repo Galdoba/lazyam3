@@ -42,7 +42,7 @@ func run() int {
 			return modules.Shutdown()
 		},
 		Commands: []*cli.Command{
-			commands.CMDProcess(),
+			commands.CMDProcess(modules),
 		},
 	}
 

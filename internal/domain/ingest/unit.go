@@ -1,6 +1,9 @@
 package ingest
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 // MediaUnit aggregates all information about a single media product:
 // its physical files, streams across those files, and validation issues.
@@ -9,6 +12,33 @@ type MediaUnit struct {
 	Filepaths  []string
 	Streams    []Stream
 	Validation ValidationIssues
+}
+
+func NewMediaUnit(data map[string][]byte) (MediaUnit, error) {
+	//TODO: refactor? or double check ParseStreams
+	mu := MediaUnit{}
+	keys := []string{}
+	for k := range data {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	for _, k := range keys {
+		streams, err := ParseStreams(data[k])
+		if err != nil {
+			return MediaUnit{}, fmt.Errorf("failed to parse data for %q: %w", k, err)
+		}
+		mu.Streams = append(mu.Streams, streams...)
+		id, err := ExtractID(k)
+		if err != nil {
+			return MediaUnit{}, err
+		}
+		if mu.ID != 0 && mu.ID != id {
+			fmt.Println("BAD ID", id)
+		} else {
+			mu.ID = id
+		}
+	}
+	return mu, nil
 }
 
 // ValidationIssues accumulates problems found during ingest.

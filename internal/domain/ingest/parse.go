@@ -12,57 +12,59 @@ type StreamInput struct {
 
 // StreamJSON is the ffprobe JSON representation of a single stream.
 type StreamJSON struct {
-	Index       int    `json:"index"`
-	CodecType   string `json:"codec_type"`
-	CodecName   string `json:"codec_name"`
-	Width       int    `json:"width"`
-	Height      int    `json:"height"`
-	PixFmt      string `json:"pix_fmt"`
-	RFrameRate  string `json:"r_frame_rate"`
-	SampleRate  string `json:"sample_rate"`
-	SampleFmt   string `json:"sample_fmt"`
+	Index         int    `json:"index"`
+	CodecType     string `json:"codec_type"`
+	CodecName     string `json:"codec_name"`
+	Width         int    `json:"width"`
+	Height        int    `json:"height"`
+	PixFmt        string `json:"pix_fmt"`
+	RFrameRate    string `json:"r_frame_rate"`
+	SampleRate    string `json:"sample_rate"`
+	SampleFmt     string `json:"sample_fmt"`
 	ChannelLayout string `json:"channel_layout"`
-	BitRate     string `json:"bit_rate"`
-	Duration    string `json:"duration"`
-	Disposition Disp    `json:"disposition"`
-	Language    string  `json:"language"`
-	Tag         TagMap  `json:"tag"`
+	BitRate       string `json:"bit_rate"`
+	Duration      string `json:"duration"`
+	Disposition   Disp   `json:"disposition"`
+	Language      string `json:"language"`
+	Tag           TagMap `json:"tag"`
 }
 
 // Disp represents ffprobe disposition flags.
 type Disp struct {
-	Default          int `json:"default"`
-	Forced           int `json:"forced"`
-	Dub              int `json:"dub"`
-	Original         int `json:"original"`
-	Comment          int `json:"comment"`
-	Lyrics           int `json:"lyrics"`
-	Karaoke          int `json:"karaoke"`
-	ProvidedBy       int `json:"provided_by"`
-	Captions         int `json:"captions"`
-	ClosedCaptions   int `json:"closed_captions"`
-	VisualImpaired   int `json:"visual_impaired"`
-	Descriptions     int `json:"descriptions"`
+	Default        int `json:"default"`
+	Forced         int `json:"forced"`
+	Dub            int `json:"dub"`
+	Original       int `json:"original"`
+	Comment        int `json:"comment"`
+	Lyrics         int `json:"lyrics"`
+	Karaoke        int `json:"karaoke"`
+	ProvidedBy     int `json:"provided_by"`
+	Captions       int `json:"captions"`
+	ClosedCaptions int `json:"closed_captions"`
+	VisualImpaired int `json:"visual_impaired"`
+	Descriptions   int `json:"descriptions"`
 }
 
 // TagMap represents key-value tags in a stream.
 type TagMap map[string]string
 
 // ParseStreams parses ffprobe JSON output into domain Stream objects.
-func ParseStreams(ffprobeJSON string) ([]Stream, error) {
+func ParseStreams(ffprobeJSON []byte) ([]Stream, error) {
+	//TODO: rework
+	// accept bytes from format and multiple streams, return domain Stream
 	var input StreamInput
-	if err := json.Unmarshal([]byte(ffprobeJSON), &input); err != nil {
+	if err := json.Unmarshal(ffprobeJSON, &input); err != nil {
 		return nil, fmt.Errorf("parse ffprobe JSON: %w", err)
 	}
 
 	var streams []Stream
 	for _, s := range input.Streams {
 		stream := Stream{
-			Index:     s.Index,
-			Kind:      streamKind(s.CodecType),
-			Codec:     s.CodecName,
-			Language:  Language(s.Language),
-			Duration:  parseDuration(s.Duration),
+			Index:    s.Index,
+			Kind:     streamKind(s.CodecType),
+			Codec:    s.CodecName,
+			Language: Language(s.Language),
+			Duration: parseDuration(s.Duration),
 		}
 
 		// Video fields

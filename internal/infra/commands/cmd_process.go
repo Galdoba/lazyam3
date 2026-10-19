@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Galdoba/lazyam3/internal/app"
 	"github.com/Galdoba/lazyam3/internal/app/ingest"
 	"github.com/Galdoba/lazyam3/internal/app/pipeline"
 	dom "github.com/Galdoba/lazyam3/internal/domain/ingest"
@@ -12,7 +13,7 @@ import (
 
 // CMDProcess is the process command — scans input directory, resolves metadata,
 // and generates rendering scripts.
-func CMDProcess() *cli.Command {
+func CMDProcess(modules *app.AppModules) *cli.Command {
 	return &cli.Command{
 		Name:        "process",
 		Usage:       "scan input directory and generate rendering scripts",
@@ -29,28 +30,47 @@ func CMDProcess() *cli.Command {
 				Usage:   "output directory",
 			},
 		},
-		Action: cmdProcessAction,
+		Action: cmdProcessAction(modules),
 	}
 }
 
-func cmdProcessAction(ctx context.Context, cmd *cli.Command) error {
-	sourceDir := cmd.String("source")
-	outputDir := cmd.String("output")
+func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
+	return func(ctx context.Context, c *cli.Command) error {
+		cfg := modules.Config
+		logger := modules.Logger.Slog().WithGroup("command")
+		logger.Info("create pipeline")
 
-	if sourceDir == "" {
-		return fmt.Errorf("source directory required (--source)")
+		sourceDir := nonEmpty(c.String("source"), cfg.Paths.InputDirectory)
+		outputDir := c.String("output")
+		if sourceDir == "" {
+			logger.Error("source directory required (flag or config field) ")
+			return fmt.Errorf("source directory required (--source)")
+		}
+		fmt.Println("create pipe")
+		ing := &ingest.Ingest{}
+		p := pipeline.NewPipeline(
+			modules.Logger.Slog().WithGroup("pipeline"),
+			dom.IngestPort(ing),
+		)
+		result, err := p.Run(pipeline.RunInput{
+			SourceDir:   sourceDir,
+			Destination: outputDir,
+		})
+		if err != nil {
+			return fmt.Errorf("pipeline failed: %w", err)
+		}
+
+		_, err = fmt.Fprintf(c.Root().Writer, "processed %d files → %s\n", result.FilesProcessed, result.ScriptWritten)
+		return err
+
 	}
+}
 
-	ing := &ingest.Ingest{}
-	p := pipeline.NewPipeline(dom.IngestPort(ing))
-	result, err := p.Run(pipeline.RunInput{
-		SourceDir:   sourceDir,
-		Destination: outputDir,
-	})
-	if err != nil {
-		return fmt.Errorf("pipeline failed: %w", err)
+func nonEmpty(str ...string) string {
+	for _, s := range str {
+		if s != "" {
+			return s
+		}
 	}
-
-	_, err = fmt.Fprintf(cmd.Root().Writer, "processed %d files → %s\n", result.FilesProcessed, result.ScriptWritten)
-	return err
+	return ""
 }

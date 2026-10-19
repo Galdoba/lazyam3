@@ -11,28 +11,28 @@ const (
 )
 
 type Config struct {
-	Paths   Paths   `json:"paths"`
-	Logger  Logging `json:"logger"`
-	Storage Storage `json:"storage"`
+	Paths   Paths   `toml:"paths"`
+	Logger  Logging `toml:"logger"`
+	Storage Storage `toml:"storage"`
 }
 
 // Storage holds store settings. Currently only the path to the JSON file;
 // when replacing jsonstore with a real database, DSN, timeouts, etc. will be added here.
 type Storage struct {
-	Path string `json:"path"`
+	Path string `toml:"path"`
 }
 
 // Paths holds application directory paths.
 type Paths struct {
-	InputDirectory  string `json:"input_directory"`
-	OutputDirectory string `json:"output_directory"`
-	MetadataPath    string `json:"metadata_path"`
+	InputDirectory  string `toml:"input_directory"`
+	OutputDirectory string `toml:"output_directory"`
+	MetadataPath    string `toml:"metadata_path"`
 }
 
 type Logging struct {
-	Level    string `json:"level"`
-	Path     string `json:"path"`
-	Terminal bool   `json:"terminal"`
+	Level    string `toml:"level"`
+	Path     string `toml:"path"`
+	Terminal bool   `toml:"terminal"`
 }
 
 func defaultCFG() Config {
@@ -54,7 +54,7 @@ func defaultCFG() Config {
 }
 
 func Load(suggestedPath string) (Config, error) {
-	cm, err := configmanager.New[Config](APPNAME, defaultCFG(), configmanager.WithFormat(configmanager.JSON))
+	cm, err := configmanager.New[Config](APPNAME, defaultCFG(), configmanager.WithFormat(configmanager.TOML))
 	if err != nil {
 		return Config{}, fmt.Errorf("failed to create configmanager: %w", err)
 	}
