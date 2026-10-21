@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"time"
 
 	appscript "github.com/Galdoba/lazyam3/internal/app/script"
@@ -122,8 +124,13 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 	}
 	prod, err := p.md.FindByID(unit.ID)
 	if err != nil {
-		p.emit(EventUnitFailed, unit.ID, fmt.Errorf("metadata for %d: %w", unit.ID, err))
-		return err
+		p.logger.Warn("metadata lookup failed, using fallback naming",
+			"id", unit.ID, "dir", dir, "error", err)
+		prod = fallbackProduct(filepath.Base(dir))
+	} else if prod == nil {
+		p.logger.Warn("metadata not found, using fallback naming",
+			"id", unit.ID, "dir", dir, "fallback_base", filepath.Base(dir))
+		prod = fallbackProduct(filepath.Base(dir))
 	}
 	if p.dryRun {
 		p.logger.Info("dry run: script build skipped", "id", unit.ID)
@@ -135,11 +142,34 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 		p.emit(EventUnitFailed, unit.ID, err)
 		return err
 	}
+	// Move source files to BUFFER with call names.
+	if err := p.prepareFiles(dir, cfg.CallNames); err != nil {
+		p.emit(EventUnitFailed, unit.ID, fmt.Errorf("prepare files: %w", err))
+		return err
+	}
 	if err := appscript.Build(ctx, cfg, p.rd); err != nil {
 		p.emit(EventUnitFailed, unit.ID, err)
 		return err
 	}
 	p.emit(EventUnitDone, unit.ID, nil)
+	return nil
+}
+
+// prepareFiles moves each file from the source unit directory to the
+// BUFFER directory under its call name. Files that are not in Filenames
+// (e.g. already-renamed sidecars) are skipped.
+func (p *Pipeline) prepareFiles(sourceDir string, callNames map[string]string) error {
+	bufferDir := filepath.Join(p.destination, "buffer")
+	if err := os.MkdirAll(bufferDir, 0o755); err != nil {
+		return fmt.Errorf("create buffer dir %q: %w", bufferDir, err)
+	}
+	for orig, call := range callNames {
+		src := filepath.Join(sourceDir, orig)
+		dst := filepath.Join(bufferDir, call)
+		if err := os.Rename(src, dst); err != nil {
+			return fmt.Errorf("move %q → %q: %w", src, dst, err)
+		}
+	}
 	return nil
 }
 
@@ -159,4 +189,13 @@ func (p *Pipeline) afterPoll() <-chan struct{} {
 		time.Sleep(debugTumeout * time.Second)
 	}()
 	return ch
+}
+
+// fallbackProduct creates a minimal Product from the source directory basename.
+// It treats the unit as a movie (no season/episode numbers).
+func fallbackProduct(seriesTitle string) *metadata.Product {
+	return &metadata.Product{
+		SeriesTitle: seriesTitle,
+		Kind:        metadata.KindMovie,
+	}
 }

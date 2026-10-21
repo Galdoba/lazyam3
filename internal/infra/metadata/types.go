@@ -65,12 +65,12 @@ type SeriesItem struct {
 	MainGenre       string        `json:"mainGenre"`
 	AgeRestrictions *int64        `json:"ageRestrictions,omitempty"`
 	Description     string        `json:"description"`
-	ImdbId          string        `json:"imdb_id"`
-	KinopoiskId     string        `json:"kinopoiskId"`
-	Countries       []string      `json:"countries"`
-	Quote           string        `json:"quote"`
-	Studios         []string      `json:"studios"`
-	Genres          []string      `json:"genres"`
+	ImdbId          string `json:"imdbId"`
+	KinopoiskId     string `json:"kinopoiskId"`
+	Countries       []string `json:"countries"`
+	Quote           string `json:"quote"`
+	Studios         []string `json:"studios"`
+	Genres          []string `json:"genres"`
 	Persons         []PersonsItem `json:"persons"`
 	Seasons         []SeasonsItem `json:"seasons"`
 }

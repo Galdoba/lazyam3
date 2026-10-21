@@ -276,7 +276,7 @@ type Config struct {
 }
 ```
 
-- Loaded via `github.com/Galdoba/appcontext/configmanager` with `WithFormat(configmanager.JSON)` — a minimal/stub selection, not the intended format
+- Loaded via `github.com/Galdoba/appcontext/configmanager` with `WithFormat(configmanager.TOML)`
 - Defaults are hardcoded (`defaultCFG()`); app name constant is `lazyam3`
 - `configs/config.yaml` and `configs/config.local.yaml` are empty placeholders
 

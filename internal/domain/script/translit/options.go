@@ -14,7 +14,6 @@ type translitOpt struct {
 	short_SE_form              bool
 	title                      bool
 	caps                       bool
-	byWords                    bool
 }
 
 func defaultTranslitterOptions() translitOpt {

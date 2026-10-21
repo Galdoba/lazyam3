@@ -25,8 +25,13 @@ type StreamJSON struct {
 	BitRate       string `json:"bit_rate"`
 	Duration      string `json:"duration"`
 	Disposition   Disp   `json:"disposition"`
-	Language      string `json:"language"`
-	Tag           TagMap `json:"tag"`
+	Tags          StreamTags `json:"tags"`
+}
+
+// StreamTags represents language and other metadata tags.
+type StreamTags struct {
+	Language   string `json:"language"`
+	FieldOrder string `json:"field_order"`
 }
 
 // Disp represents ffprobe disposition flags.
@@ -63,7 +68,7 @@ func parseStreams(ffprobeJSON []byte) ([]Stream, error) {
 			Index:    s.Index,
 			Kind:     streamKind(s.CodecType),
 			Codec:    s.CodecName,
-			Language: Language(s.Language),
+			Language: Language(s.Tags.Language),
 			Duration: parseDuration(s.Duration),
 		}
 
@@ -146,8 +151,8 @@ func parseBitRate(s string) int64 {
 }
 
 func detectInterlaced(s StreamJSON) bool {
-	if s.Tag["field_order"] != "" {
-		return s.Tag["field_order"] != "progressive"
+	if s.Tags.FieldOrder != "" {
+		return s.Tags.FieldOrder != "progressive"
 	}
 	return false
 }

@@ -2,7 +2,7 @@
 
 Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata resolution → script generation → rendering).
 
-**Current State**: Tasks 1-9 complete, task 10 (TOML config) deferred. Pipeline fully wired end-to-end with HSUB auto-detection, movie naming fix, and config-driven paths.
+**Current State**: Tasks 1-10 complete. Pipeline fully wired end-to-end with HSUB auto-detection, movie naming fix, TOML config, and config-driven paths.
 
 ## Documentation Guide
 

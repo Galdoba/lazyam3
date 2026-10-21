@@ -65,7 +65,7 @@ func defaultCFG() Config {
 }
 
 func Load(suggestedPath string) (Config, error) {
-	cm, err := configmanager.New[Config](APPNAME, defaultCFG(), configmanager.WithFormat(configmanager.TOML))
+	cm, err := configmanager.New(APPNAME, defaultCFG(), configmanager.WithFormat(configmanager.TOML))
 	if err != nil {
 		return Config{}, fmt.Errorf("failed to create configmanager: %w", err)
 	}

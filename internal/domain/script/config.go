@@ -1,6 +1,7 @@
 package script
 
 import (
+	"github.com/Galdoba/lazyam3/internal/domain/callname"
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 )
@@ -10,21 +11,25 @@ import (
 // and environment configuration.
 type ScriptConfig struct {
 	// From ingest domain
-	Filenames        []string          // input filenames in unit order; Filenames[0] is the primary media file (ingest ranks video-containing files first)
-	Streams          []ingest.Stream   // all parsed streams
-	SRT              string            // subtitle filename (empty if no subtitles)
-	HSUBFile         string            // hardsub file path (empty if no hardsub)
-	Product          metadata.Product  // the episode/season/movie product (with SeriesTitle set)
-	StreamSelections []StreamSelection // optional; auto-select if nil/empty
+	Filenames        []string               // input filenames in unit order; Filenames[0] is the primary media file (ingest ranks video-containing files first)
+	Streams          []ingest.Stream        // all parsed streams
+	SRT              string                 // subtitle filename (empty if no subtitles)
+	HSUBFile         string                 // hardsub file path (empty if no hardsub)
+	Product          metadata.Product       // the episode/season/movie product (with SeriesTitle set)
+	StreamSelections []StreamSelection      // optional; auto-select if nil/empty
 
-	// Naming components (populated from Product in BuildScript)
-	BaseName   string
-	SeasonTag  string
-	EpisodeTag string
-	// Ready-to-use tags (always present, may be empty — movies have neither).
-	// The template composes names from these instead of concatenating raw tags.
-	NameTag   string // suffix after BASENAME: "_s01e06", "_s01", "_e06", "" (movie)
-	SeasonDir string // target-dir suffix after BASENAME: "_s01", "" (movie)
+	// Predictions is the single source of truth for output file names.
+	// Populated by the pipeline layer via callname.PredictOutputs.
+	Predictions []callname.PredictedOutput
+
+	// CallNames maps original filenames to their call names.
+	// Populated by the pipeline layer via callname.BuildInputNames.
+	// Used by BuildScript to set SOURCE, SRT, HSUBFILE variables.
+	CallNames map[string]string
+
+	// Naming components (derived from Predictations for template use).
+	NameTag    string // suffix after BASENAME: "_s01e06", "_s01", "_e06", "" (movie)
+	SeasonDir  string // target-dir suffix after BASENAME: "_s01", "" (movie)
 
 	// Environment paths (filled from app config)
 	Env Environment

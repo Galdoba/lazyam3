@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/infra/fso"
@@ -22,13 +23,15 @@ func New(ffprobeBinaryPath string) *Ingest {
 
 // Ingest scans dir for regular files, probes each with ffprobe, and returns
 // a MediaUnit. Non-regular entries (directories, symlinks, etc.) are skipped.
-// A probe failure fails the entire directory immediately.
+// Subtitle sidecar files (.srt, .ass, .ssa) that ffprobe cannot probe are
+// recorded in Filenames so the pipeline can later classify them as SRT or HSUB.
 func (ing *Ingest) Ingest(dir string) (ingest.MediaUnit, error) {
 	fls, err := os.ReadDir(dir)
 	if err != nil {
 		return ingest.MediaUnit{}, err
 	}
 	dirData := make(map[string][]byte)
+	sidecars := make([]string, 0)
 	prober := fso.NewProber(ing.ffprobeBinary)
 	for _, f := range fls {
 		if !f.Type().IsRegular() {
@@ -37,9 +40,24 @@ func (ing *Ingest) Ingest(dir string) (ingest.MediaUnit, error) {
 		path := filepath.Join(dir, f.Name())
 		data, err := prober.ProbeFile(path)
 		if err != nil {
+			if isSubtitle(f.Name()) {
+				sidecars = append(sidecars, f.Name())
+				continue
+			}
 			return ingest.MediaUnit{}, fmt.Errorf("failed to probe file %q: %w", path, err)
 		}
 		dirData[f.Name()] = data
 	}
-	return ingest.NewMediaUnit(dirData)
+	mu, err := ingest.NewMediaUnit(dirData)
+	if err != nil {
+		return ingest.MediaUnit{}, err
+	}
+	mu.Filenames = append(mu.Filenames, sidecars...)
+	return mu, nil
+}
+
+// isSubtitle returns true when the filename ends with a known subtitle extension.
+func isSubtitle(name string) bool {
+	l := strings.ToLower(name)
+	return strings.HasSuffix(l, ".srt") || strings.HasSuffix(l, ".ass") || strings.HasSuffix(l, ".ssa")
 }

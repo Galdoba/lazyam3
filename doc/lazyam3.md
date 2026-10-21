@@ -65,7 +65,7 @@ Language of rendering script generation. Types: `Script`, `ScriptConfig`, `Strea
 │   ├── infra/                      # PORT IMPLEMENTATIONS. Knows about the outside world. Depends on domain.
 │   │   ├── cache/                  # in-memory cache
 │   │   ├── commands/               # CLI entry points (wires app + domain)
-│   │   ├── config/                 # Config via appcontext configmanager (JSON stub; TOML planned)
+│   │   ├── config/                 # Config via appcontext configmanager (TOML)
 │   │   ├── fso/                    # Prober: runs ffprobe
 │   │   ├── logging/                # structured logging (slog facade)
 │   │   ├── metadata/               # Repository implements ProductRepository

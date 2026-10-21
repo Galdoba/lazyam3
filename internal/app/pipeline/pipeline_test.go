@@ -123,6 +123,12 @@ func drainEvents(ch chan PipelineEvent) []PipelineEvent {
 
 func TestRunOnce_ProcessesUnit(t *testing.T) {
 	root, unitDir := sourceRoot(t)
+	// Create all files that the fake unit references.
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	events := make(chan PipelineEvent, 100)
 	rd := &fakeRenderer{}
 	p := newTestPipeline(t, root,
@@ -148,6 +154,14 @@ func TestRunOnce_ProcessesUnit(t *testing.T) {
 	if !strings.HasPrefix(sc.Content, "#!/bin/bash") {
 		t.Errorf("Content does not start with shebang")
 	}
+	// SOURCE must be a call name (not the original filename).
+	if strings.Contains(sc.Content, `SOURCE="12094.mp4"`) {
+		t.Error("SOURCE should be a call name, not the original filename")
+	}
+	// SRT must be a call name (not the original filename).
+	if strings.Contains(sc.Content, `SRT="12094-rus.srt"`) {
+		t.Error("SRT should be a call name, not the original filename")
+	}
 
 	evs := drainEvents(events)
 	if len(evs) != 2 || evs[0].Type != EventUnitDone || evs[0].ID != 12094 || evs[1].Type != EventScanDone {
@@ -157,6 +171,12 @@ func TestRunOnce_ProcessesUnit(t *testing.T) {
 
 func TestRunOnce_MetadataError(t *testing.T) {
 	root, unitDir := sourceRoot(t)
+	// Create all files that the fake unit references (needed for fallback processing).
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	events := make(chan PipelineEvent, 100)
 	rd := &fakeRenderer{}
 	p := newTestPipeline(t, root,
@@ -168,16 +188,45 @@ func TestRunOnce_MetadataError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunOnce() error: %v", err)
 	}
-	if out.Processed != 0 || out.Failed != 1 {
-		t.Errorf("RunOnce() = %+v, want Processed=0 Failed=1", out)
+	if out.Processed != 1 || out.Failed != 0 {
+		t.Errorf("RunOnce() = %+v, want Processed=1 Failed=0", out)
 	}
-	if len(rd.scripts) != 0 {
-		t.Errorf("renderer should not be called on metadata failure")
+	if len(rd.scripts) != 1 {
+		t.Errorf("expected 1 script from fallback, got %d", len(rd.scripts))
 	}
 
 	evs := drainEvents(events)
-	if len(evs) != 2 || evs[0].Type != EventUnitFailed || evs[0].ID != 12094 || evs[1].Type != EventScanDone {
-		t.Errorf("events = %+v, want [UnitFailed(12094) ScanDone]", evs)
+	if len(evs) != 2 || evs[0].Type != EventUnitDone || evs[1].Type != EventScanDone {
+		t.Errorf("events = %+v, want [UnitDone ScanDone]", evs)
+	}
+}
+
+func TestRunOnce_FallbackProduct_Naming(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{}
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		&fakeRepo{errs: map[int64]error{12094: errors.New("not found")}},
+		rd, events, false)
+
+	_, err := p.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if len(rd.scripts) != 1 {
+		t.Fatalf("expected 1 script, got %d", len(rd.scripts))
+	}
+	// Fallback Product uses dir basename "ep1" as SeriesTitle.
+	// verify BASENAME in script is "Ep1" (transliterated + titlecased).
+	script := rd.scripts[0]
+	if !strings.Contains(script.Content, "Ep1") {
+		t.Errorf("script should contain fallback base 'Ep1', got:\n%s", script.Content)
 	}
 }
 
@@ -253,8 +302,21 @@ func TestBuildScriptConfig(t *testing.T) {
 		t.Fatalf("buildScriptConfig() error: %v", err)
 	}
 
-	if cfg.SRT != "12094-rus.srt" {
-		t.Errorf("SRT = %q, want 12094-rus.srt", cfg.SRT)
+	// SRT/HSUBFile must be call names, not original filenames.
+	if cfg.SRT == "12094-rus.srt" {
+		t.Error("SRT should be a call name, not the original filename")
+	}
+	if cfg.SRT == "" {
+		t.Error("SRT must not be empty")
+	}
+	if len(cfg.CallNames) == 0 {
+		t.Fatal("CallNames must be populated")
+	}
+	// CallNames must map original filenames to call names.
+	for _, orig := range unit.Filenames {
+		if _, ok := cfg.CallNames[orig]; !ok {
+			t.Errorf("CallNames missing entry for %q", orig)
+		}
 	}
 	if cfg.Destination != filepath.Join(root, "scripts", "12094.sh") {
 		t.Errorf("Destination = %q", cfg.Destination)

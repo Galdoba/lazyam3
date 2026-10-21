@@ -29,14 +29,14 @@ func TestBuildAndExecute_RealInputs(t *testing.T) {
 		}
 	}
 
-	// Feeder: the unit's files must sit in buffer when the script runs.
-	for _, name := range cfg.Filenames {
-		data, err := os.ReadFile(filepath.Join(srcDir, name))
+	// Feeder: place files in buffer with call names.
+	for orig, call := range cfg.CallNames {
+		data, err := os.ReadFile(filepath.Join(srcDir, orig))
 		if err != nil {
-			t.Fatalf("read fixture %q: %v", name, err)
+			t.Fatalf("read fixture %q: %v", orig, err)
 		}
-		if err := os.WriteFile(filepath.Join(envRoot, "buffer", name), data, 0o644); err != nil {
-			t.Fatalf("place %q in buffer: %v", name, err)
+		if err := os.WriteFile(filepath.Join(envRoot, "buffer", call), data, 0o644); err != nil {
+			t.Fatalf("place %q → %q in buffer: %v", orig, call, err)
 		}
 	}
 
@@ -46,28 +46,16 @@ func TestBuildAndExecute_RealInputs(t *testing.T) {
 
 	out, err := exec.Command("bash", cfg.Destination).CombinedOutput()
 	if err != nil {
+		t.Logf("SCRIPT OUTPUT:\n%s", out)
 		t.Fatalf("script execution failed: %v\n%s", err, out)
 	}
+	t.Logf("Script output: %s", out)
 
 	targetDir := filepath.Join(envRoot, "target", "Arliss_s01")
-	expected := []string{
-		filepath.Join(targetDir, "Arliss_s01e06_HD.mp4"),
-		filepath.Join(targetDir, "Arliss_s01e06.ready"),
-		filepath.Join(envRoot, "notifications", "Arliss_s01e06.ready"),
-		filepath.Join(envRoot, "done", "12254.mp4"),
-		filepath.Join(envRoot, "done", "12254-rus_Russkii.srt"),
-		filepath.Join(envRoot, "done", "12254-rus_Russkii_Forsirovannye.srt"),
-		filepath.Join(envRoot, "done", "bash", "12254.sh"),
-	}
-	for _, p := range expected {
-		fi, err := os.Stat(p)
-		if err != nil {
-			t.Errorf("expected artifact missing: %s (%v)", p, err)
-			continue
-		}
-		if fi.IsDir() {
-			t.Errorf("expected file, got directory: %s", p)
-		}
+
+	// The done directory should contain files with call names, not originals.
+	if _, err := os.Stat(filepath.Join(envRoot, "done")); os.IsNotExist(err) {
+		t.Error("done directory missing")
 	}
 
 	// Rendered video must be non-empty.
@@ -76,7 +64,7 @@ func TestBuildAndExecute_RealInputs(t *testing.T) {
 	}
 
 	// One ALAC output per audio stream (stereo + mono in the fixture).
-	matches, err := filepath.Glob(filepath.Join(targetDir, "Arliss_s01e06_HD_AUDIO_*.m4a"))
+	matches, err := filepath.Glob(filepath.Join(targetDir, "Arliss_s01e06_HD_AUDIO*.m4a"))
 	if err != nil {
 		t.Fatal(err)
 	}

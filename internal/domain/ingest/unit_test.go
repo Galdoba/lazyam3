@@ -89,14 +89,14 @@ func TestParseStreams(t *testing.T) {
 				"sample_fmt": "fltp",
 				"channel_layout": "stereo",
 				"bit_rate": "128000",
-				"language": "eng"
+				"tags": {"language": "eng"}
 			},
 			{
 				"index": 2,
 				"codec_type": "subtitle",
 				"codec_name": "mov_text",
 				"disposition": {"default": 1, "forced": 1},
-				"language": "rus"
+				"tags": {"language": "rus"}
 			}
 		]
 	}`
@@ -200,8 +200,8 @@ func TestValidateMediaUnit(t *testing.T) {
 
 func TestNewMediaUnit(t *testing.T) {
 	videoProbe := `{"streams":[{"index":0,"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"pix_fmt":"yuv420p","r_frame_rate":"25/1","bit_rate":"5000000","tag":{"field_order":"progressive"}}]}`
-	audioProbe := `{"streams":[{"index":0,"codec_type":"audio","codec_name":"aac","sample_rate":"48000","sample_fmt":"fltp","channel_layout":"stereo","bit_rate":"128000","language":"eng"}]}`
-	subProbe := `{"streams":[{"index":0,"codec_type":"subtitle","codec_name":"mov_text","disposition":{"forced":1},"language":"rus"}]}`
+	audioProbe := `{"streams":[{"index":0,"codec_type":"audio","codec_name":"aac","sample_rate":"48000","sample_fmt":"fltp","channel_layout":"stereo","bit_rate":"128000","tags":{"language":"eng"}}]}`
+	subProbe := `{"streams":[{"index":0,"codec_type":"subtitle","codec_name":"mov_text","disposition":{"forced":1},"tags":{"language":"rus"}}]}`
 	dataProbe := `{"streams":[{"index":0,"codec_type":"data","codec_name":"none"}]}`
 	badJSON := `not json`
 
@@ -425,7 +425,7 @@ func TestDetectInterlaced(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := detectInterlaced(StreamJSON{Tag: TagMap(tt.tag)})
+			got := detectInterlaced(StreamJSON{Tags: StreamTags{FieldOrder: tt.tag["field_order"]}})
 			if got != tt.want {
 				t.Errorf("detectInterlaced(%v) = %v, want %v", tt.tag, got, tt.want)
 			}

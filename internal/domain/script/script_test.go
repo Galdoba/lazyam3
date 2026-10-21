@@ -10,8 +10,8 @@ import (
 
 func TestBuildScript_GoldenFile(t *testing.T) {
 	cfg := ScriptConfig{
-		Filenames:   []string{"001_video.mkv"},
-		SRT:         "001_sub.srt",
+		Filenames:   []string{"12254.mp4"},
+		SRT:         "12254-rus_Russkii.srt",
 		Destination: "/tmp/test.sh",
 		Env: Environment{
 			Buffer:        "/tmp/buffer",
@@ -31,9 +31,13 @@ func TestBuildScript_GoldenFile(t *testing.T) {
 			SeriesTitle:   "Белая королева",
 		},
 		Streams: []ingest.Stream{
-			{FileIndex: 0, Index: 0, Kind: ingest.StreamKindVideo, Codec: "h264", Width: 1920, Height: 1080, Interlaced: true, FrameRate: ingest.Rational{Num: 25, Denom: 1}},
+			{FileIndex: 0, Index: 0, Kind: ingest.StreamKindVideo, Codec: "h264", Width: 720, Height: 576, Interlaced: false, FrameRate: ingest.Rational{Num: 25, Denom: 1}},
 			{FileIndex: 0, Index: 1, Kind: ingest.StreamKindAudio, Codec: "aac", Language: "rus", ChannelLayout: ingest.LayoutStereo, SampleRate: 48000},
-			{FileIndex: 0, Index: 2, Kind: ingest.StreamKindAudio, Codec: "aac", Language: "eng", ChannelLayout: ingest.LayoutStereo, SampleRate: 48000},
+			{FileIndex: 0, Index: 2, Kind: ingest.StreamKindAudio, Codec: "aac", Language: "jpn", ChannelLayout: ingest.LayoutMono, SampleRate: 44100},
+		},
+		CallNames: map[string]string{
+			"12254.mp4":          "Arliss_s01e06_PRT261021140537_id12254.mp4",
+			"12254-rus_Russkii.srt": "Arliss_s01e06_PRT261021140537_id12254-rus_Russkii.srt",
 		},
 	}
 
@@ -51,13 +55,16 @@ func TestBuildScript_GoldenFile(t *testing.T) {
 	}
 
 	// Check key placeholders were resolved
-	checkResolved(t, script.Content, "source", "001_video.mkv")
-	checkResolved(t, script.Content, "srt", "001_sub.srt")
-	checkResolved(t, script.Content, "yadif", "yadif,")
+	// SOURCE must use call name from CallNames
+	if !strings.Contains(script.Content, `SOURCE="Arliss_s01e06_PRT261021140537_id12254.mp4"`) {
+		t.Error("SOURCE should be the call name from CallNames")
+	}
+	checkResolved(t, script.Content, "srt", "12254-rus_Russkii.srt")
+	checkResolved(t, script.Content, "yadif", "") // progressive video, no yadif
 	checkResolved(t, script.Content, "audio_filter", "[0:1]")
 	checkResolved(t, script.Content, "audio_filter", "[0:2]")
-	checkResolved(t, script.Content, "output_files", "AUDIO_00_RUS20")
-	checkResolved(t, script.Content, "output_files", "AUDIO_01_ENG20")
+	checkResolved(t, script.Content, "output_files", "AUDIO00_RUS20")
+	checkResolved(t, script.Content, "output_files", "AUDIO01_JPN10")
 
 	// Env paths must render as plain assignments (bash-valid)
 	checkResolved(t, script.Content, "in_progress", `IN_PROGRESS="/tmp/in_progress"`)
@@ -268,11 +275,11 @@ func TestBuildScript_AudioSelection(t *testing.T) {
 		t.Fatalf("BuildScript failed: %v", err)
 	}
 
-	if !strings.Contains(script.Content, "AUDIO_00_RUS20") {
-		t.Error("expected AUDIO_00_RUS20 in audio outputs")
+	if !strings.Contains(script.Content, "AUDIO00_RUS20") {
+		t.Error("expected AUDIO00_RUS20 in audio outputs")
 	}
-	if !strings.Contains(script.Content, "AUDIO_01_ENG20") {
-		t.Error("expected AUDIO_01_ENG20 in audio outputs")
+	if !strings.Contains(script.Content, "AUDIO01_ENG20") {
+		t.Error("expected AUDIO01_ENG20 in audio outputs")
 	}
 }
 

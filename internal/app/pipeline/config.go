@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/Galdoba/lazyam3/internal/domain/callname"
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 	"github.com/Galdoba/lazyam3/internal/domain/script"
@@ -20,6 +22,8 @@ const defaultPriority = 0
 // Work-directory environment paths are derived by convention under the
 // output root: <root>/{buffer,in_progress,done,notifications,target};
 // the script artifact goes to <root>/scripts/<id>.sh.
+// Predictions are the single source of truth for output names, computed
+// from the full MediaUnit before the script domain is touched.
 func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string, hardsubTag string) (script.ScriptConfig, error) {
 	if root == "" {
 		return script.ScriptConfig{}, fmt.Errorf("pipeline: destination root is required")
@@ -36,14 +40,40 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 		return a.Index - b.Index
 	})
 
-	srt, hsub := findSubtitle(unit.Filenames, hardsubTag)
+	// Predict outputs from the full MediaUnit — this is the single source
+	// of truth for output file names. Called before the script domain is
+	// touched, so predictions drive all downstream logic.
+	predictions := callname.PredictOutputs(prod, unit, filepath.Join(root, "target"), hardsubTag)
+
+	// Build call names for all unit files (original filename → call name).
+	timestamp := time.Now().Format("060102150405")
+	callNames, err := callname.BuildInputNames(prod, unit.Filenames, timestamp)
+	if err != nil {
+		return script.ScriptConfig{}, fmt.Errorf("build call names for unit %d: %w", unit.ID, err)
+	}
+
+	// Derive SRT from original filenames, HSUBFile from predictions.
+	srt, _ := findSubtitle(unit.Filenames, hardsubTag)
+	hsubFile := ""
+	for _, p := range predictions {
+		if p.MediaType == "video" {
+			hsubFile = p.HsubFile
+			break
+		}
+	}
+
+	// Resolve SRT and HSUB file paths to their call names.
+	srtCall := callNames[srt]
+	hsubCall := callNames[hsubFile]
 
 	return script.ScriptConfig{
-		Filenames:  unit.Filenames,
-		Streams:    streams,
-		SRT:        srt,
-		HSUBFile:   hsub,
-		Product:    prod,
+		Filenames:   unit.Filenames,
+		Streams:     streams,
+		SRT:         srtCall,
+		HSUBFile:    hsubCall,
+		Product:     prod,
+		Predictions: predictions,
+		CallNames:   callNames,
 		Env: script.Environment{
 			Buffer:        filepath.Join(root, "buffer"),
 			InProgress:    filepath.Join(root, "in_progress"),

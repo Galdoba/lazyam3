@@ -9,7 +9,9 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/Galdoba/lazyam3/internal/domain/callname"
 	appingest "github.com/Galdoba/lazyam3/internal/app/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	dscript "github.com/Galdoba/lazyam3/internal/domain/script"
@@ -76,23 +78,42 @@ func realConfig(t *testing.T) (dscript.ScriptConfig, string, string) {
 		return streams[i].Index < streams[j].Index
 	})
 
-		envRoot := t.TempDir()
-		cfg := dscript.ScriptConfig{
-			Filenames:  unit.Filenames,
-			SRT:        "12254-rus_Russkii.srt",
-			HSUBFile:   "12254-rus_Russkii_Forsirovannye.srt",
-			Streams:    streams,
-			Product:    *prod,
-			Env: dscript.Environment{
-				Buffer:        filepath.Join(envRoot, "buffer"),
-				InProgress:    filepath.Join(envRoot, "in_progress"),
-				Done:          filepath.Join(envRoot, "done"),
-				Notifications: filepath.Join(envRoot, "notifications"),
-				TargetRoot:    filepath.Join(envRoot, "target"),
-				Priority:      6,
-			},
-			Destination: filepath.Join(envRoot, "scripts", "12254.sh"),
-		}
+	envRoot := t.TempDir()
+
+	// Build call names for all unit files.
+	timestamp := time.Now().Format("060102150405")
+	callNames, err := callname.BuildInputNames(*prod, unit.Filenames, timestamp)
+	if err != nil {
+		t.Fatalf("BuildInputNames error: %v", err)
+	}
+
+	// Predict outputs (drives naming).
+	predictions := callname.PredictOutputs(*prod, unit, filepath.Join(envRoot, "target"), "")
+
+	// Resolve SRT/HSUB to call names.
+	srtOrig := "12254-rus_Russkii.srt"
+	hsubOrig := "12254-rus_Russkii_Forsirovannye.srt"
+	srtCall := callNames[srtOrig]
+	hsubCall := callNames[hsubOrig]
+
+	cfg := dscript.ScriptConfig{
+		Filenames:   unit.Filenames,
+		SRT:         srtCall,
+		HSUBFile:    hsubCall,
+		Streams:     streams,
+		Product:     *prod,
+		Predictions: predictions,
+		CallNames:   callNames,
+		Env: dscript.Environment{
+			Buffer:        filepath.Join(envRoot, "buffer"),
+			InProgress:    filepath.Join(envRoot, "in_progress"),
+			Done:          filepath.Join(envRoot, "done"),
+			Notifications: filepath.Join(envRoot, "notifications"),
+			TargetRoot:    filepath.Join(envRoot, "target"),
+			Priority:      6,
+		},
+		Destination: filepath.Join(envRoot, "scripts", "12254.sh"),
+	}
 	return cfg, srcDir, envRoot
 }
 
@@ -126,14 +147,19 @@ func TestBuild_RealInputs(t *testing.T) {
 		"-map \"[aud0]\"",
 		"[0:1]aresample=48000",
 		"[0:2]aresample=48000",
-		"12254.mp4",
 		`BASENAME="Arliss"`,
 		`NAME_TAG="_s01e06"`,
-		`SEASON_DIR="_s01"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("rendered script does not contain %q", want)
 		}
+	}
+	// SOURCE and SRT must be call names, not original filenames.
+	if strings.Contains(body, `SOURCE="12254.mp4"`) {
+		t.Error("SOURCE should be a call name, not the original filename")
+	}
+	if strings.Contains(body, `SRT="12254-rus_Russkii.srt"`) {
+		t.Error("SRT should be a call name, not the original filename")
 	}
 
 	if unresolved := regexp.MustCompile(`\|=\w+=\|`).FindAllString(body, -1); len(unresolved) > 0 {

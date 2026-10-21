@@ -21,9 +21,8 @@ type translitter struct {
 	wordSeparators                []string
 	keepRegister                  bool
 	keepSegmentatorRepetitions    bool
-	short_SE_form                 bool
-	shortenEpisode                bool
-	title                         bool
+	short_SE_form              bool
+	title                      bool
 	caps                          bool
 	DEBUG_panicIfLiteralIsUNKNOWN bool
 }

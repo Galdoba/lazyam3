@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Galdoba/lazyam3/internal/domain/callname"
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 )
 
@@ -117,6 +118,27 @@ func buildOutputFiles(tracks []audioTrack) string {
 	}
 	for i, t := range tracks {
 		lines = append(lines, fmt.Sprintf(`  -map "[aud%d]" -c:a alac -compression_level 0 "${TARGET_DIR}/${OUTBASE}_HD_%s.m4a"`, i, t.Suffix))
+	}
+	for i := 0; i < len(lines)-1; i++ {
+		lines[i] += ` \`
+	}
+	return strings.Join(lines, "\n")
+}
+
+// buildOutputFilesPredictions renders the -map output block using predicted
+// paths. The first prediction is always video; subsequent audio predictions
+// get their full paths directly. Uses AudioIndex for the [audN] map label.
+func buildOutputFilesPredictions(predictions []callname.PredictedOutput) string {
+	lines := make([]string, 0, len(predictions))
+	for _, p := range predictions {
+		switch p.MediaType {
+		case "video":
+			line := fmt.Sprintf(`  -map "[vidHD]" -c:v libx264 -preset medium -crf 21 -pix_fmt yuv420p -profile:v high -g 0 -map_metadata -1 -map_chapters -1 "%s"`, p.Path)
+			lines = append(lines, line)
+		case "audio":
+			line := fmt.Sprintf(`  -map "[aud%d]" -c:a alac -compression_level 0 "%s"`, p.AudioIndex, p.Path)
+			lines = append(lines, line)
+		}
 	}
 	for i := 0; i < len(lines)-1; i++ {
 		lines[i] += ` \`

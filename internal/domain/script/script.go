@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
+	"github.com/Galdoba/lazyam3/internal/domain/callname"
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
+	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 )
 
 // StreamSelection represents a stream selection rule for the rendering script.
@@ -23,27 +26,33 @@ type Script struct {
 }
 
 // BuildScript creates a rendering script from the given config.
-// It is a pure function: no IO, no side effects, fully deterministic.
+// Predictions are the single source of truth for output names.
+// If predictions are not set, they are derived from Product + Streams.
 func BuildScript(cfg ScriptConfig) (Script, error) {
 	// Validate inputs
 	if err := validateConfig(cfg); err != nil {
 		return Script{}, err
 	}
 
-	// Derive naming from product
-	cfg.BaseName = deriveBaseName(cfg.Product)
-	cfg.SeasonTag = deriveSeasonTag(cfg.Product)
-	cfg.EpisodeTag = deriveEpisodeTag(cfg.Product)
-	cfg.NameTag = deriveNameTag(cfg.SeasonTag, cfg.EpisodeTag)
-	cfg.SeasonDir = deriveSeasonDir(cfg.SeasonTag)
+	// Derive predictions if not set (backward compat for tests)
+	predictions := cfg.Predictions
+	if len(predictions) == 0 {
+		predictions = derivePredictionsFromStreams(cfg.Product, cfg.Streams, cfg.Env.TargetRoot)
+	}
+	cfg.Predictions = predictions
+
+	// Derive template variables from predictions
+	baseName, nameTag, seasonDir := deriveNamesFromPredictions(predictions)
+	cfg.NameTag = nameTag
+	cfg.SeasonDir = seasonDir
 
 	// Build video section
 	interlaced := getInterlaced(cfg.Streams)
 	yadif := buildVideoFilter(interlaced)
 	hsub := buildHSUB(cfg.HSUBFile, cfg.Env.InProgress)
 
-	// Build audio section
-	audioTracks := selectAudioTracks(cfg)
+	// Build audio section — still needs stream indices for filter_complex
+	audioTracks := selectAudioTracksFromPredictions(cfg)
 	audioFilter := buildAudioFilter(audioTracks)
 
 	// Build SRT sections
@@ -57,16 +66,16 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 
 	// Fill template placeholders
 	content := AmediaGeneric
-	content = replaceAll(content, "source", cfg.Filenames[0])
+	content = replaceAll(content, "source", cfg.CallNames[cfg.Filenames[0]])
 	content = replaceAll(content, "srt", cfg.SRT)
 	content = replaceAll(content, "hsubfile", cfg.HSUBFile)
-	content = replaceAll(content, "basename", cfg.BaseName)
-	content = replaceAll(content, "name_tag", cfg.NameTag)
-	content = replaceAll(content, "season_dir", cfg.SeasonDir)
+	content = replaceAll(content, "basename", baseName)
+	content = replaceAll(content, "name_tag", nameTag)
+	content = replaceAll(content, "season_dir", seasonDir)
 	content = replaceAll(content, "yadif", yadif)
 	content = replaceAll(content, "hsub", hsub)
 	content = replaceAll(content, "audio_filter", audioFilter)
-	content = replaceAll(content, "output_files", buildOutputFiles(audioTracks))
+	content = replaceAll(content, "output_files", buildOutputFilesPredictions(predictions))
 	content = replaceAll(content, "srt_move", srtMove)
 	content = replaceAll(content, "srt_section", srtSection)
 	content = replaceAll(content, "srt_cleanup", srtCleanup)
@@ -88,6 +97,91 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 		Destination: cfg.Destination,
 		Content:     content,
 	}, nil
+}
+
+// deriveNamesFromPredictions extracts BASENAME, NAME_TAG, and SEASON_DIR from predictions.
+func deriveNamesFromPredictions(predictions []callname.PredictedOutput) (baseName, nameTag, seasonDir string) {
+	if len(predictions) == 0 {
+		return "", "", ""
+	}
+	// Parse the path: targetRoot/baseName+seasonDir/filename
+	path := predictions[0].Path
+	lastSlash := strings.LastIndex(path, "/")
+	if lastSlash < 0 {
+		return "", "", ""
+	}
+	dir := path[:lastSlash]
+	parts := strings.Split(dir, "/")
+	if len(parts) < 2 {
+		return parts[len(parts)-1], "", ""
+	}
+	dirName := parts[len(parts)-1]
+	// dirName = baseName + seasonDir (e.g. "Belaya_koroleva_s01")
+	i := len(dirName) - 1
+	for i >= 0 && dirName[i] != '_' {
+		i--
+	}
+	if i < 0 {
+		return dirName, "", ""
+	}
+	baseName = dirName[:i]
+	seasonDir = dirName[i:] // "_s01"
+
+	// Derive nameTag from the filename (OUTBASE), not the directory.
+	// Filename is like "Arliss_s01e06_HD.mp4" → OUTBASE = "Arliss_s01e06"
+	// nameTag = OUTBASE[len(baseName):] = "_s01e06"
+	filename := path[lastSlash+1:]
+	// Strip _HD.mp4 or _HD suffix to get OUTBASE
+	outBase := filename
+	if idx := strings.Index(outBase, "_HD"); idx > 0 {
+		outBase = outBase[:idx]
+	}
+	if len(outBase) <= len(baseName) {
+		return baseName, seasonDir, seasonDir
+	}
+	nameTag = outBase[len(baseName):]
+
+	return baseName, nameTag, seasonDir
+}
+
+// selectAudioTracksFromPredictions extracts audio stream indices from predictions
+// for use in the audio filter_complex.
+func selectAudioTracksFromPredictions(cfg ScriptConfig) []audioTrack {
+	var tracks []audioTrack
+	// Collect audio streams in order
+	var audioStreams []ingest.Stream
+	for _, s := range cfg.Streams {
+		if s.Kind == ingest.StreamKindAudio {
+			audioStreams = append(audioStreams, s)
+		}
+	}
+	// Match predictions to audio streams by index
+	for _, p := range cfg.Predictions {
+		if p.MediaType != "audio" {
+			continue
+		}
+		if p.AudioIndex >= len(audioStreams) {
+			continue
+		}
+		s := audioStreams[p.AudioIndex]
+		tracks = append(tracks, audioTrack{
+			StreamIndex: s.Index,
+			Language:    p.Language,
+			Layout:      p.Layout,
+		})
+	}
+	// Normalize tracks
+	for i, t := range tracks {
+		if t.Language == "" {
+			t.Language = "und"
+		}
+		if t.Layout == "" {
+			t.Layout = string(ingest.LayoutStereo)
+		}
+		t.Layout = layoutSuffix(ingest.Layout(t.Layout))
+		tracks[i] = t
+	}
+	return tracks
 }
 
 // validateConfig checks that the config has all required data.
@@ -200,4 +294,39 @@ func buildHSUBCleanup(hsubFile string) string {
 		return ""
 	}
 	return `mv "${IN_PROGRESS}/${HSUBFILE}" "${DONE}/${HSUBFILE}"`
+}
+
+// derivePredictionsFromStreams builds PredictedOutput from Product + Streams.
+// Used as fallback when predictions are not set in config (backward compat).
+func derivePredictionsFromStreams(product metadata.Product, streams []ingest.Stream, targetRoot string) []callname.PredictedOutput {
+	// Sort streams for deterministic prediction order
+	slices.SortFunc(streams, func(a, b ingest.Stream) int {
+		if a.FileIndex != b.FileIndex {
+			return a.FileIndex - b.FileIndex
+		}
+		return a.Index - b.Index
+	})
+	streamMap := make(map[string]ingest.Stream)
+	for _, s := range streams {
+		key := fmt.Sprintf("[%d:%s:%d]", s.FileIndex, abbrevKind(s.Kind), s.Index)
+		streamMap[key] = s
+	}
+	unit := ingest.MediaUnit{
+		ID:      product.ID,
+		Streams: streamMap,
+	}
+	return callname.PredictOutputs(product, unit, targetRoot, "")
+}
+
+func abbrevKind(kind ingest.StreamKind) string {
+	switch kind {
+	case ingest.StreamKindVideo:
+		return "v"
+	case ingest.StreamKindAudio:
+		return "a"
+	case ingest.StreamKindSubtitle:
+		return "s"
+	default:
+		return string(kind)
+	}
 }
