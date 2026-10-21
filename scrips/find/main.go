@@ -7,12 +7,12 @@ import (
 	"log"
 	"os"
 
-	"github.com/Galdoba/lazyam3/internal/domain/metadata"
+	"github.com/Galdoba/lazyam3/internal/infra/metadata"
 )
 
 func main() {
 	// Flags
-	id := flag.Int64("id", 0, "ID элемента для поиска (обязательный)")
+	id := flag.Int64("id", 0, "ID of the element to search for (required)")
 	file := flag.String("file", "metadata.json", "path to the json file with metadata")
 	shallow := flag.Bool("shallow", false, "do not include descendants of the target object (only it and its parents)")
 
@@ -30,7 +30,7 @@ func main() {
 
 	flag.Parse()
 
-	// Проверяем, что -id вообще был передан (0 — валидное значение id)
+	// Verify that -id was actually provided (0 is a valid id value)
 	idSet := false
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "id" {
@@ -44,32 +44,32 @@ func main() {
 		os.Exit(2)
 	}
 
-	// Читаем файл
+	// Read the file
 	data, err := os.ReadFile(*file)
 	if err != nil {
 		log.Fatalf("failed to read file %q: %v", *file, err)
 	}
 
-	// Десериализация
+	// Deserialization
 	var root metadata.Root
 	if err := json.Unmarshal(data, &root); err != nil {
 		log.Fatalf("failed to parse json from %q: %v", *file, err)
 	}
 
-	// Выбираем режим
+	// Select mode
 	descendants := metadata.WithDescendants
 	if *shallow {
 		descendants = metadata.WithoutDescendants
 	}
 
-	// Поиск
+	// Search
 	found, ok := root.FindByID(*id, descendants)
 	if !ok {
 		fmt.Fprintf(os.Stderr, "element with id=%d not found\n", *id)
 		os.Exit(1)
 	}
 
-	// Вывод
+	// Output
 	out, err := json.MarshalIndent(found, "", "  ")
 	if err != nil {
 		log.Fatalf("failed to serialize result: %v", err)

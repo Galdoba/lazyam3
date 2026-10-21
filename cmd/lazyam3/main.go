@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/Galdoba/lazyam3/internal/app"
 	"github.com/Galdoba/lazyam3/internal/infra/commands"
@@ -20,7 +22,7 @@ func run() int {
 	modules := app.New()
 
 	root := &cli.Command{
-		Name: "", // пусто — urfave/cli подставит имя бинарника
+		Name: "", // empty — urfave/cli will substitute the binary name
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "config",
@@ -46,7 +48,12 @@ func run() int {
 		},
 	}
 
-	if err := root.Run(context.Background(), os.Args); err != nil {
+	// SIGINT/SIGTERM cancel the context: the pipeline stops after the current
+	// unit, the command logs the summary and exits 0.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := root.Run(ctx, os.Args); err != nil {
 		// Before may have failed before Logger appeared.
 		if modules.Logger != nil {
 			modules.Logger.Error("execution failed", "error", err)

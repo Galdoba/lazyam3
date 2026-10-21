@@ -1,6 +1,7 @@
 package script
 
-// Renderer writes a script's Text to a destination path.
+// Renderer materializes a built Script as a usable artifact
+// (e.g., an executable shell file at Script.Destination).
 type Renderer interface {
-	Write(dest string, content Text) error
+	Render(sc Script) error
 }

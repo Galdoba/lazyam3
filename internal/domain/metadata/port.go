@@ -1,6 +1,6 @@
 package metadata
 
-// ProductRepository provides access to media products from Amedia.
+// ProductRepository provides access to media products.
 type ProductRepository interface {
-	FindByID(id int64) (*Found, error)
+	FindByID(id int64) (*Product, error)
 }

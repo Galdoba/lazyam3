@@ -1,7 +1,6 @@
-package ffprobe
+package fso
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,11 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
-// TestHelperProcess — не настоящий тест. Он запускается как дочерний процесс
-// (см. helperProber) и эмулирует поведение ffprobe в зависимости от HELPER_MODE.
+// TestHelperProcess is not a real test. It runs as a child process
+// (see helperProber) and emulates ffprobe behavior depending on HELPER_MODE.
 func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
@@ -31,26 +29,24 @@ func TestHelperProcess(t *testing.T) {
 		fmt.Print(`{"streams":[]}`)
 		fmt.Fprint(os.Stderr, "boom")
 		os.Exit(1)
-	case "sleep":
-		time.Sleep(30 * time.Second)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown HELPER_MODE %q\n", os.Getenv("HELPER_MODE"))
 		os.Exit(2)
 	}
-	// Все «успешные» ветки завершаем через os.Exit, чтобы тестовый раннер
-	// не допечатал "PASS"/"ok" в stdout и не сломал JSON.
+	// All "successful" branches exit via os.Exit so the test runner
+	// doesn't append "PASS"/"ok" to stdout and break JSON.
 	os.Exit(0)
 }
 
-// helperProber возвращает Prober, чей бинарь — сам тестовый бинарь,
-// запускаемый в режиме «эмулятора ffprobe».
+// helperProber returns a Prober whose binary is the test binary itself,
+// run in "ffprobe emulator" mode.
 func helperProber(t *testing.T, mode string) *Prober {
 	t.Helper()
 	t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 	t.Setenv("HELPER_MODE", mode)
 
-	// Подменяем «флаги ffprobe» на флаги go test: дочерний процесс должен
-	// выполнить только TestHelperProcess. "--" отделяет флаги от filePath.
+	// Replace "ffprobe flags" with go test flags: the child process must
+	// run only TestHelperProcess. "--" separates flags from filePath.
 	old := ffprobeScanArgs
 	ffprobeScanArgs = []string{"-test.run=TestHelperProcess", "--"}
 	t.Cleanup(func() { ffprobeScanArgs = old })
@@ -84,7 +80,7 @@ func TestProbeFile_StatError(t *testing.T) {
 	p := NewProber("ffprobe")
 	missing := filepath.Join(t.TempDir(), "nope.mkv")
 
-	_, err := p.ProbeFile(context.Background(), missing)
+	_, err := p.ProbeFile(missing)
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
@@ -100,7 +96,7 @@ func TestProbeFile_Success(t *testing.T) {
 	p := helperProber(t, "success")
 	file := mkFile(t)
 
-	out, err := p.ProbeFile(context.Background(), file)
+	out, err := p.ProbeFile(file)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -125,7 +121,7 @@ func TestProbeFile_InvalidJSON(t *testing.T) {
 	p := helperProber(t, "invalid_json")
 	file := mkFile(t)
 
-	_, err := p.ProbeFile(context.Background(), file)
+	_, err := p.ProbeFile(file)
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
@@ -138,7 +134,7 @@ func TestProbeFile_CommandError(t *testing.T) {
 	p := helperProber(t, "stderr_error")
 	file := mkFile(t)
 
-	_, err := p.ProbeFile(context.Background(), file)
+	_, err := p.ProbeFile(file)
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
@@ -151,35 +147,12 @@ func TestProbeFile_ExitCodeTakesPrecedenceOverStdout(t *testing.T) {
 	p := helperProber(t, "json_and_stderr_error")
 	file := mkFile(t)
 
-	_, err := p.ProbeFile(context.Background(), file)
+	_, err := p.ProbeFile(file)
 	if err == nil {
 		t.Fatal("want error, got nil")
 	}
-	// Даже если stdout — валидный JSON, ненулевой код возврата — ошибка.
+	// Even if stdout is valid JSON, a non-zero exit code is an error.
 	if !strings.Contains(err.Error(), "ffprobe:") {
 		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestProbeFile_ContextCancelled(t *testing.T) {
-	p := helperProber(t, "sleep")
-	file := mkFile(t)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-
-	done := make(chan error, 1)
-	go func() {
-		_, err := p.ProbeFile(ctx, file)
-		done <- err
-	}()
-
-	select {
-	case err := <-done:
-		if err == nil {
-			t.Fatal("want error, got nil")
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("ProbeFile did not return after context cancellation")
 	}
 }

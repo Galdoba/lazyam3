@@ -2,13 +2,23 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Galdoba/lazyam3/internal/app"
 	"github.com/Galdoba/lazyam3/internal/app/ingest"
 	"github.com/Galdoba/lazyam3/internal/app/pipeline"
-	dom "github.com/Galdoba/lazyam3/internal/domain/ingest"
+	"github.com/Galdoba/lazyam3/internal/infra/metadata"
+	scriptinfra "github.com/Galdoba/lazyam3/internal/infra/script"
 	"github.com/urfave/cli/v3"
+)
+
+const (
+	pathIn       = "source-root"
+	pathOut      = "target-root"
+	pathFfprobe  = "ffprobe-path"
+	pathMetadata = "metadata-path"
+	pathOnce     = "once"
 )
 
 // CMDProcess is the process command — scans input directory, resolves metadata,
@@ -20,14 +30,26 @@ func CMDProcess(modules *app.AppModules) *cli.Command {
 		Description: "Scans the input directory for media files, resolves product metadata, and generates ffmpeg rendering scripts.",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:    "source",
-				Aliases: []string{"s"},
+				Name:    pathIn,
+				Aliases: []string{"in"},
 				Usage:   "input directory",
 			},
 			&cli.StringFlag{
-				Name:    "output",
-				Aliases: []string{"o"},
+				Name:    pathOut,
+				Aliases: []string{"out"},
 				Usage:   "output directory",
+			},
+			&cli.StringFlag{
+				Name:  pathFfprobe,
+				Usage: "path to ffprobe binary",
+			},
+			&cli.StringFlag{
+				Name:  pathMetadata,
+				Usage: "path to metadata.json",
+			},
+			&cli.BoolFlag{
+				Name:  pathOnce,
+				Usage: "run a single scan pass and exit instead of polling",
 			},
 		},
 		Action: cmdProcessAction(modules),
@@ -40,29 +62,78 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 		logger := modules.Logger.Slog().WithGroup("command")
 		logger.Info("create pipeline")
 
-		sourceDir := nonEmpty(c.String("source"), cfg.Paths.InputDirectory)
-		outputDir := c.String("output")
+		sourceDir := nonEmpty(c.String(pathIn), cfg.Paths.InputDirectory)
 		if sourceDir == "" {
-			logger.Error("source directory required (flag or config field) ")
-			return fmt.Errorf("source directory required (--source)")
+			logger.Error("source directory required (flag or config field)")
+			return fmt.Errorf("source directory required (--%s string or config field)", pathIn)
 		}
-		fmt.Println("create pipe")
-		ing := &ingest.Ingest{}
-		p := pipeline.NewPipeline(
-			modules.Logger.Slog().WithGroup("pipeline"),
-			dom.IngestPort(ing),
-		)
-		result, err := p.Run(pipeline.RunInput{
-			SourceDir:   sourceDir,
-			Destination: outputDir,
-		})
+		ffprobeBinary := nonEmpty(c.String(pathFfprobe), cfg.Paths.FfprobeBinary, "ffprobe")
+
+		metadataPath := nonEmpty(c.String(pathMetadata), cfg.Paths.MetadataPath)
+		if metadataPath == "" {
+			logger.Error("metadata path required (flag or config field)")
+			return fmt.Errorf("metadata path required (--%s string or config field)", pathMetadata)
+		}
+		mdRepo, err := metadata.New(metadataPath)
 		if err != nil {
-			return fmt.Errorf("pipeline failed: %w", err)
+			return fmt.Errorf("failed to load metadata from %q: %w", metadataPath, err)
 		}
 
-		_, err = fmt.Fprintf(c.Root().Writer, "processed %d files → %s\n", result.FilesProcessed, result.ScriptWritten)
-		return err
+		destination := nonEmpty(c.String(pathOut), cfg.Paths.OutputDirectory)
+		if destination == "" {
+			logger.Error("output directory required (flag or config field)")
+			return fmt.Errorf("output directory required (--%s string or config field)", pathOut)
+		}
+		if err := pipeline.EnsureEnvDirs(destination); err != nil {
+			return fmt.Errorf("prepare work directories under %q: %w", destination, err)
+		}
 
+		events := make(chan pipeline.PipelineEvent, 100)
+
+		p := pipeline.NewPipeline(pipeline.Options{
+			Logger:       modules.Logger.Slog().WithGroup("pipeline"),
+			Ingest:       ingest.New(ffprobeBinary),
+			Metadata:     mdRepo,
+			Renderer:     scriptinfra.New(),
+			Events:       events,
+			SourceDir:    sourceDir,
+			Destination:  destination,
+			HardsubTag:   cfg.Hardsub.Tag,
+		})
+
+		// TODO: start event consumer goroutine (analytics, TUI, etc.)
+		eventsDone := make(chan struct{})
+		go func() {
+			defer close(eventsDone)
+			for e := range events {
+				switch e.Type {
+				case pipeline.EventUnitDone:
+					logger.Info("unit done", "id", e.ID)
+				case pipeline.EventUnitFailed:
+					logger.Warn("unit failed", "id", e.ID, "error", e.Error)
+				}
+			}
+		}()
+
+		var out pipeline.RunOutput
+		if c.Bool(pathOnce) {
+			out, err = p.RunOnce(ctx)
+		} else {
+			out, err = p.Run(ctx)
+		}
+		// drain pending events before the summary so log order matches reality
+		close(events)
+		<-eventsDone
+		switch {
+		case err == nil:
+			logger.Info("pipeline finished", "processed", out.Processed, "failed", out.Failed)
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+			logger.Info("pipeline stopped", "processed", out.Processed, "failed", out.Failed)
+		default:
+			logger.Error("pipeline failed", "error", err, "processed", out.Processed, "failed", out.Failed)
+			return err
+		}
+		return nil
 	}
 }
 

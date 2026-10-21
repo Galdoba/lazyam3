@@ -1,8 +1,7 @@
-package ffprobe
+package fso
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -21,10 +20,8 @@ type Prober struct {
 // Constants
 // ---------------------------------------------------------------------------
 
-// ffprobe command and default scan arguments.
-const (
-	ffprobeCmd = "ffprobe"
-)
+// Default ffprobe binary name.
+const defaultBinPath = "ffprobe"
 
 var ffprobeScanArgs = []string{
 	"-v", "quiet",
@@ -35,17 +32,17 @@ var ffprobeScanArgs = []string{
 
 func NewProber(binPath string) *Prober {
 	if binPath == "" {
-		binPath = "ffprobe"
+		binPath = defaultBinPath
 	}
 	return &Prober{binPath: binPath}
 }
 
-func (p *Prober) ProbeFile(ctx context.Context, filePath string) (json.RawMessage, error) {
+func (p *Prober) ProbeFile(filePath string) (json.RawMessage, error) {
 	if _, err := os.Stat(filePath); err != nil {
 		return nil, fmt.Errorf("ffprobe: stat %q: %w", filePath, err)
 	}
 
-	cmd := exec.CommandContext(ctx, p.binPath, append(ffprobeScanArgs, filePath)...)
+	cmd := exec.Command(p.binPath, append(ffprobeScanArgs, filePath)...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

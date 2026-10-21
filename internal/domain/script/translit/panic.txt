@@ -1,0 +1,5 @@
+[2026-05-03 14:57:25.213] [info]: new task added: Dexter_101_PRT260502194624
+[2026-05-03 14:57:25.335] [info]: key SER_03728_18: found in global data
+panic: transliteration imposible:
+        Декстер®
+        '®' is not in literalsMap

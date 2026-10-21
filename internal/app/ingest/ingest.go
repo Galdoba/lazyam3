@@ -1,42 +1,45 @@
 package ingest
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/Galdoba/lazyam3/ffprobe"
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
+	"github.com/Galdoba/lazyam3/internal/infra/fso"
 )
 
-// Ingest implements ingest.IngestPort with a minimal stub.
-// Real implementation will scan, probe, and parse files.
-type Ingest struct{}
+// Ingest implements ingest.Organizer by scanning a directory, probing each
+// regular file with ffprobe, and returning a MediaUnit.
+type Ingest struct {
+	ffprobeBinary string
+}
 
-// Ingest scans a directory and returns MediaUnits.
-// TODO: implement real scan/probe/parse logic.
-func (s *Ingest) Ingest(dir string) (ingest.MediaUnit, error) {
-	// scetch: return empty for now.
-	// TODO: sort filenames alphabeticaly
-	fmt.Println("ingesting", dir)
-	fmt.Println("get files")
+// New creates an Ingest that uses the given ffprobe binary path.
+func New(ffprobeBinaryPath string) *Ingest {
+	return &Ingest{ffprobeBinary: ffprobeBinaryPath}
+}
+
+// Ingest scans dir for regular files, probes each with ffprobe, and returns
+// a MediaUnit. Non-regular entries (directories, symlinks, etc.) are skipped.
+// A probe failure fails the entire directory immediately.
+func (ing *Ingest) Ingest(dir string) (ingest.MediaUnit, error) {
 	fls, err := os.ReadDir(dir)
 	if err != nil {
 		return ingest.MediaUnit{}, err
 	}
 	dirData := make(map[string][]byte)
-	fmt.Println("probe files")
+	prober := fso.NewProber(ing.ffprobeBinary)
 	for _, f := range fls {
-		data, err := ffprobe.NewProber("").ProbeFile(context.TODO(), filepath.Join(dir, f.Name()))
-		if err != nil {
-			return ingest.MediaUnit{}, err
+		if !f.Type().IsRegular() {
+			continue
 		}
-		fmt.Println("aquired data for", f.Name())
+		path := filepath.Join(dir, f.Name())
+		data, err := prober.ProbeFile(path)
+		if err != nil {
+			return ingest.MediaUnit{}, fmt.Errorf("failed to probe file %q: %w", path, err)
+		}
 		dirData[f.Name()] = data
 	}
-	fmt.Println("create MediaUnit")
-	mu, err := ingest.NewMediaUnit(dirData)
-
-	return mu, err
+	return ingest.NewMediaUnit(dirData)
 }

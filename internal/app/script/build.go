@@ -2,12 +2,20 @@ package script
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/Galdoba/lazyam3/internal/domain/script"
 )
 
-// Build is the use case that accepts domain inputs and produces a script text.
+// Build is the use case that builds a rendering script from the config and
+// materializes it as a usable artifact via the Renderer.
 func Build(ctx context.Context, config script.ScriptConfig, renderer script.Renderer) error {
-	text := script.Text("// TODO: generate rendering script")
-	return renderer.Write(config.Destination, text)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	sc, err := script.BuildScript(config)
+	if err != nil {
+		return fmt.Errorf("build script: %w", err)
+	}
+	return renderer.Render(sc)
 }

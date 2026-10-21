@@ -1,4 +1,4 @@
-// Package jsonstore is a simple key-value store persisted to a JSON file.
+// Package jsonstore is template of a simple key-value store persisted to a JSON file.
 // It emulates a database: Get/Set/Delete/Close methods match what a real
 // store would have, so swapping in a real database won't affect commands.
 package jsonstore
@@ -39,7 +39,7 @@ func New(path string) (*Store, error) {
 func (s *Store) load() error {
 	raw, err := os.ReadFile(s.path)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil // новый пустой store
+		return nil // new empty store
 	}
 	if err != nil {
 		return fmt.Errorf("failed to read store file: %w", err)

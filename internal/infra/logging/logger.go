@@ -149,9 +149,9 @@ type multiHandler struct {
 	handlers []slog.Handler
 }
 
-func (h *multiHandler) Enabled(_ context.Context, _ slog.Level) bool {
+func (h *multiHandler) Enabled(_ context.Context, lvl slog.Level) bool {
 	for _, hh := range h.handlers {
-		if hh.Enabled(context.Background(), slog.LevelInfo) {
+		if hh.Enabled(context.Background(), lvl) {
 			return true
 		}
 	}
@@ -159,12 +159,13 @@ func (h *multiHandler) Enabled(_ context.Context, _ slog.Level) bool {
 }
 
 func (h *multiHandler) Handle(ctx context.Context, r slog.Record) error {
+	var errs []error
 	for _, hh := range h.handlers {
 		if err := hh.Handle(ctx, r); err != nil {
-			return err
+			errs = append(errs, err)
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func (h *multiHandler) WithAttrs(attrs []slog.Attr) slog.Handler {

@@ -66,7 +66,7 @@ type Stream struct {
 
 // Coordinate returns the ffmpeg-style stream coordinate,
 // e.g. "[0:v:0]" or "[1:s:0]".
-func (s Stream) Coordinate() string {
+func (s Stream) coordinate() string {
 	kind := abbreviateKind(s.Kind)
 	return fmt.Sprintf("[%d:%s:%d]", s.FileIndex, kind, s.Index)
 }

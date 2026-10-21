@@ -11,9 +11,15 @@ const (
 )
 
 type Config struct {
-	Paths   Paths   `toml:"paths"`
-	Logger  Logging `toml:"logger"`
-	Storage Storage `toml:"storage"`
+	Paths    Paths    `toml:"paths"`
+	Logger   Logging  `toml:"logger"`
+	Storage  Storage  `toml:"storage"`
+	Hardsub  Hardsub  `toml:"hardsub"`
+}
+
+// Hardsub holds hardsub classification rules.
+type Hardsub struct {
+	Tag string `toml:"tag"` // filename tag marking a sidecar subtitle as hardsub (burn-in)
 }
 
 // Storage holds store settings. Currently only the path to the JSON file;
@@ -27,6 +33,7 @@ type Paths struct {
 	InputDirectory  string `toml:"input_directory"`
 	OutputDirectory string `toml:"output_directory"`
 	MetadataPath    string `toml:"metadata_path"`
+	FfprobeBinary   string `toml:"ffprobe_binary,omitempty"`
 }
 
 type Logging struct {
@@ -41,6 +48,7 @@ func defaultCFG() Config {
 			InputDirectory:  "/tmp/lazyam3/input",
 			OutputDirectory: "/tmp/lazyam3/output",
 			MetadataPath:    "/tmp/lazyam3/metadata.json",
+			FfprobeBinary:   "",
 		},
 		Logger: Logging{
 			Level:    "info",
@@ -49,6 +57,9 @@ func defaultCFG() Config {
 		},
 		Storage: Storage{
 			Path: "/path/to/file.json",
+		},
+		Hardsub: Hardsub{
+			Tag: "Forsirovannye",
 		},
 	}
 }

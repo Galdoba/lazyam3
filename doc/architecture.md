@@ -25,9 +25,9 @@ The architecture follows **Domain-Driven Design (DDD)** principles with a clean 
         ▼                               ▼
 ┌─────────────────┐ ┌───────────────────┐ ┌─────────────────────┐
 │ domain/ingest   │ │ domain/metadata   │ │ domain/script       │
-│ MediaUnit       │ │ ProductRepository │ │ Script, Text        │
+│ MediaUnit       │ │ ProductRepository │ │ Script              │
 │ Stream          │ │ Root, Found, Kind │ │ ScriptConfig        │
-│ IngestPort      │ │ Descendants       │ │ StreamSelection     │
+│ Organizer       │ │ Descendants       │ │ StreamSelection     │
 └────────┬────────┘ └─────────┬─────────┘ │ Renderer            │
          │                    │           └──────────┬──────────┘
          │                    │                      │ imports
@@ -41,10 +41,10 @@ The architecture follows **Domain-Driven Design (DDD)** principles with a clean 
 ┌───────────────────────────────────────────────────────────────┐
 │  Infrastructure Layer (internal/infra/)                       │
 │  Concrete implementations of domain ports                     │
-│  - app/ingest.Ingest (stub) implements IngestPort             │
+│  - app/ingest.Ingest implements Organizer             │
 │  - metadata.Repository implements ProductRepository           │
-│  - fs.ScriptWriter implements Renderer                        │
-│  - ffprobe.Client / ProbeClient (probing support)             │
+│  - script.Renderer: infra/script (usable artifact: executable file) │
+│  - fso.Prober (ffprobe execution and JSON parsing)             │
 │  Also: config, logging, cache, persistence/jsonstore,         │
 │  commands (CLI entry points)                                  │
 └───────────────────────────────────────────────────────────────┘
@@ -58,21 +58,21 @@ The domain layer contains pure business logic with zero dependencies on external
 
 | Package | Responsibility | Key Types |
 |---------|---------------|-----------|
-| `internal/domain/ingest` | Physical file identity and stream description | `MediaUnit`, `Stream`, `StreamKind`, `Layout`, `Language`, `Rational`, `ValidationIssue`, `IngestPort` |
-| `internal/domain/metadata` | Product metadata from counterparty | `Root`, `Found`, `Kind`, `Descendants`, `SeriesItem`, `SeasonsItem`, `EpisodesItem`, `MoviesItem`, `ProductRepository` |
-| `internal/domain/script` | Rendering script generation | `Script`, `Text`, `ScriptConfig`, `StreamSelection`, `Renderer` |
+| `internal/domain/ingest` | Physical file identity and stream description | `MediaUnit`, `Stream`, `StreamKind`, `Layout`, `Language`, `Rational`, `ValidationIssue`, `Organizer` |
+| `internal/domain/metadata` | Product metadata from counterparty | `Product`, `Kind`, `ProductRepository` |
+| `internal/domain/script` | Rendering script generation | `Script`, `ScriptConfig`, `StreamSelection`, `Renderer` |
 
 ### Domain Port Interfaces
 
 ```go
 // domain/ingest/port.go
-type IngestPort interface { Ingest(dir string) ([]MediaUnit, error) }
+type Organizer interface { Ingest(dir string) (MediaUnit, error) }
 
 // domain/metadata/port.go
-type ProductRepository interface { FindByID(id int64) (*Found, error) }
+type ProductRepository interface { FindByID(id int64) (*Product, error) }
 
 // domain/script/port.go
-type Renderer interface { Write(dest string, content Text) error }
+type Renderer interface { Render(sc Script) error }
 ```
 
 ### Pure Functions
@@ -80,12 +80,12 @@ type Renderer interface { Write(dest string, content Text) error }
 ```go
 // domain/ingest
 func ExtractID(filename string) (int64, error)                        // "63603.mp4" → 63603
-func ParseStreams(ffprobeJSON string) ([]Stream, error)               // ffprobe JSON → []Stream
+func ParseStreams(ffprobeJSON []byte) ([]Stream, error)               // ffprobe JSON → []Stream
 func ValidateMediaUnit(streams []Stream) ValidationIssues             // domain validation rules
 func (s Stream) Coordinate() string                                   // ffmpeg selector "[0:a:1]"
 
-// domain/metadata
-func (r *Root) FindByID(id int64, d Descendants) (*Found, bool)       // tree search, returns self-contained copy
+// domain/metadata — no pure functions: types + ProductRepository port only
+// (JSON tree search lives in infra/metadata: Root.FindByID(id, Descendants) → *Found)
 ```
 
 ### Design Principles
@@ -93,8 +93,8 @@ func (r *Root) FindByID(id int64, d Descendants) (*Found, bool)       // tree se
 - **Domains are pure** — no imports from infrastructure or application layers
 - **Ports define contracts** — implementations live in application/infrastructure
 - **Types are data** — `MediaUnit`, `Found`, `Script` are data structures; behavior lives in package-level functions
-- **Search logic stays in domain** — `Root.FindByID()` is a domain method, not infrastructure
-- **One accepted cross-domain dependency** — `domain/script` imports `domain/ingest` (`ScriptConfig.Files []ingest.Stream`). `domain/ingest` and `domain/metadata` import no other domain.
+- **Logic stays in domain** — `ValidateMediaUnit()` rules are domain functions, not infrastructure
+- **One accepted cross-domain dependency** — `domain/script` imports both `domain/ingest` and `domain/metadata` (`ScriptConfig.Streams []ingest.Stream`). `domain/ingest` and `domain/metadata` import no other domain.
 
 ## Application Layer
 
@@ -105,33 +105,45 @@ The application layer orchestrates domain services to accomplish use cases. It k
 ```go
 // internal/app/pipeline
 type Pipeline struct {
-    Ingest ingest.IngestPort
+    logger      *slog.Logger
+    in          ingest.Organizer
+    md          metadata.ProductRepository
+    rd          script.Renderer
+    sourceDir   string
+    destination string
+    dryRun      bool
+    events      chan PipelineEvent
 }
 
-func NewPipeline(in ingest.IngestPort) *Pipeline
-func (p *Pipeline) Run(input RunInput) (RunOutput, error)
+func NewPipeline(opts Options) *Pipeline
+func (p *Pipeline) Run(ctx context.Context) (RunOutput, error)    // loops RunOnce until ctx cancelled
+func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) // one scan pass
 ```
 
 **Responsibilities (current):**
-- Calls `Ingest.Ingest(sourceDir)` and returns `FilesProcessed`
-- Metadata resolution, script generation, and rendering are TODO (tasks 2–8)
+- `RunOnce`: scans `sourceDir`, per writable unit directory runs ingest → metadata (`FindByID`) → `app/script.Build` (unless `DryRun`), emits `PipelineEvent` (UnitDone/UnitFailed/ScanDone), returns `RunOutput{Processed, Failed}`
+- Assembles `ScriptConfig` by convention: streams sorted by `(FileIndex, Index)`, SRT = first `.srt` filename, env paths derived under `Destination` (`buffer`, `in_progress`, `done`, `notifications`, `target`), script artifact at `<Destination>/scripts/<id>.sh`; `EnsureEnvDirs` creates that tree (called from cmd_process at startup)
+- Per-unit failures are counted and emitted, not returned; the error return covers scan failure and context cancellation
 
 **What Pipeline does NOT do:**
-- Does not scan files directly (delegates to `IngestPort`)
-- Does not query metadata directly (delegates to `ProductRepository` — not yet wired)
-- Does not generate script content (delegates to domain/script — not yet wired)
-- Does not write files directly (delegates to `Renderer` — not yet wired)
+- Does not scan files directly (delegates to `Organizer`)
+- Does not query metadata directly (delegates to `ProductRepository`)
+- Does not generate script content (delegates to `domain/script` via `app/script.Build`)
+- Does not write files directly (delegates to `Renderer`)
 
 ### Use Cases
 
 ```go
 // internal/app/ingest
-type Ingest struct{}
-func (s *Ingest) Ingest(dir string) ([]ingest.MediaUnit, error)  // stub: returns nil, nil
+type Ingest struct {
+	ffprobeBinary string
+}
+func (ing *Ingest) Ingest(dir string) (ingest.MediaUnit, error)
+// real: scan → filter → probe → parse → MediaUnit
 
 // internal/app/script
 func Build(ctx context.Context, config script.ScriptConfig, renderer script.Renderer) error
-// currently writes a placeholder Text via Renderer
+// real: BuildScript(config) → renderer.Render(sc) — materializes a usable artifact
 ```
 
 ### AppModules
@@ -151,8 +163,9 @@ Shared dependency container. Only `Config` and `Logger` are eagerly initialized 
 
 | Type | Purpose |
 |------|---------|
-| `RunInput` | Runtime parameters from CLI: `SourceDir`, `Destination`, `DryRun` |
-| `RunOutput` | Results returned to CLI: `FilesProcessed`, `ScriptWritten` |
+| `Options` | Pipeline construction: Logger, Events channel, ports (Ingest, Metadata, Renderer), SourceDir, Destination, DryRun, HardsubTag |
+| `RunOutput` | Result summary: Processed (completed chain), Failed (ingest/metadata/script failures) |
+| `PipelineEvent` | Signal emitted to CLI: Type (UnitDone/UnitFailed/ScanDone), ID, Error |
 
 ## Infrastructure Layer
 
@@ -162,12 +175,11 @@ Infrastructure provides concrete implementations of domain ports and the outside
 
 | Package | Contents | Depends On |
 |---------|----------|------------|
-| `internal/infra/fs` | `ScriptWriter` (implements `script.Renderer`) | `domain/script` |
-| `internal/infra/ffprobe` | `Client` (runs ffprobe, `RawData`), `Mapper` (stub), `ProbeClient` (`[]ingest.Stream`) | `domain/ingest` |
+| `internal/infra/fso` | `Prober` (runs ffprobe, returns JSON) | — |
 | `internal/infra/metadata` | `Repository` (implements `ProductRepository`) | `domain/metadata` |
+| `internal/infra/script` | `Renderer` (implements `domain/script.Renderer`; MkdirAll + WriteFile + Chmod, options) | `domain/script` |
 | `internal/infra/config` | `Config` struct, `Load()` via appcontext configmanager | — |
 | `internal/infra/logging` | `Logger` (slog facade) | — |
-| `internal/infra/cache` | in-memory cache | — |
 | `internal/infra/persistence/jsonstore` | JSON key-value store | — |
 | `internal/infra/commands` | `CMDProcess` (CLI command; wires app + domain) | `app`, `domain/ingest` |
 
@@ -176,25 +188,31 @@ Infrastructure provides concrete implementations of domain ports and the outside
 ```go
 type Repository struct {
     mu   sync.RWMutex
-    root *metadata.Root
+    root *Root
 }
 ```
 
 **Workflow:**
 1. `New(path)` — reads and unmarshals `metadata.json` into `Root`
-2. `FindByID(id)` — delegates to `Root.FindByID(id, WithDescendants)`
-3. Returns `*Found` with a self-contained copy of the product tree
+2. `FindByID(id)` — delegates to `Root.FindByID(id, WithDescendants)`, converts to `*Product`
+3. Returns `*Product` (flat domain DTO)
 
 ### Current Ingest Path
 
-The real scan/probe/parse implementation does not exist yet. Today:
+The scan/probe/parse implementation is complete:
 
-1. `commands.CMDProcess` validates `--source`
-2. Creates `app/ingest.Ingest` (stub) and `pipeline.NewPipeline`
-3. `Pipeline.Run` calls `Ingest.Ingest(sourceDir)` → `nil`
-4. Returns `RunOutput{FilesProcessed: 0}`
+1. `commands.CMDProcess` validates `--source-root` and `--ffprobe-path` (fallback: flag → `paths.ffprobe_binary` → `ffprobe`), loads metadata (`--metadata-path` or config)
+2. Creates `app/ingest.Ingest` with ffprobe binary path and `metadata.Repository` with catalog path
+3. `Pipeline.Run` scans directories, calls `Organizer.Ingest(dir)` per directory
+4. Each directory is probed, parsed, and validated into a `MediaUnit`
+5. Events (`EventUnitDone`, `EventUnitFailed`) are emitted per unit
 
-`infra/ffprobe.ProbeClient` exists but is not yet wired into any ingest implementation.
+By default `Pipeline.Run` polls every second until SIGINT/SIGTERM: the context is
+cancelled, the run stops after the current unit and the command logs
+`pipeline stopped` with the processed/failed totals and exits 0. `--once` runs a
+single scan pass (`RunOnce`) and exits the same way.
+
+`infra/fso.Prober` handles ffprobe execution and JSON parsing.
 
 ## Presentation Layer
 
@@ -211,16 +229,16 @@ CLI commands are the entry point. Wiring lives in `cmd/lazyam3/main.go`:
 func CMDProcess() *cli.Command {
     return &cli.Command{
         Name:  "process",
-        Flags: []cli.Flag{ /* --source, --output */ },
+        Flags: []cli.Flag{ /* --source-root, --target-root, --ffprobe-path, --metadata-path, --once */ },
         Action: cmdProcessAction,
     }
 }
 
 func cmdProcessAction(ctx context.Context, cmd *cli.Command) error {
-    // 1. Validate flags (--source required)
+    // 1. Validate flags (--source-root required, --metadata-path or config)
     // 2. Create dependencies (app/ingest.Ingest stub, Pipeline)
-    // 3. Run pipeline
-    // 4. Output results
+    // 3. Run pipeline (--once: single pass; otherwise poll until SIGINT)
+    // 4. Output results (processed/failed summary, exit 0 on cancellation)
 }
 ```
 
@@ -267,14 +285,12 @@ type Config struct {
 ```
 1. cmd/lazyam3 starts
 2. AppModules created (empty)
-3. Root Before: config loaded, logger created (modules.Init)
+3. Root Before: config loaded, logger created (modules.Init); SIGINT/SIGTERM cancel the run context
 4. commands.CMDProcess action:
-   a. Validate --source flag
-   b. Create app/ingest.Ingest (stub) and Pipeline
-   c. Pipeline.Run(input):
-      - Ingest.Ingest(sourceDir) → []MediaUnit   (currently nil)
-      - TODO: metadata resolution, script generation, rendering
-   d. Print "processed N files"
+   a. Validate --source-root flag; resolve metadata/ffprobe paths (flag → config → default)
+   b. Create app/ingest.Ingest, metadata.Repository, ensure work dirs, create Pipeline
+   c. --once → RunOnce (single pass); default → Run (polls until the context is cancelled)
+   d. Log "pipeline finished/stopped" with processed/failed totals (exit 0 on signal)
 5. Root After: modules.Shutdown() closes store and logger
 ```
 

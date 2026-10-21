@@ -2,7 +2,7 @@
 
 Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata resolution → script generation → rendering).
 
-**Current State: TASK 1 COMPLETE — ingest domain defined (types + pure functions, 24 unit tests). `app/ingest` is a stub; pipeline wires ingest only. See `doc/tasks.json`.**
+**Current State**: Tasks 1-9 complete, task 10 (TOML config) deferred. Pipeline fully wired end-to-end with HSUB auto-detection, movie naming fix, and config-driven paths.
 
 ## Documentation Guide
 
@@ -10,7 +10,11 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 |---|---|
 | `doc/architecture.md` | Full architecture: layers, domains, ports, dependency rules, development guidelines |
 | `doc/lazyam3.md` | Brief overview: workflow, domain modules, repository tree |
+| `doc/ingest.md` | Ingest domain: types, pure functions, validation rules, test data |
+| `doc/metadata.md` | Metadata domain: Product/Kind, ProductRepository, tree lookup, catalog test data |
+| `doc/script.md` | Script domain: BuildScript, naming derivation, audio filters, SRT/HSUB handling, template |
 | `doc/tasks.json` | Implementation tasks: items with reasons, verification, blocking deps, status tracking |
+| `doc/BACKLOG.md` | Deferred items: language translation, source file naming hook |
 | `AGENTS.md` | This file: commands, dependencies, quick reference |
 
 ## Commands
@@ -37,33 +41,23 @@ infrastructure (internal/infra/*)  ← Concrete implementations of ports
 platform (internal/platform/*)     ← Stateless services (no domain deps)
 ```
 
-**Key principles:**
-- Domains are pure — no imports from infra or app (exception: `domain/script` imports `domain/ingest`)
-- Pipeline works only with interfaces and DTOs
-- Infrastructure implements domain ports
-- Commands wire dependencies and call Pipeline
-
 ## External Dependencies
 
 | Package | Purpose |
 |---|---|
 | `github.com/urfave/cli/v3` | CLI framework (direct dependency) |
 | `charm.land/bubbletea/v2` | TUI framework (`internal/presentation/tui`, not wired yet) |
-| `github.com/Galdoba/appcontext` | Config loading via configmanager (JSON stub; TOML planned — task 10) |
+| `github.com/Galdoba/appcontext` | Config loading via configmanager (TOML; `[hardsub] tag` for HSUB detection) |
 | `github.com/tidwall/gjson` | JSON querying (`scrips/asses` tool) |
 
-Note: `go mod tidy` is pending — `appcontext` and `gjson` are imported directly but still marked `// indirect` in go.mod.
 
-## Key Types
 
-| Type | Package | Purpose |
-|---|---|---|
-| `Pipeline` | `internal/app/pipeline` | Orchestrator (currently `Ingest` only) |
-| `RunInput` / `RunOutput` | `internal/app/pipeline` | DTOs at presentation ↔ app boundary |
-| `MediaUnit` | `internal/domain/ingest` | Aggregated file info (ID, filepaths, streams, validation) |
-| `Stream` | `internal/domain/ingest` | Single stream (kind, codec, layout, language, …) |
-| `IngestPort` | `internal/domain/ingest` | Port for file ingestion |
-| `ProductRepository` | `internal/domain/metadata` | Port for metadata lookup |
-| `Found` / `Root` | `internal/domain/metadata` | Product tree and search result |
-| `Renderer` | `internal/domain/script` | Port for script rendering |
-| `AppModules` | `internal/app` | Shared dependency container (Config, Logger; lazy Cache, Store) |
+## Development Rules
+
+- Domains are pure — no imports from infra or app
+- Pipeline works only with interfaces and DTOs
+- Infrastructure implements domain ports
+- Commands wire dependencies and call Pipeline
+- Make only minimal code edits
+- Infrastructure failures fail fast
+

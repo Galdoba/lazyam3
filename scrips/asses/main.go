@@ -15,7 +15,7 @@ import (
 
 	"github.com/tidwall/gjson"
 
-	"github.com/Galdoba/lazyam3/internal/domain/metadata" // замените на ваш путь
+	"github.com/Galdoba/lazyam3/internal/infra/metadata"
 )
 
 func main() {
@@ -65,7 +65,7 @@ func die(err error) {
 func cmdCheck(args []string) {
 	fs := flag.NewFlagSet("check", flag.ExitOnError)
 	filePath := fs.String("file", "metadata.json", "path to JSON")
-	fs.Parse(args)
+	_ = fs.Parse(args)
 
 	data, err := os.ReadFile(*filePath)
 	if err != nil {
@@ -89,7 +89,7 @@ func cmdFieldValues(args []string) {
 	filePath := fs.String("file", "metadata.json", "path to JSON")
 	field := fs.String("field", "", "field name (required)")
 	noLines := fs.Bool("no-lines", false, "do not print lines, only counters")
-	fs.Parse(args)
+	_ = fs.Parse(args)
 
 	if *field == "" {
 		die(errors.New("-field is required"))
@@ -135,7 +135,7 @@ func printFieldValueCounts(data []byte, field string) {
 	root := gjson.ParseBytes(data)
 
 	counts := map[string]int{}
-	var order []string // порядок первого появления
+	var order []string // order of first appearance
 
 	walkGJSON(root, "@this", func(path string, v gjson.Result) {
 		if lastPathSegment(path) != field {
@@ -200,10 +200,10 @@ func valueRepr(v gjson.Result) string {
 }
 
 // ---------------------------------------------------------------------------
-// check-required (на gjson)
+// check-required (on gjson)
 // ---------------------------------------------------------------------------
 
-// Пути в нотации gjson. '#' — любой индекс массива.
+// Paths in gjson notation. '#' is any array index.
 var requiredByPath = map[string][]string{
 	"@this":                         {"series", "movies"},
 	"series.#":                      {"id", "title", "ageRestrictions"},
@@ -219,7 +219,7 @@ var requiredByPath = map[string][]string{
 func cmdCheckRequired(args []string) {
 	fs := flag.NewFlagSet("check-required", flag.ExitOnError)
 	filePath := fs.String("file", "metadata.json", "path to JSON")
-	fs.Parse(args)
+	_ = fs.Parse(args)
 
 	data, err := os.ReadFile(*filePath)
 	if err != nil {
@@ -228,7 +228,7 @@ func cmdCheckRequired(args []string) {
 
 	li := newLineIndex(data)
 
-	var issues []requiredIssue // ← было: []issue
+	var issues []requiredIssue // was: []issue
 
 	root := gjson.ParseBytes(data)
 	root.ForEach(func(key, value gjson.Result) bool {
@@ -248,8 +248,8 @@ func cmdCheckRequired(args []string) {
 	}
 }
 
-// checkRequiredInValue рекурсивно обходит значение и для объектов,
-// путь которых есть в requiredByPath, проверяет обязательные ключи.
+// checkRequiredInValue recursively traverses the value and for objects
+// whose path is in requiredByPath, checks required keys.
 func checkRequiredInValue(path string, v gjson.Result, li *lineIndex, issues *[]requiredIssue) {
 	if v.IsArray() {
 		v.ForEach(func(_, item gjson.Result) bool {
@@ -262,7 +262,7 @@ func checkRequiredInValue(path string, v gjson.Result, li *lineIndex, issues *[]
 		return
 	}
 
-	// Проверяем обязательные ключи для этого пути.
+	// Check required keys for this path.
 	if req, ok := requiredByPath[path]; ok {
 		for _, f := range req {
 			if !v.Get(f).Exists() {
@@ -271,8 +271,8 @@ func checkRequiredInValue(path string, v gjson.Result, li *lineIndex, issues *[]
 			}
 		}
 	}
-	// Рекурсивно спускаемся по вложенным объектам/массивам,
-	// расширяя путь.
+	// Recursively descend into nested objects/arrays,
+	// extending the path.
 	v.ForEach(func(k, sub gjson.Result) bool {
 		childPath := path
 		if childPath == "@this" {
@@ -286,14 +286,14 @@ func checkRequiredInValue(path string, v gjson.Result, li *lineIndex, issues *[]
 }
 
 // ---------------------------------------------------------------------------
-// check-null (на gjson)
+// check-null (on gjson)
 // ---------------------------------------------------------------------------
 
 func cmdCheckNull(args []string) {
 	fs := flag.NewFlagSet("check-null", flag.ExitOnError)
 	filePath := fs.String("file", "metadata.json", "path to JSON")
-	prefix := fs.String("prefix", "", "показывать только пути с этим префиксом")
-	fs.Parse(args)
+	prefix := fs.String("prefix", "", "show only paths with this prefix")
+	_ = fs.Parse(args)
 
 	data, err := os.ReadFile(*filePath)
 	if err != nil {
@@ -333,8 +333,8 @@ func cmdCheckNull(args []string) {
 	fmt.Fprintf(os.Stderr, "\nnull values: %d\n", len(hits))
 }
 
-// walkGJSON рекурсивно обходит Result, вызывая fn для каждого узла.
-// path начинается с "@this" для корня.
+// walkGJSON recursively traverses the Result, calling fn for each node.
+// path starts with "@this" for the root.
 func walkGJSON(v gjson.Result, path string, fn func(path string, v gjson.Result)) {
 	fn(path, v)
 	switch {
@@ -358,7 +358,7 @@ func walkGJSON(v gjson.Result, path string, fn func(path string, v gjson.Result)
 }
 
 // ---------------------------------------------------------------------------
-// индексация строк
+// line indexing
 // ---------------------------------------------------------------------------
 
 type lineIndex struct{ starts []int64 }
@@ -373,7 +373,7 @@ func newLineIndex(data []byte) *lineIndex {
 	return &lineIndex{starts: starts}
 }
 
-// locate возвращает 1-based line и col для байтового offset.
+// locate returns 1-based line and column for a byte offset.
 func (li *lineIndex) locate(offset int64) (line, col int) {
 	if offset < 0 {
 		return 1, 1
@@ -391,7 +391,7 @@ func (li *lineIndex) locate(offset int64) (line, col int) {
 }
 
 // ---------------------------------------------------------------------------
-// декодер с указанием строки/колонки (для subcommand "check")
+// decoder with line/column indication (for "check" subcommand)
 // ---------------------------------------------------------------------------
 
 type JSONDecodeError struct {

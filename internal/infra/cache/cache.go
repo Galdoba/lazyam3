@@ -1,4 +1,4 @@
-// Package cache is a thread-safe in-memory key-value cache.
+// Package cache is a template of thread-safe in-memory key-value cache.
 // Lives within the process, not persistent.
 package cache
 

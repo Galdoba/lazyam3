@@ -49,7 +49,7 @@ type Disp struct {
 type TagMap map[string]string
 
 // ParseStreams parses ffprobe JSON output into domain Stream objects.
-func ParseStreams(ffprobeJSON []byte) ([]Stream, error) {
+func parseStreams(ffprobeJSON []byte) ([]Stream, error) {
 	//TODO: rework
 	// accept bytes from format and multiple streams, return domain Stream
 	var input StreamInput
