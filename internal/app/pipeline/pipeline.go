@@ -146,12 +146,8 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 		p.emit(EventUnitFailed, unit.ID, err)
 		return err
 	}
-	// Move source files to BUFFER using the executor paths (same paths the script will use).
-	bufferPath := cfg.Env.Buffer
-	if bufferPath == "" {
-		bufferPath = filepath.Join(p.destination, "buffer")
-	}
-	if err := p.prepareFiles(dir, cfg.CallNames, bufferPath); err != nil {
+	// Move source files to OUTPUT directory (same place where scripts land).
+	if err := p.prepareFiles(dir, cfg.CallNames, p.destination); err != nil {
 		p.emit(EventUnitFailed, unit.ID, fmt.Errorf("prepare files: %w", err))
 		return err
 	}

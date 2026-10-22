@@ -328,9 +328,9 @@ func TestBuildScriptConfig(t *testing.T) {
 	if strings.Contains(cfg.Destination, "12094.sh") {
 		t.Error("Destination should use OUTBASE, not unit ID")
 	}
-	// Without executor paths, env fields should be empty.
-	if cfg.Env.Buffer != "" || cfg.Env.InProgress != "" {
-		t.Errorf("Env paths should be empty without executor paths: %+v", cfg.Env)
+	// Without executor paths, env fields should default to root.
+	if cfg.Env.Buffer != root || cfg.Env.InProgress != root {
+		t.Errorf("Env paths should default to root without executor paths: %+v", cfg.Env)
 	}
 
 	// Streams sorted by (FileIndex, Index) regardless of map order.

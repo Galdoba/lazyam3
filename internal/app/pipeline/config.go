@@ -85,10 +85,25 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 
 	// Normalize all executor paths for Windows
 	buffer := toSlash(executorPaths["buffer"])
+	if buffer == "" {
+		buffer = toSlash(root)
+	}
 	inProgress := toSlash(executorPaths["in_progress"])
+	if inProgress == "" {
+		inProgress = toSlash(root)
+	}
 	done := toSlash(executorPaths["done"])
+	if done == "" {
+		done = toSlash(root)
+	}
 	notifications := toSlash(executorPaths["notifications"])
+	if notifications == "" {
+		notifications = toSlash(root)
+	}
 	archive := toSlash(executorPaths["archive"])
+	if archive == "" {
+		archive = toSlash(filepath.Join(root, "archive"))
+	}
 
 	return script.ScriptConfig{
 		Filenames:   unit.Filenames,
