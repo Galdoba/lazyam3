@@ -217,7 +217,7 @@ func buildSRTSection(srt string, predictions []callname.PredictedOutput) string 
 		predPath = predictions[0].Path
 	}
 	// Extract directory from prediction path.
-	dir := filepath.Dir(predPath)
+	dir := filepath.ToSlash(filepath.Dir(predPath))
 	// SRT already includes the .srt extension, use it as-is for the destination filename.
 	return fmt.Sprintf(`cp "${IN_PROGRESS}/${SRT}" "%s/%s"`, dir, srt)
 }
@@ -278,7 +278,7 @@ func buildMKDirTarget(predictions []callname.PredictedOutput) string {
 	if path == "" {
 		path = predictions[0].Path
 	}
-	dir := filepath.Dir(path)
+	dir := filepath.ToSlash(filepath.Dir(path))
 	return `mkdir -p "` + dir + `"`
 }
 
