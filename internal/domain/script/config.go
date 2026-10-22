@@ -28,8 +28,9 @@ type ScriptConfig struct {
 	CallNames map[string]string
 
 	// Naming components (derived from Predictations for template use).
-	NameTag    string // suffix after BASENAME: "_s01e06", "_s01", "_e06", "" (movie)
-	SeasonDir  string // target-dir suffix after BASENAME: "_s01", "" (movie)
+	NameTag      string // suffix after BASENAME: "_s01e06", "_s01", "_e06", "" (movie)
+	SeasonDir    string // target-dir suffix after BASENAME: "_s01", "" (movie)
+	PRTTimestamp string // pipeline-provided timestamp for output file naming
 
 	// Environment paths (filled from app config)
 	Env Environment

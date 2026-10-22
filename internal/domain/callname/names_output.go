@@ -66,6 +66,9 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot 
 
 	// OUTBASE = baseName + nameTag (e.g. Belaya_koroleva_s01e01)
 	outBase := baseName + nameTag
+	if unit.PRTTimestamp != "" {
+		outBase = outBase + "_PRT" + unit.PRTTimestamp
+	}
 
 	// Detect hardsub: a subtitle file whose name contains the hardsub tag.
 	hsubFile := detectHSUB(unit.Filenames, hardsubTag)
@@ -169,15 +172,15 @@ func deriveEpisodeTag(p metadata.Product) string {
 }
 
 // deriveNameTagWithUnderscore returns the season/episode suffix with leading
-// underscore: "_s01e06", "_s01", "_e06", or "" (movie).
+// underscore: "_s01_06", "_s01", "_06", or "" (movie).
 func deriveNameTagWithUnderscore(seasonTag, episodeTag string) string {
 	switch {
 	case seasonTag != "" && episodeTag != "":
-		return "_s" + seasonTag + "e" + episodeTag
+		return "_s" + seasonTag + "_" + episodeTag
 	case seasonTag != "":
 		return "_s" + seasonTag
 	case episodeTag != "":
-		return "_e" + episodeTag
+		return "_" + episodeTag
 	}
 	return ""
 }

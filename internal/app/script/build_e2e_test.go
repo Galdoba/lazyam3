@@ -58,13 +58,19 @@ func TestBuildAndExecute_RealInputs(t *testing.T) {
 		t.Error("done directory missing")
 	}
 
-	// Rendered video must be non-empty.
-	if fi, err := os.Stat(filepath.Join(targetDir, "Arliss_s01e06_HD.mp4")); err == nil && fi.Size() == 0 {
+	// Rendered video must be non-empty (glob for PRT-wildcard).
+	matches, err := filepath.Glob(filepath.Join(targetDir, "*_HD.mp4"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) == 0 {
+		t.Error("no rendered video found")
+	} else if fi, err := os.Stat(matches[0]); err == nil && fi.Size() == 0 {
 		t.Error("rendered video is empty")
 	}
 
 	// One ALAC output per audio stream (stereo + mono in the fixture).
-	matches, err := filepath.Glob(filepath.Join(targetDir, "Arliss_s01e06_HD_AUDIO*.m4a"))
+	matches, err = filepath.Glob(filepath.Join(targetDir, "*_HD_AUDIO*.m4a"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -54,7 +54,7 @@ func TestPredictOutputs_series_episode(t *testing.T) {
 	if got[0].HsubFile != "" {
 		t.Errorf("[0] HsubFile = %q, want %q", got[0].HsubFile, "")
 	}
-	wantVideo := "/mnt/ROOT/EDIT/Arliss_s01/Arliss_s01e06_HD.mp4"
+	wantVideo := "/mnt/ROOT/EDIT/Arliss_s01/Arliss_s01_06_HD.mp4"
 	if got[0].Path != wantVideo {
 		t.Errorf("[0] Path = %q, want %q", got[0].Path, wantVideo)
 	}
@@ -72,7 +72,7 @@ func TestPredictOutputs_series_episode(t *testing.T) {
 	if got[1].Layout != "20" {
 		t.Errorf("[1] Layout = %q, want %q", got[1].Layout, "20")
 	}
-	wantAudio0 := "/mnt/ROOT/EDIT/Arliss_s01/Arliss_s01e06_HD_AUDIO00_RUS20.m4a"
+	wantAudio0 := "/mnt/ROOT/EDIT/Arliss_s01/Arliss_s01_06_HD_AUDIO00_RUS20.m4a"
 	if got[1].Path != wantAudio0 {
 		t.Errorf("[1] Path = %q, want %q", got[1].Path, wantAudio0)
 	}
@@ -84,7 +84,7 @@ func TestPredictOutputs_series_episode(t *testing.T) {
 	if got[2].Language != "jpn" {
 		t.Errorf("[2] Language = %q, want %q", got[2].Language, "jpn")
 	}
-	wantAudio1 := "/mnt/ROOT/EDIT/Arliss_s01/Arliss_s01e06_HD_AUDIO01_JPN51.m4a"
+	wantAudio1 := "/mnt/ROOT/EDIT/Arliss_s01/Arliss_s01_06_HD_AUDIO01_JPN51.m4a"
 	if got[2].Path != wantAudio1 {
 		t.Errorf("[2] Path = %q, want %q", got[2].Path, wantAudio1)
 	}
@@ -93,7 +93,7 @@ func TestPredictOutputs_series_episode(t *testing.T) {
 	if got[3].MediaType != "subtitle" {
 		t.Errorf("[3] MediaType = %q, want %q", got[3].MediaType, "subtitle")
 	}
-	wantSub := "/mnt/ROOT/EDIT/Arliss_s01/Arliss_s01e06.srt"
+	wantSub := "/mnt/ROOT/EDIT/Arliss_s01/Arliss_s01_06.srt"
 	if got[3].Path != wantSub {
 		t.Errorf("[3] Path = %q, want %q", got[3].Path, wantSub)
 	}
@@ -277,7 +277,7 @@ func TestPredictOutputs_episode_only(t *testing.T) {
 
 	got := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "")
 
-	want := "/mnt/ROOT/EDIT/Show/Show_e07_HD.mp4"
+	want := "/mnt/ROOT/EDIT/Show/Show_07_HD.mp4"
 
 	if got[0].Path != want {
 		t.Errorf("[0] Path = %q, want %q", got[0].Path, want)
@@ -330,5 +330,43 @@ func TestLayoutTag(t *testing.T) {
 				t.Errorf("layoutTag(%q) = %q, want %q", tt.layout, got, tt.want)
 			}
 		})
+	}
+}
+
+// ── PredictOutputs with PRT timestamp ──────────────────────────────
+
+func TestPredictOutputs_with_PRT_timestamp(t *testing.T) {
+	season := 1
+	episode := 6
+	product := metadata.Product{
+		ID:            12345,
+		Kind:          metadata.KindSeriesEpisode,
+		SeriesTitle:   "Arliss",
+		SeasonNumber:  &season,
+		EpisodeNumber: &episode,
+	}
+	streams := []ingest.Stream{
+		{Kind: ingest.StreamKindVideo, Index: 0},
+		{Kind: ingest.StreamKindAudio, Index: 1, Language: "rus", ChannelLayout: ingest.LayoutStereo},
+	}
+	unit := newUnit(product, []string{"12345.mp4", "12345-rus.srt"}, streams)
+	unit.PRTTimestamp = "261023120000"
+
+	got := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "")
+
+	if len(got) != 2 {
+		t.Fatalf("PredictOutputs() = %d outputs, want 2", len(got))
+	}
+
+	// Video should include PRT timestamp
+	wantVideo := "/mnt/ROOT/EDIT/Arliss_s01/Arliss_s01_06_PRT261023120000_HD.mp4"
+	if got[0].Path != wantVideo {
+		t.Errorf("[0] Path = %q, want %q", got[0].Path, wantVideo)
+	}
+
+	// Audio should include PRT timestamp
+	wantAudio := "/mnt/ROOT/EDIT/Arliss_s01/Arliss_s01_06_PRT261023120000_HD_AUDIO00_RUS20.m4a"
+	if got[1].Path != wantAudio {
+		t.Errorf("[1] Path = %q, want %q", got[1].Path, wantAudio)
 	}
 }

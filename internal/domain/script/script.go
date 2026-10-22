@@ -37,7 +37,7 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 	// Derive predictions if not set (backward compat for tests)
 	predictions := cfg.Predictions
 	if len(predictions) == 0 {
-		predictions = derivePredictionsFromStreams(cfg.Product, cfg.Streams, cfg.Env.TargetRoot)
+		predictions = derivePredictionsFromStreams(cfg.Product, cfg.Streams, cfg.Env.TargetRoot, cfg.PRTTimestamp)
 	}
 	cfg.Predictions = predictions
 
@@ -310,7 +310,7 @@ func buildReadyFile(predictions []callname.PredictedOutput) string {
 
 // derivePredictionsFromStreams builds PredictedOutput from Product + Streams.
 // Used as fallback when predictions are not set in config (backward compat).
-func derivePredictionsFromStreams(product metadata.Product, streams []ingest.Stream, targetRoot string) []callname.PredictedOutput {
+func derivePredictionsFromStreams(product metadata.Product, streams []ingest.Stream, targetRoot string, prtTimestamp string) []callname.PredictedOutput {
 	// Sort streams for deterministic prediction order
 	slices.SortFunc(streams, func(a, b ingest.Stream) int {
 		if a.FileIndex != b.FileIndex {
@@ -324,8 +324,9 @@ func derivePredictionsFromStreams(product metadata.Product, streams []ingest.Str
 		streamMap[key] = s
 	}
 	unit := ingest.MediaUnit{
-		ID:      product.ID,
-		Streams: streamMap,
+		ID:           product.ID,
+		Streams:      streamMap,
+		PRTTimestamp: prtTimestamp,
 	}
 	return callname.PredictOutputs(product, unit, targetRoot, "")
 }

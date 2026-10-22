@@ -54,10 +54,11 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	// Predict outputs from the full MediaUnit — this is the single source
 	// of truth for output file names. Called before the script domain is
 	// touched, so predictions drive all downstream logic.
+	timestamp := time.Now().Format("060102150405")
+	unit.PRTTimestamp = timestamp
 	predictions := callname.PredictOutputs(prod, unit, targetRoot, hardsubTag)
 
 	// Build call names for all unit files (original filename → call name).
-	timestamp := time.Now().Format("060102150405")
 	callNames, err := callname.BuildInputNames(prod, unit.Filenames, timestamp)
 	if err != nil {
 		return script.ScriptConfig{}, fmt.Errorf("build call names for unit %d: %w", unit.ID, err)
@@ -80,8 +81,9 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	// Extract OUTBASE from first video prediction for script filename.
 	outBase := extractOutBase(predictions)
 
-	// Build destination path using OUTBASE instead of unit ID.
-	destination := filepath.Join(root, fmt.Sprintf("%s.sh", outBase))
+	// Build destination path using OUTBASE with PRT timestamp so concurrent
+	// runs do not overwrite each other.
+	destination := filepath.Join(root, fmt.Sprintf("%s_PRT%s.sh", outBase, timestamp))
 
 	// Normalize all executor paths for Windows
 	buffer := toSlash(executorPaths["buffer"])
@@ -106,13 +108,14 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	}
 
 	return script.ScriptConfig{
-		Filenames:   unit.Filenames,
-		Streams:     streams,
-		SRT:         srtCall,
-		HSUBFile:    hsubCall,
-		Product:     prod,
-		Predictions: predictions,
-		CallNames:   callNames,
+		Filenames:      unit.Filenames,
+		Streams:        streams,
+		SRT:            srtCall,
+		HSUBFile:       hsubCall,
+		Product:        prod,
+		Predictions:    predictions,
+		CallNames:      callNames,
+		PRTTimestamp:   timestamp,
 		Env: script.Environment{
 			Buffer:        buffer,
 			InProgress:    inProgress,
