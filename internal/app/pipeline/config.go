@@ -88,6 +88,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	inProgress := toSlash(executorPaths["in_progress"])
 	done := toSlash(executorPaths["done"])
 	notifications := toSlash(executorPaths["notifications"])
+	archive := toSlash(executorPaths["archive"])
 
 	return script.ScriptConfig{
 		Filenames:   unit.Filenames,
@@ -102,6 +103,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 			InProgress:    inProgress,
 			Done:          done,
 			Notifications: notifications,
+			Archive:       archive,
 			TargetRoot:    targetRoot,
 			Priority:      defaultPriority,
 		},

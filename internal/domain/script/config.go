@@ -44,6 +44,7 @@ type Environment struct {
 	InProgress    string
 	Done          string
 	Notifications string
+	Archive       string // script self-archive location (from TOML)
 	TargetRoot    string // e.g. "/mnt/ROOT/EDIT"
 	Priority      int
 }

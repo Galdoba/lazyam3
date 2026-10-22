@@ -115,10 +115,11 @@ func realConfig(t *testing.T) (dscript.ScriptConfig, string, string) {
 			InProgress:    filepath.Join(envRoot, "in_progress"),
 			Done:          filepath.Join(envRoot, "done"),
 			Notifications: filepath.Join(envRoot, "notifications"),
+			Archive:       filepath.Join(envRoot, "done", "bash"),
 			TargetRoot:    filepath.Join(envRoot, "target"),
 			Priority:      6,
 		},
-		Destination: filepath.Join(envRoot, "scripts", outBase+".sh"),
+		Destination: filepath.Join(envRoot, outBase+".sh"),
 	}
 	return cfg, srcDir, envRoot
 }

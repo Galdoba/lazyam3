@@ -61,6 +61,8 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot 
 	} else {
 		targetDir = filepath.Join(targetRoot, baseName)
 	}
+	// Normalize to forward slashes for cross-platform compatibility
+	targetDir = filepath.ToSlash(targetDir)
 
 	// OUTBASE = baseName + nameTag (e.g. Belaya_koroleva_s01e01)
 	outBase := baseName + nameTag

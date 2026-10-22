@@ -28,6 +28,7 @@ var AmediaGeneric = strings.Join([]string{
 	`BUFFER="|=buffer=|"`,
 	`IN_PROGRESS="|=in_progress=|"`,
 	`DONE="|=done=|"`,
+	`ARCHIVE="|=archive=|"`,
 	`NOTIFICATIONS="|=notifications=|"`,
 	``,
 	`#`,
@@ -46,5 +47,5 @@ var AmediaGeneric = strings.Join([]string{
 	`mv "${IN_PROGRESS}/${SOURCE}" "${DONE}/${SOURCE}"`,
 	`|=srt_cleanup=|`,
 	`|=hsub_cleanup=|`,
-	`mv "$0" "${DONE}/bash/"`,
+	`mv "$0" "${ARCHIVE}"`,
 }, "\n")

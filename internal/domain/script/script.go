@@ -81,6 +81,7 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 	content = replaceAll(content, "in_progress", cfg.Env.InProgress)
 	content = replaceAll(content, "done", cfg.Env.Done)
 	content = replaceAll(content, "notifications", cfg.Env.Notifications)
+	content = replaceAll(content, "archive", cfg.Env.Archive)
 	content = replaceAll(content, "mkdir_target", mkdirTarget)
 
 	// Validate no unresolved placeholders remain
