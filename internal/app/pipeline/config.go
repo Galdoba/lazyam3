@@ -16,7 +16,7 @@ import (
 
 // defaultPriority is written into generated scripts until config (task 10)
 // exposes Environment.Priority.
-const defaultPriority = 0
+const defaultPriority = 6
 
 // buildScriptConfig assembles the domain ScriptConfig for one unit.
 // Work-directory environment paths are derived by convention under the

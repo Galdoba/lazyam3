@@ -6,6 +6,7 @@ import (
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 	"github.com/Galdoba/lazyam3/internal/domain/script"
+	"github.com/Galdoba/lazyam3/internal/infra/config"
 )
 
 // Options configures the Pipeline at construction time.
@@ -24,6 +25,7 @@ type Options struct {
 	Destination string
 	DryRun      bool
 	HardsubTag  string // filename tag marking sidecar subtitles as hardsub (burn-in)
+	CFG         config.Config
 }
 
 // PipelineEvent is a signal emitted by the Pipeline during processing.

@@ -11,10 +11,10 @@ const (
 )
 
 type Config struct {
-	Paths    Paths    `toml:"paths"`
-	Logger   Logging  `toml:"logger"`
-	Storage  Storage  `toml:"storage"`
-	Hardsub  Hardsub  `toml:"hardsub"`
+	Paths   Paths   `toml:"paths"`
+	Logger  Logging `toml:"logger"`
+	Storage Storage `toml:"storage"`
+	Hardsub Hardsub `toml:"hardsub"`
 }
 
 // Hardsub holds hardsub classification rules.
@@ -30,10 +30,16 @@ type Storage struct {
 
 // Paths holds application directory paths.
 type Paths struct {
-	InputDirectory  string `toml:"input_directory"`
-	OutputDirectory string `toml:"output_directory"`
-	MetadataPath    string `toml:"metadata_path"`
-	FfprobeBinary   string `toml:"ffprobe_binary,omitempty"`
+	InputDirectory   string `toml:"input_directory"`
+	OutputDirectory  string `toml:"output_directory"`
+	MetadataPath     string `toml:"metadata_path"`
+	FfprobeBinary    string `toml:"ffprobe_binary,omitempty"`
+	SourceRootIn     string `json:"source_root_in"`     //where source files are located
+	TargetRootDir    string `json:"target_root_dir"`    //where script is sending results to
+	Buffer           string `json:"buffer"`             //where scripts and preapared sources land
+	ProcessingDir    string `json:"processing_dir"`     //where script is working with files
+	DoneDir          string `json:"done_dir"`           //where script is placing processed sources
+	ScriptArchiveDir string `json:"script_archive_dir"` //where script is sending it's self after processing
 }
 
 type Logging struct {

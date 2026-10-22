@@ -91,14 +91,15 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 		events := make(chan pipeline.PipelineEvent, 100)
 
 		p := pipeline.NewPipeline(pipeline.Options{
-			Logger:       modules.Logger.Slog().WithGroup("pipeline"),
-			Ingest:       ingest.New(ffprobeBinary),
-			Metadata:     mdRepo,
-			Renderer:     scriptinfra.New(),
-			Events:       events,
-			SourceDir:    sourceDir,
-			Destination:  destination,
-			HardsubTag:   cfg.Hardsub.Tag,
+			Logger:      modules.Logger.Slog().WithGroup("pipeline"),
+			Ingest:      ingest.New(ffprobeBinary),
+			Metadata:    mdRepo,
+			Renderer:    scriptinfra.New(),
+			Events:      events,
+			SourceDir:   sourceDir,
+			Destination: destination,
+			// HardsubTag:  cfg.Hardsub.Tag,
+			CFG: cfg,
 		})
 
 		// TODO: start event consumer goroutine (analytics, TUI, etc.)

@@ -13,6 +13,7 @@ import (
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 	"github.com/Galdoba/lazyam3/internal/domain/script"
+	"github.com/Galdoba/lazyam3/internal/infra/config"
 	"github.com/Galdoba/lazyam3/internal/infra/fso"
 )
 
@@ -22,11 +23,12 @@ const (
 
 // Pipeline orchestrates the media processing workflow.
 type Pipeline struct {
-	logger       *slog.Logger
-	in           ingest.Organizer
-	md           metadata.ProductRepository
-	rd           script.Renderer
-	hardsubTag   string
+	logger     *slog.Logger
+	in         ingest.Organizer
+	md         metadata.ProductRepository
+	rd         script.Renderer
+	cfg        config.Config
+	hardsubTag string
 
 	sourceDir   string
 	destination string
@@ -37,10 +39,10 @@ type Pipeline struct {
 // NewPipeline creates a new Pipeline instance.
 func NewPipeline(opts Options) *Pipeline {
 	return &Pipeline{
-		logger: opts.Logger,
-		in:     opts.Ingest,
-		md:     opts.Metadata,
-		rd:     opts.Renderer,
+		logger:     opts.Logger,
+		in:         opts.Ingest,
+		md:         opts.Metadata,
+		rd:         opts.Renderer,
 		hardsubTag: opts.HardsubTag,
 
 		sourceDir:   opts.SourceDir,
