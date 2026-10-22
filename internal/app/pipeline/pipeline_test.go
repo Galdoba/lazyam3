@@ -359,11 +359,11 @@ func TestBuildScriptConfig_ExecutorPaths(t *testing.T) {
 	unit := testUnit()
 	root := t.TempDir()
 	execPaths := map[string]string{
-		"buffer":          "/exec/buffer",
-		"processing_dir":  "/exec/in_progress",
-		"done_dir":        "/exec/done",
-		"notifications":   "/exec/notifications",
-		"target_root_dir": "/exec/target",
+		"buffer":        "/exec/buffer",
+		"in_progress":   "/exec/in_progress",
+		"done":          "/exec/done",
+		"notifications": "/exec/notifications",
+		"target":        "/exec/target",
 	}
 	cfg, err := buildScriptConfig(unit, *testProduct(), root, execPaths, "")
 	if err != nil {

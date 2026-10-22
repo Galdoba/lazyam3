@@ -41,7 +41,7 @@ type GeneratorPaths struct {
 // embedded into generated scripts for the executor to use.
 type Paths struct {
 	Generator GeneratorPaths `toml:"generator"`
-	Executor  map[string]string
+	Executor  map[string]string `toml:"executor"`
 }
 
 // GeneratorInput returns the generator input directory.

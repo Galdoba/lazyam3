@@ -20,7 +20,7 @@ const defaultPriority = 6
 
 // buildScriptConfig assembles the domain ScriptConfig for one unit.
 // Environment paths are read from executorPaths (executor filesystem).
-// Predictions are computed against the executor's target_root_dir so that
+// Predictions are computed against the executor's target path so that
 // ffmpeg output paths are accessible to the executor.
 // The script destination is named by OUTBASE extracted from predictions.
 func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string, executorPaths map[string]string, hardsubTag string) (script.ScriptConfig, error) {
@@ -42,11 +42,14 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 		return a.Index - b.Index
 	})
 
-	// Use executor's target_root_dir for predictions so paths are valid on executor.
-	targetRoot := executorPaths["target_root_dir"]
+	// Use executor's target path for predictions so paths are valid on executor.
+	// TOML keys: buffer, in_progress, done, target, archive, notifications
+	targetRoot := executorPaths["target"]
 	if targetRoot == "" {
 		targetRoot = filepath.Join(root, "target")
 	}
+	// Normalize paths for Windows (backslash → forward slash)
+	targetRoot = toSlash(targetRoot)
 
 	// Predict outputs from the full MediaUnit — this is the single source
 	// of truth for output file names. Called before the script domain is
@@ -78,7 +81,13 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	outBase := extractOutBase(predictions)
 
 	// Build destination path using OUTBASE instead of unit ID.
-	destination := filepath.Join(root, "scripts", fmt.Sprintf("%s.sh", outBase))
+	destination := filepath.Join(root, fmt.Sprintf("%s.sh", outBase))
+
+	// Normalize all executor paths for Windows
+	buffer := toSlash(executorPaths["buffer"])
+	inProgress := toSlash(executorPaths["in_progress"])
+	done := toSlash(executorPaths["done"])
+	notifications := toSlash(executorPaths["notifications"])
 
 	return script.ScriptConfig{
 		Filenames:   unit.Filenames,
@@ -89,15 +98,23 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 		Predictions: predictions,
 		CallNames:   callNames,
 		Env: script.Environment{
-			Buffer:        executorPaths["buffer"],
-			InProgress:    executorPaths["processing_dir"],
-			Done:          executorPaths["done_dir"],
-			Notifications: executorPaths["notifications"],
+			Buffer:        buffer,
+			InProgress:    inProgress,
+			Done:          done,
+			Notifications: notifications,
 			TargetRoot:    targetRoot,
 			Priority:      defaultPriority,
 		},
 		Destination: destination,
 	}, nil
+}
+
+// toSlash normalizes a path to use forward slashes (Windows → Unix).
+func toSlash(path string) string {
+	if path == "" {
+		return ""
+	}
+	return filepath.ToSlash(path)
 }
 
 // extractOutBase derives the OUTBASE (filename stem before _HD) from predictions.

@@ -217,7 +217,8 @@ func buildSRTSection(srt string, predictions []callname.PredictedOutput) string 
 	}
 	// Extract directory from prediction path.
 	dir := filepath.Dir(predPath)
-	return fmt.Sprintf(`cp "${IN_PROGRESS}/${SRT}" "%s/%s.srt"`, dir, srt)
+	// SRT already includes the .srt extension, use it as-is for the destination filename.
+	return fmt.Sprintf(`cp "${IN_PROGRESS}/${SRT}" "%s/%s"`, dir, srt)
 }
 
 // buildSRTCleanup generates the shell line to move the SRT file to done.

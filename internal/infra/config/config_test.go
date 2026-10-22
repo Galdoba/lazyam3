@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -51,5 +53,64 @@ func TestDefaultConfig_ExecutorMap(t *testing.T) {
 	}
 	if len(cfg.Paths.Executor) != 0 {
 		t.Errorf("Paths.Executor should be empty, got %d entries", len(cfg.Paths.Executor))
+	}
+}
+
+func TestTOML_ParseExecutorPaths(t *testing.T) {
+	toml := `[paths]
+[paths.generator]
+input_directory = '\\192.168.31.4\buffer\IN\examplesCopy\'
+output_directory = '\\192.168.31.4\buffer\IN\'
+metadata_path = '\\192.168.31.4\buffer\IN\@AMEDIA_IN\metadata.json'
+
+[paths.executor]
+archive = "/home/pemaltynov/IN/_DONE/bash/"
+buffer = "/home/pemaltynov/IN/"
+done = "/home/pemaltynov/IN/_DONE/"
+in_progress = "/home/pemaltynov/IN/_IN_PROGRESS/"
+target = "/mnt/pemaltynov/ROOT/EDIT/_amedia/"
+
+[logger]
+level = 'debug'
+path = 'c:\Users\pemaltynov\.config\lazyam3\lazyam3.log'
+terminal = true
+
+[storage]
+path = 'c:\Users\pemaltynov\.config\lazyam3\storage.json'
+
+[hardsub]
+tag = 'Forsirovannye'
+`
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "test.toml")
+	if err := os.WriteFile(path, []byte(toml), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if cfg.Paths.Executor == nil {
+		t.Fatal("Paths.Executor is nil")
+	}
+
+	tests := []struct {
+		key      string
+		expected string
+	}{
+		{"buffer", "/home/pemaltynov/IN/"},
+		{"in_progress", "/home/pemaltynov/IN/_IN_PROGRESS/"},
+		{"done", "/home/pemaltynov/IN/_DONE/"},
+		{"target", "/mnt/pemaltynov/ROOT/EDIT/_amedia/"},
+		{"archive", "/home/pemaltynov/IN/_DONE/bash/"},
+	}
+
+	for _, tc := range tests {
+		got := cfg.Paths.ExecutorPath(tc.key)
+		if got != tc.expected {
+			t.Errorf("Paths.ExecutorPath(%q) = %q, want %q", tc.key, got, tc.expected)
+		}
 	}
 }
