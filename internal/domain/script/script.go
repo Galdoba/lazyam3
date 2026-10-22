@@ -83,6 +83,7 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 	content = replaceAll(content, "notifications", cfg.Env.Notifications)
 	content = replaceAll(content, "archive", cfg.Env.Archive)
 	content = replaceAll(content, "mkdir_target", mkdirTarget)
+	content = replaceAll(content, "ready_file", buildReadyFile(predictions))
 
 	// Validate no unresolved placeholders remain
 	if unresolved := findUnresolved(content); len(unresolved) > 0 {
@@ -280,6 +281,31 @@ func buildMKDirTarget(predictions []callname.PredictedOutput) string {
 	}
 	dir := filepath.ToSlash(filepath.Dir(path))
 	return `mkdir -p "` + dir + `"`
+}
+
+// buildReadyFile generates the touch command for the .ready file.
+// The .ready file is created in the same directory as the video output.
+func buildReadyFile(predictions []callname.PredictedOutput) string {
+	if len(predictions) == 0 {
+		return ""
+	}
+	var path string
+	for _, p := range predictions {
+		if p.MediaType == "video" {
+			path = p.Path
+			break
+		}
+	}
+	if path == "" {
+		path = predictions[0].Path
+	}
+	// Derive .ready filename from video path: replace .mp4 with .ready
+	base := filepath.Base(path)
+	ext := filepath.Ext(base)
+	base = base[:len(base)-len(ext)]
+	readyPath := filepath.Join(filepath.Dir(path), base+".ready")
+	readyPath = filepath.ToSlash(readyPath)
+	return `touch "` + readyPath + `"`
 }
 
 // derivePredictionsFromStreams builds PredictedOutput from Product + Streams.
