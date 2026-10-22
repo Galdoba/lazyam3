@@ -74,7 +74,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot 
 
 	// Video: always one output.
 	video := PredictedOutput{
-		Path:     filepath.Join(targetDir, outBase+"_HD.mp4"),
+		Path: filepath.ToSlash(filepath.Join(targetDir, outBase+"_HD.mp4")),
 		MediaType: "video",
 		HsubFile: hsubFile,
 	}
@@ -92,7 +92,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot 
 		}
 		layout := layoutTag(s.ChannelLayout)
 		outputs = append(outputs, PredictedOutput{
-			Path:       filepath.Join(targetDir, fmt.Sprintf("%s_HD_AUDIO%02d_%s%s.m4a", outBase, audioIdx, strings.ToUpper(lang), layout)),
+			Path: filepath.ToSlash(filepath.Join(targetDir, fmt.Sprintf("%s_HD_AUDIO%02d_%s%s.m4a", outBase, audioIdx, strings.ToUpper(lang), layout))),
 			MediaType:  "audio",
 			Language:   lang,
 			Layout:     layout,
@@ -105,7 +105,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot 
 	for _, s := range streams {
 		if s.Kind == ingest.StreamKindSubtitle {
 			outputs = append(outputs, PredictedOutput{
-				Path:      filepath.Join(targetDir, outBase+".srt"),
+				Path: filepath.ToSlash(filepath.Join(targetDir, outBase+".srt")),
 				MediaType: "subtitle",
 			})
 			break
