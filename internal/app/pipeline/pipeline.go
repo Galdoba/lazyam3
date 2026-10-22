@@ -146,7 +146,7 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 		p.emit(EventUnitFailed, unit.ID, err)
 		return err
 	}
-	// Move source files to BUFFER with call names.
+	// Move source files to BUFFER using the executor paths (same paths the script will use).
 	bufferPath := cfg.Env.Buffer
 	if bufferPath == "" {
 		bufferPath = filepath.Join(p.destination, "buffer")
@@ -155,6 +155,7 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 		p.emit(EventUnitFailed, unit.ID, fmt.Errorf("prepare files: %w", err))
 		return err
 	}
+	// Build and write the script.
 	if err := appscript.Build(ctx, cfg, p.rd); err != nil {
 		p.emit(EventUnitFailed, unit.ID, err)
 		return err
