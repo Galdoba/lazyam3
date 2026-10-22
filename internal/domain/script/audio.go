@@ -140,7 +140,7 @@ func buildOutputFilesPredictions(predictions []callname.PredictedOutput) string 
 			lines = append(lines, line)
 		}
 	}
-	for i := 0; i < len(lines)-1; i++ {
+	for i := 0; i < len(lines); i++ {
 		lines[i] += ` \`
 	}
 	return strings.Join(lines, "\n")
