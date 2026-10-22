@@ -91,7 +91,8 @@ func TestBuildAndExecute_RealInputs(t *testing.T) {
 	if _, err := os.Stat(cfg.Destination); !os.IsNotExist(err) {
 		t.Errorf("script still at %s after execution (err=%v)", cfg.Destination, err)
 	}
-	if !strings.HasSuffix(cfg.Destination, filepath.Join("scripts", "12254.sh")) {
-		t.Errorf("unexpected destination layout: %s", cfg.Destination)
+	// Destination should end with OUTBASE.sh, not unit ID.
+	if strings.HasSuffix(cfg.Destination, "12254.sh") {
+		t.Errorf("destination should use OUTBASE, not unit ID: %s", cfg.Destination)
 	}
 }

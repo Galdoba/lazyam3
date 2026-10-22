@@ -30,10 +30,11 @@ type Pipeline struct {
 	cfg        config.Config
 	hardsubTag string
 
-	sourceDir   string
-	destination string
-	dryRun      bool
-	events      chan PipelineEvent
+	sourceDir     string
+	destination   string
+	execPaths     map[string]string
+	dryRun        bool
+	events        chan PipelineEvent
 }
 
 // NewPipeline creates a new Pipeline instance.
@@ -47,6 +48,7 @@ func NewPipeline(opts Options) *Pipeline {
 
 		sourceDir:   opts.SourceDir,
 		destination: opts.Destination,
+		execPaths:   opts.ExecutorPaths,
 		dryRun:      opts.DryRun,
 		events:      opts.Events,
 	}
@@ -139,13 +141,17 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 		p.emit(EventUnitDone, unit.ID, nil)
 		return nil
 	}
-	cfg, err := buildScriptConfig(unit, *prod, p.destination, p.hardsubTag)
+	cfg, err := buildScriptConfig(unit, *prod, p.destination, p.execPaths, p.hardsubTag)
 	if err != nil {
 		p.emit(EventUnitFailed, unit.ID, err)
 		return err
 	}
 	// Move source files to BUFFER with call names.
-	if err := p.prepareFiles(dir, cfg.CallNames); err != nil {
+	bufferPath := cfg.Env.Buffer
+	if bufferPath == "" {
+		bufferPath = filepath.Join(p.destination, "buffer")
+	}
+	if err := p.prepareFiles(dir, cfg.CallNames, bufferPath); err != nil {
 		p.emit(EventUnitFailed, unit.ID, fmt.Errorf("prepare files: %w", err))
 		return err
 	}
@@ -160,8 +166,10 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 // prepareFiles moves each file from the source unit directory to the
 // BUFFER directory under its call name. Files that are not in Filenames
 // (e.g. already-renamed sidecars) are skipped.
-func (p *Pipeline) prepareFiles(sourceDir string, callNames map[string]string) error {
-	bufferDir := filepath.Join(p.destination, "buffer")
+func (p *Pipeline) prepareFiles(sourceDir string, callNames map[string]string, bufferDir string) error {
+	if bufferDir == "" {
+		return fmt.Errorf("prepare files: buffer directory is required")
+	}
 	if err := os.MkdirAll(bufferDir, 0o755); err != nil {
 		return fmt.Errorf("create buffer dir %q: %w", bufferDir, err)
 	}

@@ -4,6 +4,9 @@ import "strings"
 
 // AmediaGeneric is the default bash/ffmpeg rendering script template.
 // Placeholders use the |=key=| format, replaced by BuildScript.
+//
+// P2 design: all output paths are computed in Go and embedded as literals.
+// The script contains no path concatenation — everything is pre-resolved.
 var AmediaGeneric = strings.Join([]string{
 	`#!/bin/bash`,
 	`set -o nounset    # error when referencing undefined variable`,
@@ -18,24 +21,18 @@ var AmediaGeneric = strings.Join([]string{
 	`SOURCE="|=source=|"`,
 	`SRT="|=srt=|"`,
 	`HSUBFILE="|=hsubfile=|"`,
-	`BASENAME="|=basename=|"`,
-	`NAME_TAG="|=name_tag=|"`,
-	`SEASON_DIR="|=season_dir=|"`,
-	`OUTBASE="${BASENAME}${NAME_TAG}"`,
 	`YADIF="|=yadif=|"`,
 	`HSUB="|=hsub=|"`,
 	`#`,
 	`# Генерирование вторичных переменных`,
-	`TARGET_DIR="|=target_root=|/${BASENAME}${SEASON_DIR}"`,
 	`BUFFER="|=buffer=|"`,
 	`IN_PROGRESS="|=in_progress=|"`,
 	`DONE="|=done=|"`,
 	`NOTIFICATIONS="|=notifications=|"`,
-	`READY_FILE="${OUTBASE}.ready"`,
 	``,
 	`#`,
 	`# Создаем пути`,
-	`mkdir -p ${TARGET_DIR}`,
+	`|=mkdir_target=|`,
 	`mv "${BUFFER}/${SOURCE}" "${IN_PROGRESS}/${SOURCE}"`,
 	`|=srt_move=|`,
 	`|=hsub_move=|`,
@@ -49,7 +46,5 @@ var AmediaGeneric = strings.Join([]string{
 	`mv "${IN_PROGRESS}/${SOURCE}" "${DONE}/${SOURCE}"`,
 	`|=srt_cleanup=|`,
 	`|=hsub_cleanup=|`,
-	`touch "${TARGET_DIR}/${READY_FILE}"`,
-	`cp ${TARGET_DIR}/${READY_FILE} ${NOTIFICATIONS}/${READY_FILE}`,
 	`mv "$0" "${DONE}/bash/"`,
 }, "\n")

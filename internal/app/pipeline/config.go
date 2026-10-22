@@ -19,14 +19,16 @@ import (
 const defaultPriority = 6
 
 // buildScriptConfig assembles the domain ScriptConfig for one unit.
-// Work-directory environment paths are derived by convention under the
-// output root: <root>/{buffer,in_progress,done,notifications,target};
-// the script artifact goes to <root>/scripts/<id>.sh.
-// Predictions are the single source of truth for output names, computed
-// from the full MediaUnit before the script domain is touched.
-func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string, hardsubTag string) (script.ScriptConfig, error) {
+// Environment paths are read from executorPaths (executor filesystem).
+// Predictions are computed against the executor's target_root_dir so that
+// ffmpeg output paths are accessible to the executor.
+// The script destination is named by OUTBASE extracted from predictions.
+func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string, executorPaths map[string]string, hardsubTag string) (script.ScriptConfig, error) {
 	if root == "" {
 		return script.ScriptConfig{}, fmt.Errorf("pipeline: destination root is required")
+	}
+	if executorPaths == nil {
+		executorPaths = map[string]string{}
 	}
 
 	streams := make([]ingest.Stream, 0, len(unit.Streams))
@@ -40,10 +42,16 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 		return a.Index - b.Index
 	})
 
+	// Use executor's target_root_dir for predictions so paths are valid on executor.
+	targetRoot := executorPaths["target_root_dir"]
+	if targetRoot == "" {
+		targetRoot = filepath.Join(root, "target")
+	}
+
 	// Predict outputs from the full MediaUnit — this is the single source
 	// of truth for output file names. Called before the script domain is
 	// touched, so predictions drive all downstream logic.
-	predictions := callname.PredictOutputs(prod, unit, filepath.Join(root, "target"), hardsubTag)
+	predictions := callname.PredictOutputs(prod, unit, targetRoot, hardsubTag)
 
 	// Build call names for all unit files (original filename → call name).
 	timestamp := time.Now().Format("060102150405")
@@ -66,6 +74,12 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	srtCall := callNames[srt]
 	hsubCall := callNames[hsubFile]
 
+	// Extract OUTBASE from first video prediction for script filename.
+	outBase := extractOutBase(predictions)
+
+	// Build destination path using OUTBASE instead of unit ID.
+	destination := filepath.Join(root, "scripts", fmt.Sprintf("%s.sh", outBase))
+
 	return script.ScriptConfig{
 		Filenames:   unit.Filenames,
 		Streams:     streams,
@@ -75,21 +89,50 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 		Predictions: predictions,
 		CallNames:   callNames,
 		Env: script.Environment{
-			Buffer:        filepath.Join(root, "buffer"),
-			InProgress:    filepath.Join(root, "in_progress"),
-			Done:          filepath.Join(root, "done"),
-			Notifications: filepath.Join(root, "notifications"),
-			TargetRoot:    filepath.Join(root, "target"),
+			Buffer:        executorPaths["buffer"],
+			InProgress:    executorPaths["processing_dir"],
+			Done:          executorPaths["done_dir"],
+			Notifications: executorPaths["notifications"],
+			TargetRoot:    targetRoot,
 			Priority:      defaultPriority,
 		},
-		Destination: filepath.Join(root, "scripts", fmt.Sprintf("%d.sh", unit.ID)),
+		Destination: destination,
 	}, nil
+}
+
+// extractOutBase derives the OUTBASE (filename stem before _HD) from predictions.
+// Returns the base filename without extension and without _HD suffix.
+func extractOutBase(predictions []callname.PredictedOutput) string {
+	if len(predictions) == 0 {
+		return ""
+	}
+	// Find first video prediction
+	var path string
+	for _, p := range predictions {
+		if p.MediaType == "video" {
+			path = p.Path
+			break
+		}
+	}
+	if path == "" {
+		path = predictions[0].Path
+	}
+
+	base := filepath.Base(path) // "Show_s01e06_HD.mp4"
+	ext := filepath.Ext(base)   // ".mp4"
+	base = base[:len(base)-len(ext)]
+	if strings.HasSuffix(base, "_HD") {
+		base = base[:len(base)-3] // "Show_s01e06"
+	}
+	return base
 }
 
 // EnsureEnvDirs creates the work-directory tree under the output root that
 // generated scripts assume to exist: buffer, in_progress, done (plus done/bash
 // for script self-archiving), notifications, target, and scripts.
 // Layout is defined here next to buildScriptConfig — keep them in sync.
+// NOTE: This function is kept for backward compatibility but is no longer
+// called by the pipeline when executor paths are configured.
 func EnsureEnvDirs(root string) error {
 	if root == "" {
 		return fmt.Errorf("pipeline: destination root is required")

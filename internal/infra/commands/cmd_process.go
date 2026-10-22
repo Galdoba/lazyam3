@@ -62,14 +62,14 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 		logger := modules.Logger.Slog().WithGroup("command")
 		logger.Info("create pipeline")
 
-		sourceDir := nonEmpty(c.String(pathIn), cfg.Paths.InputDirectory)
+		sourceDir := nonEmpty(c.String(pathIn), cfg.Paths.GeneratorInput())
 		if sourceDir == "" {
 			logger.Error("source directory required (flag or config field)")
 			return fmt.Errorf("source directory required (--%s string or config field)", pathIn)
 		}
-		ffprobeBinary := nonEmpty(c.String(pathFfprobe), cfg.Paths.FfprobeBinary, "ffprobe")
+		ffprobeBinary := nonEmpty(c.String(pathFfprobe), cfg.Paths.GeneratorFFprobe(), "ffprobe")
 
-		metadataPath := nonEmpty(c.String(pathMetadata), cfg.Paths.MetadataPath)
+		metadataPath := nonEmpty(c.String(pathMetadata), cfg.Paths.GeneratorMetadata())
 		if metadataPath == "" {
 			logger.Error("metadata path required (flag or config field)")
 			return fmt.Errorf("metadata path required (--%s string or config field)", pathMetadata)
@@ -79,26 +79,24 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 			return fmt.Errorf("failed to load metadata from %q: %w", metadataPath, err)
 		}
 
-		destination := nonEmpty(c.String(pathOut), cfg.Paths.OutputDirectory)
+		destination := nonEmpty(c.String(pathOut), cfg.Paths.GeneratorOutput())
 		if destination == "" {
 			logger.Error("output directory required (flag or config field)")
 			return fmt.Errorf("output directory required (--%s string or config field)", pathOut)
-		}
-		if err := pipeline.EnsureEnvDirs(destination); err != nil {
-			return fmt.Errorf("prepare work directories under %q: %w", destination, err)
 		}
 
 		events := make(chan pipeline.PipelineEvent, 100)
 
 		p := pipeline.NewPipeline(pipeline.Options{
-			Logger:      modules.Logger.Slog().WithGroup("pipeline"),
-			Ingest:      ingest.New(ffprobeBinary),
-			Metadata:    mdRepo,
-			Renderer:    scriptinfra.New(),
-			Events:      events,
-			SourceDir:   sourceDir,
-			Destination: destination,
-			// HardsubTag:  cfg.Hardsub.Tag,
+			Logger:        modules.Logger.Slog().WithGroup("pipeline"),
+			Ingest:        ingest.New(ffprobeBinary),
+			Metadata:      mdRepo,
+			Renderer:      scriptinfra.New(),
+			Events:        events,
+			SourceDir:     sourceDir,
+			Destination:   destination,
+			ExecutorPaths: cfg.Paths.Executor,
+			// HardsubTag:    cfg.Hardsub.Tag,
 			CFG: cfg,
 		})
 

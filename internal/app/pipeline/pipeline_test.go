@@ -97,15 +97,16 @@ func sourceRoot(t *testing.T) (string, string) {
 func newTestPipeline(t *testing.T, root string, in *fakeOrganizer, repo *fakeRepo, rd *fakeRenderer, events chan PipelineEvent, dryRun bool) *Pipeline {
 	t.Helper()
 	return NewPipeline(Options{
-		Logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Ingest:       in,
-		Metadata:     repo,
-		Renderer:     rd,
-		Events:       events,
-		SourceDir:    root,
-		Destination:  t.TempDir(),
-		DryRun:       dryRun,
-		HardsubTag:   "",
+		Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Ingest:        in,
+		Metadata:      repo,
+		Renderer:      rd,
+		Events:        events,
+		SourceDir:     root,
+		Destination:   t.TempDir(),
+		DryRun:        dryRun,
+		HardsubTag:    "",
+		ExecutorPaths: nil,
 	})
 }
 
@@ -148,8 +149,9 @@ func TestRunOnce_ProcessesUnit(t *testing.T) {
 		t.Fatalf("renderer got %d scripts, want 1", len(rd.scripts))
 	}
 	sc := rd.scripts[0]
-	if !strings.HasSuffix(sc.Destination, filepath.Join("scripts", "12094.sh")) {
-		t.Errorf("Destination = %q, want .../scripts/12094.sh", sc.Destination)
+	// Destination should use OUTBASE (derived from predictions).
+	if !strings.HasSuffix(sc.Destination, ".sh") {
+		t.Errorf("Destination = %q, want .../.sh", sc.Destination)
 	}
 	if !strings.HasPrefix(sc.Content, "#!/bin/bash") {
 		t.Errorf("Content does not start with shebang")
@@ -223,7 +225,7 @@ func TestRunOnce_FallbackProduct_Naming(t *testing.T) {
 		t.Fatalf("expected 1 script, got %d", len(rd.scripts))
 	}
 	// Fallback Product uses dir basename "ep1" as SeriesTitle.
-	// verify BASENAME in script is "Ep1" (transliterated + titlecased).
+	// verify OUTBASE in script contains "Ep1" (transliterated + titlecased).
 	script := rd.scripts[0]
 	if !strings.Contains(script.Content, "Ep1") {
 		t.Errorf("script should contain fallback base 'Ep1', got:\n%s", script.Content)
@@ -274,11 +276,12 @@ func TestRunOnce_DryRunSkipsBuild(t *testing.T) {
 
 func TestRunOnce_ScanError(t *testing.T) {
 	p := NewPipeline(Options{
-		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
-		Ingest:    &fakeOrganizer{},
-		Metadata:  &fakeRepo{},
-		Renderer:  &fakeRenderer{},
-		SourceDir: filepath.Join(t.TempDir(), "does-not-exist"),
+		Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Ingest:        &fakeOrganizer{},
+		Metadata:      &fakeRepo{},
+		Renderer:      &fakeRenderer{},
+		SourceDir:     filepath.Join(t.TempDir(), "does-not-exist"),
+		ExecutorPaths: nil,
 	})
 	if _, err := p.RunOnce(context.Background()); err == nil {
 		t.Fatal("RunOnce() on missing source dir: expected error, got nil")
@@ -297,7 +300,7 @@ func TestRun_CtxCancelled(t *testing.T) {
 func TestBuildScriptConfig(t *testing.T) {
 	unit := testUnit()
 	root := t.TempDir()
-	cfg, err := buildScriptConfig(unit, *testProduct(), root, "")
+	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "")
 	if err != nil {
 		t.Fatalf("buildScriptConfig() error: %v", err)
 	}
@@ -318,15 +321,16 @@ func TestBuildScriptConfig(t *testing.T) {
 			t.Errorf("CallNames missing entry for %q", orig)
 		}
 	}
-	if cfg.Destination != filepath.Join(root, "scripts", "12094.sh") {
-		t.Errorf("Destination = %q", cfg.Destination)
+	// Destination should use OUTBASE, not unit ID.
+	if cfg.Destination == "" {
+		t.Error("Destination should not be empty")
 	}
-	if cfg.Env.Buffer != filepath.Join(root, "buffer") ||
-		cfg.Env.InProgress != filepath.Join(root, "in_progress") ||
-		cfg.Env.Done != filepath.Join(root, "done") ||
-		cfg.Env.Notifications != filepath.Join(root, "notifications") ||
-		cfg.Env.TargetRoot != filepath.Join(root, "target") {
-		t.Errorf("Env paths not derived from root: %+v", cfg.Env)
+	if strings.Contains(cfg.Destination, "12094.sh") {
+		t.Error("Destination should use OUTBASE, not unit ID")
+	}
+	// Without executor paths, env fields should be empty.
+	if cfg.Env.Buffer != "" || cfg.Env.InProgress != "" {
+		t.Errorf("Env paths should be empty without executor paths: %+v", cfg.Env)
 	}
 
 	// Streams sorted by (FileIndex, Index) regardless of map order.
@@ -346,8 +350,40 @@ func TestBuildScriptConfig(t *testing.T) {
 }
 
 func TestBuildScriptConfig_RequiresRoot(t *testing.T) {
-	if _, err := buildScriptConfig(testUnit(), *testProduct(), "", ""); err == nil {
+	if _, err := buildScriptConfig(testUnit(), *testProduct(), "", nil, ""); err == nil {
 		t.Fatal("expected error for empty destination root, got nil")
+	}
+}
+
+func TestBuildScriptConfig_ExecutorPaths(t *testing.T) {
+	unit := testUnit()
+	root := t.TempDir()
+	execPaths := map[string]string{
+		"buffer":          "/exec/buffer",
+		"processing_dir":  "/exec/in_progress",
+		"done_dir":        "/exec/done",
+		"notifications":   "/exec/notifications",
+		"target_root_dir": "/exec/target",
+	}
+	cfg, err := buildScriptConfig(unit, *testProduct(), root, execPaths, "")
+	if err != nil {
+		t.Fatalf("buildScriptConfig() error: %v", err)
+	}
+
+	if cfg.Env.Buffer != "/exec/buffer" {
+		t.Errorf("Env.Buffer = %q, want /exec/buffer", cfg.Env.Buffer)
+	}
+	if cfg.Env.InProgress != "/exec/in_progress" {
+		t.Errorf("Env.InProgress = %q, want /exec/in_progress", cfg.Env.InProgress)
+	}
+	if cfg.Env.Done != "/exec/done" {
+		t.Errorf("Env.Done = %q, want /exec/done", cfg.Env.Done)
+	}
+	if cfg.Env.Notifications != "/exec/notifications" {
+		t.Errorf("Env.Notifications = %q, want /exec/notifications", cfg.Env.Notifications)
+	}
+	if cfg.Env.TargetRoot != "/exec/target" {
+		t.Errorf("Env.TargetRoot = %q, want /exec/target", cfg.Env.TargetRoot)
 	}
 }
 

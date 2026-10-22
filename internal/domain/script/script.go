@@ -41,11 +41,6 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 	}
 	cfg.Predictions = predictions
 
-	// Derive template variables from predictions
-	baseName, nameTag, seasonDir := deriveNamesFromPredictions(predictions)
-	cfg.NameTag = nameTag
-	cfg.SeasonDir = seasonDir
-
 	// Build video section
 	interlaced := getInterlaced(cfg.Streams)
 	yadif := buildVideoFilter(interlaced)
@@ -57,21 +52,21 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 
 	// Build SRT sections
 	srtMove := buildSRTMove(cfg.SRT)
-	srtSection := buildSRTSection(cfg.SRT)
+	srtSection := buildSRTSection(cfg.SRT, predictions)
 	srtCleanup := buildSRTCleanup(cfg.SRT)
 
 	// Build HSUB sections
 	hsubMove := buildHSUBMove(cfg.HSUBFile)
 	hsubCleanup := buildHSUBCleanup(cfg.HSUBFile)
 
+	// Build mkdir command for output directory
+	mkdirTarget := buildMKDirTarget(predictions)
+
 	// Fill template placeholders
 	content := AmediaGeneric
 	content = replaceAll(content, "source", cfg.CallNames[cfg.Filenames[0]])
 	content = replaceAll(content, "srt", cfg.SRT)
 	content = replaceAll(content, "hsubfile", cfg.HSUBFile)
-	content = replaceAll(content, "basename", baseName)
-	content = replaceAll(content, "name_tag", nameTag)
-	content = replaceAll(content, "season_dir", seasonDir)
 	content = replaceAll(content, "yadif", yadif)
 	content = replaceAll(content, "hsub", hsub)
 	content = replaceAll(content, "audio_filter", audioFilter)
@@ -86,7 +81,7 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 	content = replaceAll(content, "in_progress", cfg.Env.InProgress)
 	content = replaceAll(content, "done", cfg.Env.Done)
 	content = replaceAll(content, "notifications", cfg.Env.Notifications)
-	content = replaceAll(content, "target_root", cfg.Env.TargetRoot)
+	content = replaceAll(content, "mkdir_target", mkdirTarget)
 
 	// Validate no unresolved placeholders remain
 	if unresolved := findUnresolved(content); len(unresolved) > 0 {
@@ -97,51 +92,6 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 		Destination: cfg.Destination,
 		Content:     content,
 	}, nil
-}
-
-// deriveNamesFromPredictions extracts BASENAME, NAME_TAG, and SEASON_DIR from predictions.
-func deriveNamesFromPredictions(predictions []callname.PredictedOutput) (baseName, nameTag, seasonDir string) {
-	if len(predictions) == 0 {
-		return "", "", ""
-	}
-	// Parse the path: targetRoot/baseName+seasonDir/filename
-	path := predictions[0].Path
-	lastSlash := strings.LastIndex(path, "/")
-	if lastSlash < 0 {
-		return "", "", ""
-	}
-	dir := path[:lastSlash]
-	parts := strings.Split(dir, "/")
-	if len(parts) < 2 {
-		return parts[len(parts)-1], "", ""
-	}
-	dirName := parts[len(parts)-1]
-	// dirName = baseName + seasonDir (e.g. "Belaya_koroleva_s01")
-	i := len(dirName) - 1
-	for i >= 0 && dirName[i] != '_' {
-		i--
-	}
-	if i < 0 {
-		return dirName, "", ""
-	}
-	baseName = dirName[:i]
-	seasonDir = dirName[i:] // "_s01"
-
-	// Derive nameTag from the filename (OUTBASE), not the directory.
-	// Filename is like "Arliss_s01e06_HD.mp4" → OUTBASE = "Arliss_s01e06"
-	// nameTag = OUTBASE[len(baseName):] = "_s01e06"
-	filename := path[lastSlash+1:]
-	// Strip _HD.mp4 or _HD suffix to get OUTBASE
-	outBase := filename
-	if idx := strings.Index(outBase, "_HD"); idx > 0 {
-		outBase = outBase[:idx]
-	}
-	if len(outBase) <= len(baseName) {
-		return baseName, seasonDir, seasonDir
-	}
-	nameTag = outBase[len(baseName):]
-
-	return baseName, nameTag, seasonDir
 }
 
 // selectAudioTracksFromPredictions extracts audio stream indices from predictions
@@ -249,11 +199,25 @@ func buildSRTMove(srt string) string {
 }
 
 // buildSRTSection generates the shell line to copy the SRT file to the target directory.
-func buildSRTSection(srt string) string {
-	if srt == "" {
+// Uses the prediction path to determine the output directory structure.
+func buildSRTSection(srt string, predictions []callname.PredictedOutput) string {
+	if srt == "" || len(predictions) == 0 {
 		return ""
 	}
-	return `cp "${IN_PROGRESS}/${SRT}" "${TARGET_DIR}/${OUTBASE}.srt"`
+	// Find the directory from the first prediction (video).
+	var predPath string
+	for _, p := range predictions {
+		if p.MediaType == "video" {
+			predPath = p.Path
+			break
+		}
+	}
+	if predPath == "" {
+		predPath = predictions[0].Path
+	}
+	// Extract directory from prediction path.
+	dir := filepath.Dir(predPath)
+	return fmt.Sprintf(`cp "${IN_PROGRESS}/${SRT}" "%s/%s.srt"`, dir, srt)
 }
 
 // buildSRTCleanup generates the shell line to move the SRT file to done.
@@ -294,6 +258,26 @@ func buildHSUBCleanup(hsubFile string) string {
 		return ""
 	}
 	return `mv "${IN_PROGRESS}/${HSUBFILE}" "${DONE}/${HSUBFILE}"`
+}
+
+// buildMKDirTarget generates the mkdir -p command for the output directory.
+// Uses the directory from the first video prediction.
+func buildMKDirTarget(predictions []callname.PredictedOutput) string {
+	if len(predictions) == 0 {
+		return ""
+	}
+	var path string
+	for _, p := range predictions {
+		if p.MediaType == "video" {
+			path = p.Path
+			break
+		}
+	}
+	if path == "" {
+		path = predictions[0].Path
+	}
+	dir := filepath.Dir(path)
+	return `mkdir -p "` + dir + `"`
 }
 
 // derivePredictionsFromStreams builds PredictedOutput from Product + Streams.

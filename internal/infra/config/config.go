@@ -28,19 +28,36 @@ type Storage struct {
 	Path string `toml:"path"`
 }
 
-// Paths holds application directory paths.
-type Paths struct {
-	InputDirectory   string `toml:"input_directory"`
-	OutputDirectory  string `toml:"output_directory"`
-	MetadataPath     string `toml:"metadata_path"`
-	FfprobeBinary    string `toml:"ffprobe_binary,omitempty"`
-	SourceRootIn     string `json:"source_root_in"`     //where source files are located
-	TargetRootDir    string `json:"target_root_dir"`    //where script is sending results to
-	Buffer           string `json:"buffer"`             //where scripts and preapared sources land
-	ProcessingDir    string `json:"processing_dir"`     //where script is working with files
-	DoneDir          string `json:"done_dir"`           //where script is placing processed sources
-	ScriptArchiveDir string `json:"script_archive_dir"` //where script is sending it's self after processing
+// GeneratorPaths holds directory paths used by the generator process.
+type GeneratorPaths struct {
+	InputDirectory  string `toml:"input_directory"`
+	OutputDirectory string `toml:"output_directory"`
+	MetadataPath    string `toml:"metadata_path"`
+	FfprobeBinary   string `toml:"ffprobe_binary,omitempty"`
 }
+
+// Paths holds application directory paths, split into generator and executor
+// namespaces. Generator paths are used by lazyam3 CLI; executor paths are
+// embedded into generated scripts for the executor to use.
+type Paths struct {
+	Generator GeneratorPaths `toml:"generator"`
+	Executor  map[string]string
+}
+
+// GeneratorInput returns the generator input directory.
+func (p Paths) GeneratorInput() string { return p.Generator.InputDirectory }
+
+// GeneratorOutput returns the generator output directory.
+func (p Paths) GeneratorOutput() string { return p.Generator.OutputDirectory }
+
+// GeneratorMetadata returns the metadata JSON path.
+func (p Paths) GeneratorMetadata() string { return p.Generator.MetadataPath }
+
+// GeneratorFFprobe returns the ffprobe binary path.
+func (p Paths) GeneratorFFprobe() string { return p.Generator.FfprobeBinary }
+
+// ExecutorPath returns an executor path by key.
+func (p Paths) ExecutorPath(key string) string { return p.Executor[key] }
 
 type Logging struct {
 	Level    string `toml:"level"`
@@ -51,10 +68,13 @@ type Logging struct {
 func defaultCFG() Config {
 	return Config{
 		Paths: Paths{
-			InputDirectory:  "/tmp/lazyam3/input",
-			OutputDirectory: "/tmp/lazyam3/output",
-			MetadataPath:    "/tmp/lazyam3/metadata.json",
-			FfprobeBinary:   "",
+			Generator: GeneratorPaths{
+				InputDirectory:  "/tmp/lazyam3/input",
+				OutputDirectory: "/tmp/lazyam3/output",
+				MetadataPath:    "/tmp/lazyam3/metadata.json",
+				FfprobeBinary:   "",
+			},
+			Executor: map[string]string{},
 		},
 		Logger: Logging{
 			Level:    "info",

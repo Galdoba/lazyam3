@@ -136,7 +136,7 @@ func buildOutputFilesPredictions(predictions []callname.PredictedOutput) string 
 			line := fmt.Sprintf(`  -map "[vidHD]" -c:v libx264 -preset medium -crf 21 -pix_fmt yuv420p -profile:v high -g 0 -map_metadata -1 -map_chapters -1 "%s"`, p.Path)
 			lines = append(lines, line)
 		case "audio":
-			line := fmt.Sprintf(`  -map "[aud%d]" -c:a alac -compression_level 0 "%s"`, p.AudioIndex, p.Path)
+			line := fmt.Sprintf(`  -map "[aud%d]" -c:a alac -compression_level 0 -map_metadata -1 -map_chapters -1 "%s"`, p.AudioIndex, p.Path)
 			lines = append(lines, line)
 		}
 	}

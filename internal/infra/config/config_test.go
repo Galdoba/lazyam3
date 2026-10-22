@@ -7,14 +7,14 @@ import (
 func TestDefaultConfig(t *testing.T) {
 	cfg := defaultCFG()
 
-	if cfg.Paths.InputDirectory != "/tmp/lazyam3/input" {
-		t.Errorf("Paths.InputDirectory = %q, want %q", cfg.Paths.InputDirectory, "/tmp/lazyam3/input")
+	if cfg.Paths.GeneratorInput() != "/tmp/lazyam3/input" {
+		t.Errorf("Paths.Generator.InputDirectory = %q, want %q", cfg.Paths.GeneratorInput(), "/tmp/lazyam3/input")
 	}
-	if cfg.Paths.OutputDirectory != "/tmp/lazyam3/output" {
-		t.Errorf("Paths.OutputDirectory = %q, want %q", cfg.Paths.OutputDirectory, "/tmp/lazyam3/output")
+	if cfg.Paths.GeneratorOutput() != "/tmp/lazyam3/output" {
+		t.Errorf("Paths.Generator.OutputDirectory = %q, want %q", cfg.Paths.GeneratorOutput(), "/tmp/lazyam3/output")
 	}
-	if cfg.Paths.MetadataPath != "/tmp/lazyam3/metadata.json" {
-		t.Errorf("Paths.MetadataPath = %q, want %q", cfg.Paths.MetadataPath, "/tmp/lazyam3/metadata.json")
+	if cfg.Paths.GeneratorMetadata() != "/tmp/lazyam3/metadata.json" {
+		t.Errorf("Paths.Generator.MetadataPath = %q, want %q", cfg.Paths.GeneratorMetadata(), "/tmp/lazyam3/metadata.json")
 	}
 	if cfg.Logger.Level != "info" {
 		t.Errorf("Logger.Level = %q, want %q", cfg.Logger.Level, "info")
@@ -32,8 +32,8 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestDefaultConfig_FfprobeBinary(t *testing.T) {
 	cfg := defaultCFG()
-	if cfg.Paths.FfprobeBinary != "" {
-		t.Errorf("Paths.FfprobeBinary = %q, want empty string", cfg.Paths.FfprobeBinary)
+	if cfg.Paths.GeneratorFFprobe() != "" {
+		t.Errorf("Paths.Generator.FfprobeBinary = %q, want empty string", cfg.Paths.GeneratorFFprobe())
 	}
 }
 
@@ -41,5 +41,15 @@ func TestDefaultConfig_LoggerPath(t *testing.T) {
 	cfg := defaultCFG()
 	if cfg.Logger.Path != "/path/to/file" {
 		t.Errorf("Logger.Path = %q, want %q", cfg.Logger.Path, "/path/to/file")
+	}
+}
+
+func TestDefaultConfig_ExecutorMap(t *testing.T) {
+	cfg := defaultCFG()
+	if cfg.Paths.Executor == nil {
+		t.Error("Paths.Executor should not be nil")
+	}
+	if len(cfg.Paths.Executor) != 0 {
+		t.Errorf("Paths.Executor should be empty, got %d entries", len(cfg.Paths.Executor))
 	}
 }

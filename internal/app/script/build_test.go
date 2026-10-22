@@ -96,6 +96,12 @@ func realConfig(t *testing.T) (dscript.ScriptConfig, string, string) {
 	srtCall := callNames[srtOrig]
 	hsubCall := callNames[hsubOrig]
 
+	// Extract OUTBASE from predictions for script filename.
+	outBase := extractOutBase(predictions)
+	if outBase == "" {
+		outBase = "Arliss_s01e06"
+	}
+
 	cfg := dscript.ScriptConfig{
 		Filenames:   unit.Filenames,
 		SRT:         srtCall,
@@ -112,9 +118,32 @@ func realConfig(t *testing.T) (dscript.ScriptConfig, string, string) {
 			TargetRoot:    filepath.Join(envRoot, "target"),
 			Priority:      6,
 		},
-		Destination: filepath.Join(envRoot, "scripts", "12254.sh"),
+		Destination: filepath.Join(envRoot, "scripts", outBase+".sh"),
 	}
 	return cfg, srcDir, envRoot
+}
+
+func extractOutBase(predictions []callname.PredictedOutput) string {
+	if len(predictions) == 0 {
+		return ""
+	}
+	var path string
+	for _, p := range predictions {
+		if p.MediaType == "video" {
+			path = p.Path
+			break
+		}
+	}
+	if path == "" {
+		path = predictions[0].Path
+	}
+	base := filepath.Base(path)
+	ext := filepath.Ext(base)
+	base = base[:len(base)-len(ext)]
+	if strings.HasSuffix(base, "_HD") {
+		base = base[:len(base)-3]
+	}
+	return base
 }
 
 func TestBuild_RealInputs(t *testing.T) {
@@ -147,8 +176,6 @@ func TestBuild_RealInputs(t *testing.T) {
 		"-map \"[aud0]\"",
 		"[0:1]aresample=48000",
 		"[0:2]aresample=48000",
-		`BASENAME="Arliss"`,
-		`NAME_TAG="_s01e06"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("rendered script does not contain %q", want)
