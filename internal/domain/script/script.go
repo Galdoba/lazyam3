@@ -239,7 +239,7 @@ func buildHSUB(hsubFile, inProgress string) string {
 	}
 	path := hsubFile
 	if inProgress != "" {
-		path = filepath.Join(inProgress, hsubFile)
+		path = filepath.ToSlash(filepath.Join(inProgress, hsubFile))
 	}
 	return fmt.Sprintf(`subtitles=filename=%s:original_size=1920x1080:force_style='FontName=Segoe UI,Fontsize=19.4,PrimaryColour='&H00EBEBEB',SecondaryColour='&H000000FF',OutlineColour='&H00000000',BackColour='&H80000000',Underline=0,StrikeOut=0,ScaleX=1,ScaleY=1,Spacing=0,Angle=0,BorderStyle=1,Outline=0.5,Shadow=0,Alignment=2,MarginL=5,MarginR=5,MarginV=20,Encoding=1',`, path)
 }
