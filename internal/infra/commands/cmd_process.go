@@ -96,8 +96,8 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 			SourceDir:     sourceDir,
 			Destination:   destination,
 			ExecutorPaths: cfg.Paths.Executor,
-			// HardsubTag:    cfg.Hardsub.Tag,
-			CFG: cfg,
+			HardsubTag:    cfg.Hardsub.Tag,
+			CFG:           cfg,
 		})
 
 		// TODO: start event consumer goroutine (analytics, TUI, etc.)
