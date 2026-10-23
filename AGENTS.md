@@ -6,9 +6,9 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 
 ## Current Feature
 
-> **Work on: `A4` — Color support for terminal logs** (`doc/feature_list.json`)
+> **Work on: `C1` — Config package refactoring** (`doc/feature_list.json`)
 >
-> Status: `proposed` · blocked_by: `[]` · effort: 20 min · priority: 2
+> Status: `proposed` · blocked_by: `["A4" — done, in_rewiew]` · effort: 30 min · priority: 3
 
 Selection rule: pick the highest-priority feature in `doc/feature_list.json` whose `blocked_by` list is empty and whose `status` is `proposed`. When a feature is done, set its `status` to `in_rewiew` in `doc/feature_list.json` before moving on.
 

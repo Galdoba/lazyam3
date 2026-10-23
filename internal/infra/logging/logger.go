@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/Galdoba/lazyam3/internal/infra/config"
@@ -121,9 +122,52 @@ func newTermHandler(cfg config.Logging) slog.Handler {
 		Level: levelFromString(cfg.Level),
 	}
 	if strings.EqualFold(cfg.Format, "text") {
-		return slog.NewTextHandler(os.Stderr, opts)
+		var w io.Writer = os.Stderr
+		if cfg.Color {
+			// slog.TextHandler escapes control characters (strconv.Quote),
+			// so ANSI codes cannot be injected via ReplaceAttr — the level
+			// is colorized on the writer instead.
+			w = &colorLevelWriter{w: w}
+		}
+		return slog.NewTextHandler(w, opts)
 	}
 	return slog.NewJSONHandler(os.Stderr, opts)
+}
+
+var levelFieldRe = regexp.MustCompile(`^(time=\S+ )?level=([A-Z]+)`)
+
+var levelColors = map[string]string{
+	"DEBUG": "\x1b[36m",
+	"INFO":  "\x1b[32m",
+	"WARN":  "\x1b[33m",
+	"ERROR": "\x1b[31m",
+}
+
+type colorLevelWriter struct{ w io.Writer }
+
+func (cw *colorLevelWriter) Write(p []byte) (int, error) {
+	if _, err := cw.w.Write(colorizeLevel(p)); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+func colorizeLevel(p []byte) []byte {
+	loc := levelFieldRe.FindSubmatchIndex(p)
+	if loc == nil {
+		return p
+	}
+	color, ok := levelColors[string(p[loc[4]:loc[5]])]
+	if !ok {
+		return p
+	}
+	out := make([]byte, 0, len(p)+20)
+	out = append(out, p[:loc[4]]...)
+	out = append(out, color...)
+	out = append(out, p[loc[4]:loc[5]]...)
+	out = append(out, "\x1b[0m"...)
+	out = append(out, p[loc[5]:]...)
+	return out
 }
 
 func newFileHandler(cfg config.Logging) (slog.Handler, io.Closer, error) {

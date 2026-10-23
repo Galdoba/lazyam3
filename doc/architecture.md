@@ -286,7 +286,7 @@ Current state (`internal/infra/config`):
 ```go
 type Config struct {
     Paths   Paths   // GeneratorInput, GeneratorOutput, GeneratorFFprobe, GeneratorMetadata, Executor
-    Logger  Logging // Level, Path, Terminal
+    Logger  Logging // Level, Path, Terminal, Format, Color
     Storage Storage // Path (jsonstore)
     Hardsub Hardsub // Tag (HSUB detection)
 }

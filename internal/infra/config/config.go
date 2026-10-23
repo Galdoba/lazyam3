@@ -64,6 +64,7 @@ type Logging struct {
 	Path     string `toml:"path"`
 	Terminal bool   `toml:"terminal"`
 	Format   string `toml:"format"` // "json" (default) or "text" — terminal output only
+	Color    bool   `toml:"color"`  // colorize level in terminal text output
 }
 
 func defaultCFG() Config {

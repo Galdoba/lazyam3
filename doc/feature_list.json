@@ -71,7 +71,7 @@
   "A4": {
     "title": "Color support for terminal logs",
     "source": "doc/logging_suggestions.md#A4",
-    "status": "proposed",
+    "status": "in_rewiew",
     "effort": "20 min",
     "impact": "medium",
     "priority": 2,
@@ -82,24 +82,29 @@
       "file": "internal/infra/logging/logger.go",
       "config_field": "Color bool `toml:\"color\"` on config.Logging",
       "notes": [
-        "Use slog.HandlerOptions.ReplaceAttr to wrap the level value in ANSI codes",
-        "Only effective when format = \"text\"; ignored for JSON output",
-        "No new dependency strictly required (raw ANSI escapes); mattn/go-colorable optional",
-        "Colors apply to terminal handler only — file output stays plain"
+        "ReplaceAttr approach from the proposal does NOT work: TextHandler quotes values containing control characters via strconv.Quote, so ANSI escapes would be emitted as literal \\x1b text",
+        "Implemented colorLevelWriter — an io.Writer wrapper around os.Stderr that colorizes the level field of each line (TextHandler guarantees one Write per record)",
+        "Colors DEBUG=cyan INFO=green WARN=yellow ERROR=red with reset after level token",
+        "Only effective when format = \"text\"; JSON output ignored",
+        "No new dependency — raw ANSI escapes",
+        "Colors apply to terminal handler only — file output stays plain",
+        "No TTY detection: color=true is an explicit opt-in; keep the zero-value default false"
       ]
     },
     "benefits": [
       "Levels scannable at a glance in text mode"
     ],
     "trade_offs": [
-      "Possible new dependency",
+      "No TTY detection — color=true writes escapes even when stderr is redirected",
       "Colors not copied to file",
-      "Needs terminal support detection (non-TTY output)"
+      "Writer-level colorizer depends on TextHandler line format (time=... level=...)"
     ],
     "tests": [
-      "color = true emits ANSI escapes for level in text mode",
-      "color = false or json mode emits no escapes"
-    ]
+      "TestNewTermHandler_ColorText — color=true text mode emits ANSI-escaped level (level=\\x1b[32mINFO\\x1b[0m)",
+      "TestNewTermHandler_ColorDisabled — color=false text mode emits no escapes",
+      "TestNewTermHandler_ColorJSONIgnored — color=true json mode emits no escapes"
+    ],
+    "outcome": "Implemented. config.Logging gained Color field; newTermHandler wraps os.Stderr in colorLevelWriter when format=text and color=true. ReplaceAttr was rejected: TextHandler escapes control chars via strconv.Quote, so ANSI codes cannot pass through the value pipeline. File and JSON output stay plain."
   },
   "C1": {
     "title": "Config package refactoring",

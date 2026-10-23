@@ -381,6 +381,33 @@ func TestNewTermHandler_NoTerminal(t *testing.T) {
 	}
 }
 
+func TestNewTermHandler_ColorText(t *testing.T) {
+	data := captureTermOutput(t, config.Logging{Terminal: true, Format: "text", Color: true})
+	if !bytes.Contains(data, []byte("level=\x1b[32mINFO\x1b[0m")) {
+		t.Errorf("color=true text output missing colorized level:\n%q", data)
+	}
+}
+
+func TestNewTermHandler_ColorDisabled(t *testing.T) {
+	data := captureTermOutput(t, config.Logging{Terminal: true, Format: "text", Color: false})
+	if bytes.Contains(data, []byte("\x1b")) {
+		t.Errorf("color=false text output contains ANSI escapes:\n%q", data)
+	}
+	if !bytes.Contains(data, []byte("level=INFO")) {
+		t.Errorf("expected plain level field, got:\n%q", data)
+	}
+}
+
+func TestNewTermHandler_ColorJSONIgnored(t *testing.T) {
+	data := captureTermOutput(t, config.Logging{Terminal: true, Format: "json", Color: true})
+	if bytes.Contains(data, []byte("\x1b")) {
+		t.Errorf("json output contains ANSI escapes:\n%q", data)
+	}
+	if !bytes.Contains(data, []byte(`"msg":"format test message"`)) {
+		t.Errorf("expected JSON output, got:\n%s", data)
+	}
+}
+
 func TestNewLogger_TerminalTextFormat(t *testing.T) {
 	// NewLogger with only terminal + text format should succeed and write text to stderr.
 	old := os.Stderr
