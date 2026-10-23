@@ -28,11 +28,11 @@ type Pipeline struct {
 	rd         script.Renderer
 	hardsubTag string
 
-	sourceDir     string
-	destination   string
-	execPaths     map[string]string
-	dryRun        bool
-	events        chan PipelineEvent
+	sourceDir   string
+	destination string
+	execPaths   map[string]string
+	dryRun      bool
+	events      chan PipelineEvent
 }
 
 // NewPipeline creates a new Pipeline instance.

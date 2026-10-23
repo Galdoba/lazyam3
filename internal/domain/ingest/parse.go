@@ -12,19 +12,19 @@ type StreamInput struct {
 
 // StreamJSON is the ffprobe JSON representation of a single stream.
 type StreamJSON struct {
-	Index         int    `json:"index"`
-	CodecType     string `json:"codec_type"`
-	CodecName     string `json:"codec_name"`
-	Width         int    `json:"width"`
-	Height        int    `json:"height"`
-	PixFmt        string `json:"pix_fmt"`
-	RFrameRate    string `json:"r_frame_rate"`
-	SampleRate    string `json:"sample_rate"`
-	SampleFmt     string `json:"sample_fmt"`
-	ChannelLayout string `json:"channel_layout"`
-	BitRate       string `json:"bit_rate"`
-	Duration      string `json:"duration"`
-	Disposition   Disp   `json:"disposition"`
+	Index         int        `json:"index"`
+	CodecType     string     `json:"codec_type"`
+	CodecName     string     `json:"codec_name"`
+	Width         int        `json:"width"`
+	Height        int        `json:"height"`
+	PixFmt        string     `json:"pix_fmt"`
+	RFrameRate    string     `json:"r_frame_rate"`
+	SampleRate    string     `json:"sample_rate"`
+	SampleFmt     string     `json:"sample_fmt"`
+	ChannelLayout string     `json:"channel_layout"`
+	BitRate       string     `json:"bit_rate"`
+	Duration      string     `json:"duration"`
+	Disposition   Disp       `json:"disposition"`
 	Tags          StreamTags `json:"tags"`
 }
 
@@ -55,7 +55,7 @@ type TagMap map[string]string
 
 // ParseStreams parses ffprobe JSON output into domain Stream objects.
 func parseStreams(ffprobeJSON []byte) ([]Stream, error) {
-	//TODO: rework
+	// TODO: rework
 	// accept bytes from format and multiple streams, return domain Stream
 	var input StreamInput
 	if err := json.Unmarshal(ffprobeJSON, &input); err != nil {

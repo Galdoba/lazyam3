@@ -33,7 +33,7 @@ type PredictedOutput struct {
 // as the script domain (video, audio, SRT) without depending on it.
 // hardsubTag is a filename substring that marks sidecar subtitles as hardsub.
 // prodID is the product ID, used in output filenames as _idN.
-func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot string, hardsubTag string, prodID int64) []PredictedOutput {
+func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot, hardsubTag string, prodID int64) []PredictedOutput {
 	streams := make([]ingest.Stream, 0, len(unit.Streams))
 	for _, s := range unit.Streams {
 		streams = append(streams, s)
@@ -72,7 +72,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot 
 		outBase = outBase + "_PRT" + unit.PRTTimestamp
 	}
 	if prodID > 0 {
-		outBase = outBase + fmt.Sprintf("_id%d", prodID)
+		outBase += fmt.Sprintf("_id%d", prodID)
 	}
 
 	// Detect hardsub: a subtitle file whose name contains the hardsub tag.
@@ -82,9 +82,9 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot 
 
 	// Video: always one output.
 	video := PredictedOutput{
-		Path: filepath.ToSlash(filepath.Join(targetDir, outBase+"_HD.mp4")),
+		Path:      filepath.ToSlash(filepath.Join(targetDir, outBase+"_HD.mp4")),
 		MediaType: "video",
-		HsubFile: hsubFile,
+		HsubFile:  hsubFile,
 	}
 	outputs = append(outputs, video)
 
@@ -100,7 +100,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot 
 		}
 		layout := layoutTag(s.ChannelLayout)
 		outputs = append(outputs, PredictedOutput{
-			Path: filepath.ToSlash(filepath.Join(targetDir, fmt.Sprintf("%s_HD_AUDIO%02d_%s%s.m4a", outBase, audioIdx, strings.ToUpper(lang), layout))),
+			Path:       filepath.ToSlash(filepath.Join(targetDir, fmt.Sprintf("%s_HD_AUDIO%02d_%s%s.m4a", outBase, audioIdx, strings.ToUpper(lang), layout))),
 			MediaType:  "audio",
 			Language:   lang,
 			Layout:     layout,
@@ -113,7 +113,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot 
 	for _, s := range streams {
 		if s.Kind == ingest.StreamKindSubtitle {
 			outputs = append(outputs, PredictedOutput{
-				Path: filepath.ToSlash(filepath.Join(targetDir, outBase+"_HD.srt")),
+				Path:      filepath.ToSlash(filepath.Join(targetDir, outBase+"_HD.srt")),
 				MediaType: "subtitle",
 			})
 			break
@@ -206,7 +206,7 @@ func deriveNameTagCompact(seasonTag, episodeTag string) string {
 
 // PredictScriptName generates the script filename for the given product and unit.
 // It uses the compact naming format (e.g. "Show_s01e06_PRT261023120000.sh").
-func PredictScriptName(product metadata.Product, unit ingest.MediaUnit, targetRoot string, hardsubTag string, timestamp string) string {
+func PredictScriptName(product metadata.Product, unit ingest.MediaUnit, targetRoot, hardsubTag, timestamp string) string {
 	baseName := deriveOutBase(product)
 	seasonTag := deriveSeasonTag(product)
 	episodeTag := deriveEpisodeTag(product)

@@ -10,10 +10,10 @@ import (
 
 func TestPredictOutputs(t *testing.T) {
 	product := metadata.Product{
-		ID:          12345,
-		Kind:        metadata.KindSeries,
-		SeriesTitle: "Show",
-		SeasonNumber: intPtr(1),
+		ID:            12345,
+		Kind:          metadata.KindSeries,
+		SeriesTitle:   "Show",
+		SeasonNumber:  intPtr(1),
 		EpisodeNumber: intPtr(1),
 	}
 
@@ -94,7 +94,7 @@ func TestPredictOutputs_Movie(t *testing.T) {
 	}
 
 	unit := ingest.MediaUnit{
-		ID:   999,
+		ID:        999,
 		Filenames: []string{"999.mp4"},
 		Streams: map[string]ingest.Stream{
 			"[0:v:0]": {
@@ -134,8 +134,8 @@ func TestPredictOutputs_OnlySeason(t *testing.T) {
 	}
 
 	unit := ingest.MediaUnit{
-		ID:         100,
-		Filenames:  []string{"100.mp4"},
+		ID:           100,
+		Filenames:    []string{"100.mp4"},
 		PRTTimestamp: "261015000000",
 		Streams: map[string]ingest.Stream{
 			"[0:v:0]": {
@@ -162,10 +162,10 @@ func TestPredictOutputs_OnlySeason(t *testing.T) {
 
 func TestPredictScriptName(t *testing.T) {
 	product := metadata.Product{
-		ID:          12345,
-		Kind:        metadata.KindSeries,
-		SeriesTitle: "Show",
-		SeasonNumber: intPtr(1),
+		ID:            12345,
+		Kind:          metadata.KindSeries,
+		SeriesTitle:   "Show",
+		SeasonNumber:  intPtr(1),
 		EpisodeNumber: intPtr(1),
 	}
 
@@ -185,10 +185,10 @@ func TestPredictScriptName(t *testing.T) {
 
 func TestPredictScriptName_EmptyTimestamp(t *testing.T) {
 	product := metadata.Product{
-		ID:          12345,
-		Kind:        metadata.KindSeries,
-		SeriesTitle: "Show",
-		SeasonNumber: intPtr(1),
+		ID:            12345,
+		Kind:          metadata.KindSeries,
+		SeriesTitle:   "Show",
+		SeasonNumber:  intPtr(1),
 		EpisodeNumber: intPtr(1),
 	}
 
@@ -208,10 +208,10 @@ func TestPredictScriptName_EmptyTimestamp(t *testing.T) {
 
 func TestPredictOutputs_HSUBDetection(t *testing.T) {
 	product := metadata.Product{
-		ID:          12345,
-		Kind:        metadata.KindSeries,
-		SeriesTitle: "Show",
-		SeasonNumber: intPtr(1),
+		ID:            12345,
+		Kind:          metadata.KindSeries,
+		SeriesTitle:   "Show",
+		SeasonNumber:  intPtr(1),
 		EpisodeNumber: intPtr(1),
 	}
 
@@ -308,10 +308,10 @@ func TestLayoutTag(t *testing.T) {
 
 func TestPredictOutputs_DefaultAudioLang(t *testing.T) {
 	product := metadata.Product{
-		ID:          12345,
-		Kind:        metadata.KindSeries,
-		SeriesTitle: "Show",
-		SeasonNumber: intPtr(1),
+		ID:            12345,
+		Kind:          metadata.KindSeries,
+		SeriesTitle:   "Show",
+		SeasonNumber:  intPtr(1),
 		EpisodeNumber: intPtr(1),
 	}
 
@@ -344,10 +344,10 @@ func TestPredictOutputs_DefaultAudioLang(t *testing.T) {
 
 func TestPredictOutputs_EmptyBase(t *testing.T) {
 	product := metadata.Product{
-		ID:          12345,
-		Kind:        metadata.KindSeries,
-		SeriesTitle: "",
-		SeasonNumber: intPtr(1),
+		ID:            12345,
+		Kind:          metadata.KindSeries,
+		SeriesTitle:   "",
+		SeasonNumber:  intPtr(1),
 		EpisodeNumber: intPtr(1),
 	}
 

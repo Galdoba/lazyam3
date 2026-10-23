@@ -4,9 +4,9 @@ import "strings"
 
 func defaultLiteralsMap() map[string]string {
 	defaultLiteralsMap := make(map[string]string)
-	//Symbols to remove
-	//Symbols to underscore
-	defaultLiteralsMap[" "] = "_" //space
+	// Symbols to remove
+	// Symbols to underscore
+	defaultLiteralsMap[" "] = "_" // space
 	defaultLiteralsMap[","] = "_"
 	defaultLiteralsMap[";"] = "_"
 	defaultLiteralsMap[":"] = "_"
@@ -42,7 +42,7 @@ func defaultLiteralsMap() map[string]string {
 	defaultLiteralsMap["|"] = "_"
 	defaultLiteralsMap["®"] = "_"
 
-	//Cyrillic
+	// Cyrillic
 	defaultLiteralsMap["а"] = "a"
 	defaultLiteralsMap["б"] = "b"
 	defaultLiteralsMap["в"] = "v"
@@ -76,20 +76,21 @@ func defaultLiteralsMap() map[string]string {
 	defaultLiteralsMap["э"] = "e"
 	defaultLiteralsMap["ю"] = "yu"
 	defaultLiteralsMap["я"] = "ya"
-	//Non-Latin
+	// Non-Latin
 	defaultLiteralsMap["à"] = "a"
 	defaultLiteralsMap["ê"] = "e"
 	defaultLiteralsMap["è"] = "e"
 	defaultLiteralsMap["é"] = "e"
 	defaultLiteralsMap["ü"] = "u"
 
-	//Neizvestnyy_istoriya_odnogo_ubiycy_unknown
+	// Neizvestnyy_istoriya_odnogo_ubiycy_unknown
 
 	return defaultLiteralsMap
 }
 
 func defaultIgnoreList() []string {
-	return []string{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
+	return []string{
+		"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
 		"0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
 	}
 }

@@ -91,10 +91,7 @@ func createHandlers(cfg config.Logging) ([]slog.Handler, []io.Closer, error) {
 		closers = append(closers, fileCloser)
 	}
 
-	termHandler, err := newTermHandler(cfg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create term handler: %w", err)
-	}
+	termHandler := newTermHandler(cfg)
 	if termHandler != nil {
 		handlers = append(handlers, termHandler)
 	}
@@ -106,21 +103,21 @@ func createHandlers(cfg config.Logging) ([]slog.Handler, []io.Closer, error) {
 	return handlers, closers, nil
 }
 
-func newTermHandler(cfg config.Logging) (slog.Handler, error) {
+func newTermHandler(cfg config.Logging) slog.Handler {
 	if !cfg.Terminal {
-		return nil, nil
+		return nil
 	}
 	opts := &slog.HandlerOptions{
 		Level: levelFromString(cfg.Level),
 	}
-	return slog.NewJSONHandler(os.Stderr, opts), nil
+	return slog.NewJSONHandler(os.Stderr, opts)
 }
 
 func newFileHandler(cfg config.Logging) (slog.Handler, io.Closer, error) {
 	if cfg.Path == "" {
 		return nil, nil, nil
 	}
-	logfile, err := os.OpenFile(cfg.Path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	logfile, err := os.OpenFile(cfg.Path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to open log file: %w", err)
 	}
@@ -149,9 +146,9 @@ type multiHandler struct {
 	handlers []slog.Handler
 }
 
-func (h *multiHandler) Enabled(_ context.Context, lvl slog.Level) bool {
+func (h *multiHandler) Enabled(ctx context.Context, lvl slog.Level) bool {
 	for _, hh := range h.handlers {
-		if hh.Enabled(context.Background(), lvl) {
+		if hh.Enabled(ctx, lvl) {
 			return true
 		}
 	}

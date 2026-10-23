@@ -1,0 +1,99 @@
+{
+  "A2": {
+    "title": "Group() helper for named contexts",
+    "source": "doc/logging_suggestions.md#A2",
+    "status": "proposed",
+    "effort": "5 min",
+    "impact": "high",
+    "priority": 3,
+    "blocked_by": [],
+    "problem": "Commands must call Slog().WithGroup(\"name\") and lose the typed *Logger surface (Errorf unavailable on grouped loggers).",
+    "proposal": "Add Logger.Group(name string) *Logger that wraps inner.WithGroup(name).",
+    "implementation": {
+      "file": "internal/infra/logging/logger.go",
+      "signature": "func (l *Logger) Group(name string) *Logger",
+      "notes": [
+        "One-liner: return &Logger{inner: l.inner.WithGroup(name)}",
+        "Child logger owns no resources (closers empty), same contract as With()",
+        "Migrate call sites in internal/infra/commands/cmd_process.go:62 and :91 to drop the Slog() escape hatch"
+      ]
+    },
+    "benefits": [
+      "Preserves typed surface (*Logger not *slog.Logger)",
+      "Consistent with With() API",
+      "Removes boilerplate in commands"
+    ],
+    "trade_offs": [
+      "Another method to remember"
+    ],
+    "tests": [
+      "TestLogger_Group returns a different instance and logs grouped output",
+      "Errorf available on grouped child logger"
+    ]
+  },
+  "A3": {
+    "title": "JSON vs text format toggle",
+    "source": "doc/logging_suggestions.md#A3",
+    "status": "proposed",
+    "effort": "15 min",
+    "impact": "medium",
+    "priority": 2,
+    "blocked_by": [],
+    "problem": "Terminal output is always JSON (machine-readable but unreadable for humans).",
+    "proposal": "Add optional format field to [logger] config: \"json\" (default) or \"text\".",
+    "implementation": {
+      "file": "internal/infra/config + internal/infra/logging/logger.go",
+      "config_field": "Format string `toml:\"format\"` on config.Logging",
+      "notes": [
+        "newTermHandler switches on strings.ToLower(cfg.Format): \"text\" -> slog.NewTextHandler(os.Stderr, opts), default -> slog.NewJSONHandler",
+        "File handler stays JSON (machine-consumed)",
+        "Empty format defaults to \"json\" — no breaking change"
+      ]
+    },
+    "benefits": [
+      "Humans get readable terminal logs",
+      "No breaking changes (default json)"
+    ],
+    "trade_offs": [
+      "One extra config field",
+      "Text output less structured"
+    ],
+    "tests": [
+      "Terminal with format \"text\" writes non-JSON lines",
+      "Terminal with format \"\" or \"json\" keeps JSON output"
+    ]
+  },
+  "A4": {
+    "title": "Color support for terminal logs",
+    "source": "doc/logging_suggestions.md#A4",
+    "status": "proposed",
+    "effort": "20 min",
+    "impact": "medium",
+    "priority": 2,
+    "blocked_by": ["A3"],
+    "problem": "Human-readable text logs are colorless; levels don't stand out.",
+    "proposal": "Add optional color field to [logger] config; colorize level values in terminal text output.",
+    "implementation": {
+      "file": "internal/infra/logging/logger.go",
+      "config_field": "Color bool `toml:\"color\"` on config.Logging",
+      "notes": [
+        "Use slog.HandlerOptions.ReplaceAttr to wrap the level value in ANSI codes",
+        "Only effective when format = \"text\"; ignored for JSON output",
+        "No new dependency strictly required (raw ANSI escapes); mattn/go-colorable optional",
+        "Colors apply to terminal handler only — file output stays plain"
+      ]
+    },
+    "benefits": [
+      "Levels scannable at a glance in text mode"
+    ],
+    "trade_offs": [
+      "Possible new dependency",
+      "Colors not copied to file",
+      "Needs terminal support detection (non-TTY output)"
+    ],
+    "tests": [
+      "color = true emits ANSI escapes for level in text mode",
+      "color = false or json mode emits no escapes"
+    ]
+  }
+}

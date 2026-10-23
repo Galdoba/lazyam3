@@ -21,12 +21,12 @@ type Options struct {
 	Renderer script.Renderer
 
 	// Config
-	SourceDir    string
-	Destination  string
-	DryRun       bool
-	HardsubTag   string // filename tag marking sidecar subtitles as hardsub (burn-in)
+	SourceDir     string
+	Destination   string
+	DryRun        bool
+	HardsubTag    string            // filename tag marking sidecar subtitles as hardsub (burn-in)
 	ExecutorPaths map[string]string // executor filesystem paths from config
-	CFG          config.Config
+	CFG           config.Config
 }
 
 // PipelineEvent is a signal emitted by the Pipeline during processing.

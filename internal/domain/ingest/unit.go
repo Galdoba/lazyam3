@@ -7,11 +7,11 @@ import (
 // MediaUnit aggregates all information about a single media product:
 // its physical files, streams across those files, and validation issues.
 type MediaUnit struct {
-	ID            int64
-	Filenames     []string
-	Streams       map[string]Stream
-	Validation    ValidationIssues
-	PRTTimestamp  string // pipeline-provided timestamp for output file naming (e.g. "261023120000")
+	ID           int64
+	Filenames    []string
+	Streams      map[string]Stream
+	Validation   ValidationIssues
+	PRTTimestamp string // pipeline-provided timestamp for output file naming (e.g. "261023120000")
 }
 
 func newMediaUnit() MediaUnit {

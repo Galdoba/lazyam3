@@ -65,12 +65,12 @@ type SeriesItem struct {
 	MainGenre       string        `json:"mainGenre"`
 	AgeRestrictions *int64        `json:"ageRestrictions,omitempty"`
 	Description     string        `json:"description"`
-	ImdbId          string `json:"imdbId"`
-	KinopoiskId     string `json:"kinopoiskId"`
-	Countries       []string `json:"countries"`
-	Quote           string `json:"quote"`
-	Studios         []string `json:"studios"`
-	Genres          []string `json:"genres"`
+	ImdbId          string        `json:"imdbId"`
+	KinopoiskId     string        `json:"kinopoiskId"`
+	Countries       []string      `json:"countries"`
+	Quote           string        `json:"quote"`
+	Studios         []string      `json:"studios"`
+	Genres          []string      `json:"genres"`
 	Persons         []PersonsItem `json:"persons"`
 	Seasons         []SeasonsItem `json:"seasons"`
 }
@@ -280,15 +280,15 @@ func FoundToProduct(f *Found) *mdomain.Product {
 		}
 		s := f.Data.Series[0]
 		return &mdomain.Product{
-			ID:            s.Id,
-			Kind:          f.Kind,
-			Title:         s.Title,
-			SeriesTitle:   s.Title,
-			Description:   s.Description,
-			Genres:        s.Genres,
-			Countries:     s.Countries,
-			KinopoiskID:   s.KinopoiskId,
-			IMDBID:        s.ImdbId,
+			ID:          s.Id,
+			Kind:        f.Kind,
+			Title:       s.Title,
+			SeriesTitle: s.Title,
+			Description: s.Description,
+			Genres:      s.Genres,
+			Countries:   s.Countries,
+			KinopoiskID: s.KinopoiskId,
+			IMDBID:      s.ImdbId,
 		}
 	case mdomain.KindSeason:
 		if len(f.Data.Series) == 0 || len(f.Data.Series[0].Seasons) == 0 {
@@ -297,16 +297,16 @@ func FoundToProduct(f *Found) *mdomain.Product {
 		season := f.Data.Series[0].Seasons[0]
 		parent := f.Data.Series[0]
 		return &mdomain.Product{
-			ID:            season.Id,
-			Kind:          f.Kind,
-			Title:         season.Title,
-			ParentID:      &parent.Id,
-			SeasonNumber:  intPtr(season.SeasonNumber),
-			SeriesTitle:   parent.Title,
-			Genres:        parent.Genres,
-			Countries:     parent.Countries,
-			KinopoiskID:   parent.KinopoiskId,
-			IMDBID:        parent.ImdbId,
+			ID:           season.Id,
+			Kind:         f.Kind,
+			Title:        season.Title,
+			ParentID:     &parent.Id,
+			SeasonNumber: intPtr(season.SeasonNumber),
+			SeriesTitle:  parent.Title,
+			Genres:       parent.Genres,
+			Countries:    parent.Countries,
+			KinopoiskID:  parent.KinopoiskId,
+			IMDBID:       parent.ImdbId,
 		}
 	case mdomain.KindSeriesEpisode:
 		if len(f.Data.Series) == 0 || len(f.Data.Series[0].Seasons) == 0 {

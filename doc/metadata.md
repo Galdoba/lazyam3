@@ -1,144 +1,155 @@
-# Metadata Domain
+# Bounded Context: Metadata
 
-The metadata domain handles the product catalog from the counterparty: resolving a product ID (series, season, episode, movie, or movie episode) into a flat, pipeline-ready `Product`.
+> **Status:** active  
+> **Owner:** pipeline engineering  
+> **Entropy level:** Low
 
-## Overview
+## 1. Purpose
 
-```
-metadata.json → [parse tree] → FindByID(id) → [prune tree] → Found → [flatten] → Product
-```
+The metadata domain provides a catalog lookup service for resolving product IDs (series, season, episode, movie, or movie episode) into a flat, pipeline-ready `Product`. It loads a JSON catalog from the counterparty, searches a hierarchical tree structure, prunes the result to a self-contained subtree, and flattens that subtree into a single `Product` DTO.
 
-The domain defines the language of the catalog (`Product`, `Kind`) and the lookup contract (`ProductRepository`). The JSON storage format, tree search, and file loading live in infrastructure — they are storage concerns, not domain concerns.
+**Out of scope:** Media file scanning (belongs to the *Ingest* domain), rendering script generation (belongs to the *Script* domain), file delivery or notification, and any user-facing interface. The domain knows nothing about *what* the media looks like on disk — only that a catalog entry exists for a given numeric ID.
 
-## Domain Layer
+## 2. Context & Environment
 
-### Types
+- **Users / Actors:** The automated pipeline is the sole actor. No human directly interacts with this domain; it is instantiated by the pipeline orchestrator (`app.Pipeline.RunOnce`) which loads the catalog once and passes it into `pipeline.Options.Metadata` for use during `RunOnce`.
+- **Adjacent domains and systems:** 
+  - **Ingest** — provides the `MediaUnit.ID` that the metadata domain resolves via `FindByID`.
+  - **Script** — consumes the `Product` (via `callname`) for file naming derivation, using `SeriesTitle`, `SeasonNumber`, `EpisodeNumber`, and `Kind`.
+  - **JSON metadata file** (`metadata.json`) — the sole data source; its schema is fixed by the counterparty and includes series, seasons, episodes, movies, and movie episodes.
+  - **Filesystem (OS)** — the source of the JSON catalog file; accessed through infrastructure, never by the domain.
+- **Key business rules:** A product ID resolves to exactly one catalog entry. The search order is movies first, then series. Descendants are pruned to the target's immediate path unless `WithDescendants` is requested. All returned data is cloned — mutations of the result never touch the repository's tree.
 
-**`Product`** — flat metadata record. One shape for all catalog kinds, ready for the pipeline.
+## 3. Boundaries & Interactions
 
-```go
-type Product struct {
-    ID            int64    // Catalog ID (matches the ID in filenames)
-    Kind          Kind     // What kind of catalog object this is
-    Title         string
-    SeriesTitle   string   // Parent series/movie title (own title for series/movie kinds); set by FoundToProduct — used by script naming
-    ParentID      *int64   // Season ID (for season/episode), series ID (for season), movie ID (for movie episode)
-    SeasonNumber  *int     // series.season, series.season.episode
-    EpisodeNumber *int     // movie.episode, series.season.episode
-    SeasonEp      string   // "s01e01" style code for series episodes
-    Description   string
-    Genres        []string // Inherited from parent series/movie for children
-    Countries     []string // Inherited from parent series/movie for children
-    KinopoiskID   string   // Inherited from parent series/movie for children
-    IMDBID        string   // Inherited from parent series/movie for children
-}
-```
+- **Inbound interactions:** 
+  - `New(path string) (*Repository, error)` — infrastructure constructor; reads, parses, and validates the JSON catalog. Fails fast on missing, broken, or empty files.
+  - `Repository.FindByID(id int64) (*Product, error)` — the domain port. Acquires a read lock, searches the tree, prunes, and flattens.
+  - `Root.FindByID(id int64, d Descendants) (*Found, bool)` — pure tree search on the loaded JSON structure.
+  - `FoundToProduct(*Found) *Product` — pure flattening function that maps a pruned subtree to a domain DTO.
+- **Outbound interactions:** 
+  - Returns a `*Product` DTO to the application layer.
+  - The domain itself makes no external calls; all I/O is delegated to infrastructure.
+- **Domain Events:** None. The domain is synchronous and returns a DTO directly.
+- **Dependencies:** 
+  - No domain imports any other domain. `domain/metadata` is a leaf in the dependency graph.
+  - `domain/script` depends on `domain/metadata` (via `mdomain.Product` in `ScriptConfig`).
 
-**`Kind`** — classifies the catalog object the ID refers to.
+## 4. Ubiquitous Language
 
-```go
-const (
-    KindMovie         Kind = "movie"
-    KindMovieEpisode  Kind = "movie.episode"
-    KindSeries        Kind = "series"
-    KindSeason        Kind = "series.season"
-    KindSeriesEpisode Kind = "series.season.episode"
-)
-```
+| Term | Definition | Synonyms/Notes |
+|------|------------|----------------|
+| **Product** | Flat metadata record representing one catalog entry. | "catalog product", "product record" |
+| **Kind** | Classification of the catalog object: movie, series, season, episode, or movie episode. | "catalog kind", "entity type" |
+| **ProductRepository** | Domain port interface for resolving catalog IDs. | "repository", "catalog lookup" |
+| **Repository** | Infrastructure implementation of ProductRepository (thread-safe, backed by JSON). | "catalog repo", "metadata repo" |
+| **Root** | Top-level JSON container holding series and movies arrays. | "catalog root", "JSON root" |
+| **Found** | A pruned subtree with an attached Kind, returned by tree search. | "lookup result", "pruned tree" |
+| **Descendants** | Boolean flag controlling pruning depth: `WithDescendants` or `WithoutDescendants`. | "pruning mode", "expand children" |
+| **SeriesTitle** | Root series/movie title, used by downstream domains for file naming. | "parent title", "show title" |
+| **SeasonEp** | Formatted season-episode tag (e.g. `"s01e01"`), only for `series.season.episode`. | "S01E01", "season-episode code" |
+| **ParentID** | ID of the parent catalog entry (season for episodes, movie for movie episodes, series for seasons). | "parent reference" |
 
-### Pure Functions
+## 5. Key Scenarios / Use Cases
 
-None. The domain is types + port only; tree search walks the JSON storage structure and lives in infrastructure.
+### Scenario 1: Resolve a series by ID
+- **Given** a metadata catalog loaded from `metadata.json`
+- **When** `FindByID(11120)` is called
+- **Then** a `Product` is returned with `ID=11120`, `Kind="series"`, `Title="Белая королева"`, `SeriesTitle="Белая королева"`
+- **And** `Genres`, `Countries`, `KinopoiskID`, `IMDBID` are populated from the series entry
 
-## Implementation Layer
+### Scenario 2: Resolve a season by ID
+- **Given** a loaded catalog
+- **When** `FindByID(11393)` is called (season 1 of "Белая королева")
+- **Then** a `Product` is returned with `Kind="series.season"`, `SeasonNumber=1`
+- **And** `ParentID` points to the series ID (11120), `SeriesTitle="Белая королева"`
+- **And** `Genres` and `Countries` are inherited from the parent series
 
-### `ProductRepository` Interface (port)
+### Scenario 3: Resolve a series episode by ID
+- **Given** a loaded catalog
+- **When** `FindByID(12061)` is called (episode 1 of season 1)
+- **Then** a `Product` is returned with `Kind="series.season.episode"`, `EpisodeNumber=1`
+- **And** `SeasonEp` is formatted as `"s01e01"`
+- **And** `ParentID` points to the season ID (11393), `SeriesTitle` is the series title
+- **And** genres are inherited from the series, not the season
 
-```go
-type ProductRepository interface {
-    FindByID(id int64) (*Product, error)
-}
-```
+### Scenario 4: Resolve a movie by ID
+- **Given** a loaded catalog
+- **When** `FindByID(9257)` is called
+- **Then** a `Product` is returned with `Kind="movie"`, `Title` set to the movie's title, `SeriesTitle` equal to the same title
+- **And** `Genres`, `Countries`, `KinopoiskID`, `IMDBID` are populated from the movie entry
 
-Defines the contract for resolving catalog IDs to domain `Product`s.
+### Scenario 5: Resolve a multi-part movie episode by ID
+- **Given** a loaded catalog
+- **When** `FindByID(10100)` is called (Фил Спектор, a movie episode)
+- **Then** a `Product` is returned with `Kind="movie.episode"`, `EpisodeNumber` set
+- **And** `ParentID` points to the movie ID (9261), `SeriesTitle` is the movie title
+- **And** genres are inherited from the movie
 
-### Infrastructure (`internal/infra/metadata/`)
+### Scenario 6: Not found — returns an error
+- **Given** a loaded catalog
+- **When** `FindByID(99999)` is called with an ID not present in the tree
+- **Then** an error is returned with the message `"product 99999 not found"`
 
-**JSON types** (storage format): `Root` → `[]SeriesItem` / `[]MoviesItem` → `[]SeasonsItem` → `[]EpisodesItem`, plus `PersonsItem`.
+### Scenario 7: Empty catalog — fails at construction
+- **Given** a JSON file with empty `series` and `movies` arrays
+- **When** `New(path)` is called
+- **Then** an error is returned with the message `"empty metadata: no series or movies found"`
 
-**Lookup flow:**
+### Scenario 8: Concurrent lookups are safe
+- **Given** a loaded `Repository`
+- **When** multiple goroutines call `FindByID` concurrently
+- **Then** all calls complete successfully without data races (guaranteed by `sync.RWMutex`)
 
-```go
-LoadRoot(path) → *Root                    // read + unmarshal metadata.json
-Root.FindByID(id, d) → (*Found, bool)     // tree search, returns pruned self-contained copy
-FoundToProduct(*Found) *Product           // flatten pruned tree to domain DTO
-```
+## 6. High-Level Data Model (Key Entities)
 
-**`Root.FindByID(id int64, d Descendants) (*Found, bool)`**
+- **Product** — flat metadata record, one shape for all catalog kinds.
+  - Key fields: `ID` (int64), `Kind` (Kind), `Title`, `SeriesTitle`, `ParentID` (*int64), `SeasonNumber` (*int), `EpisodeNumber` (*int), `SeasonEp` (string), `Description`, `Genres` ([]string), `Countries` ([]string), `KinopoiskID` (string), `IMDBID` (string).
+  - Key invariants: `SeriesTitle` is always populated; `Genres`/`Countries`/`KinopoiskID`/`IMDBID` are inherited from the root entity (series or movie) for all descendants; `ParentID` is nil for top-level entries (series, movie).
 
-Search order: movies first (movie → its episodes), then series (series → seasons → episodes). The result is a `Found{Kind, Data Root}` — a pruned copy of the tree with the target at its proper place:
+- **Kind** — enum classifying catalog objects: `movie`, `movie.episode`, `series`, `series.season`, `series.season.episode`.
 
-- `WithoutDescendants` — only the target path (e.g. a season without its episodes)
-- `WithDescendants` — the target keeps its children (e.g. a season with its episodes)
+- **ProductRepository** — domain port: `FindByID(id int64) (*Product, error)`. Implemented by infrastructure.
 
-All returned data is cloned — mutations of the result never touch the repository's tree.
+- **Found** — infrastructure type representing a pruned subtree with attached Kind. Wraps a `Root` that has been pruned to contain only the target element and its required ancestry chain. Always returned with `WithDescendants` by the repository port.
 
-**`FoundToProduct(*Found) *Product`**
+- **Root** — infrastructure type: `Series []SeriesItem`, `Movies []MoviesItem`. The top-level JSON container loaded from disk.
 
-| Kind | Title/Description from | SeriesTitle | ParentID | SeasonNumber | EpisodeNumber | SeasonEp | Genres/IDs |
-|---|---|---|---|---|---|---|---|
-| `series` | series | own title | — | — | — | — | own |
-| `series.season` | season | series | series | ✓ | — | — | inherited from series |
-| `series.season.episode` | episode | series | season | ✓ | ✓ | `s%02de%02d` | inherited from series |
-| `movie` | movie | own title | — | — | — | — | own |
-| `movie.episode` | episode | movie | movie | — | ✓ | — | inherited from movie |
+**Relationships:**
+- Product 1—1 Kind
+- Product is resolved by ProductRepository
+- Found 1—1 Root (pruned subtree)
+- Root 1—N SeriesItem, 1—N MoviesItem
+- SeriesItem 0—N SeasonsItem
+- SeasonsItem 0—N EpisodesItem
+- MoviesItem 0—N EpisodesItem
 
-**`Repository`** — implements the port, thread-safe (`sync.RWMutex`):
+## 7. Non-Functional Requirements & Constraints
 
-```go
-func New(path string) (*Repository, error)          // fail-fast: read/parse/empty errors
-func (r *Repository) FindByID(id int64) (*mdomain.Product, error)  // always WithDescendants
-```
+- **Authorization:** N/A — the domain runs as part of an automated pipeline with no user-facing access control.
+- **Performance/Scale:** Designed for batch processing of hundreds to thousands of media units. Tree search is O(n) where n is the total number of catalog entries (series + movies + seasons + episodes). The real catalog (`testdata/metadata.json`) contains ~690 series and ~981 movies, making search fast enough for per-unit pipeline lookups. Cloning is O(m) where m is the pruned subtree size (typically small).
+- **Data:** No persistence. The catalog is loaded once at startup and held in memory. The JSON schema is external (counterparty-defined) and may change; the domain assumes the schema is stable within a pipeline run. No PII is stored.
+- **External constraints:** Depends on the counterparty's JSON metadata file format. The file is read once at construction via `os.ReadFile` and `json.Unmarshal`. The domain assumes ffprobe is not involved.
 
-Errors: `read metadata file: …`, `parse metadata JSON: …`, `empty metadata: no series or movies found`, `product <id> not found`.
+## 8. Acceptance Criteria
 
-### CLI Integration
+- [ ] `LoadRoot` correctly reads and parses `metadata.json`, validating that at least one series or movie exists.
+- [ ] `Root.FindByID` searches movies first, then series, returning the correct Kind for all five catalog types.
+- [ ] `FindByID` with `WithDescendants` returns the full subtree (series with all seasons+episodes, season with all episodes, movie with all episodes).
+- [ ] `FindByID` with `WithoutDescendants` prunes the target's children to zero (series with 0 seasons, season with 0 episodes).
+- [ ] `FoundToProduct` correctly maps all five Kind variants: sets `SeriesTitle`, `ParentID`, `SeasonNumber`, `EpisodeNumber`, `SeasonEp`, and inherits `Genres`/`Countries`/`KinopoiskID`/`IMDBID` from the root entity.
+- [ ] `FoundToProduct` returns `nil` for `nil` input or empty data slices.
+- [ ] All returned data is cloned — mutating a `Product` or `Found` never touches the repository's underlying tree (`TestFindByID_CloneIsIndependent`).
+- [ ] `Repository.FindByID` is thread-safe under concurrent access (`sync.RWMutex`).
+- [ ] `Repository.New` fails fast with descriptive errors: file read, JSON parse, empty catalog.
+- [ ] `Repository.FindByID` returns `"product <id> not found"` for IDs absent from the tree.
+- [ ] Integration tests pass with the real `testdata/metadata.json` (690 series, 981 movies): series (11120), season (11393), episode (12061), movie (9257), movie episode (10100).
+- [ ] CLI `--metadata-path` flag correctly wires the repository into the pipeline; missing or broken catalog fails the command immediately.
 
-```bash
-lazyam3 process \
-  --source-root /path/to/media \
-  --metadata-path /path/to/metadata.json \
-  --once
-```
+## 9. Open Questions
 
-The `--metadata-path` flag falls back to the `paths.metadata_path` config field. The repository is created before the pipeline starts — a missing, broken, or empty catalog fails the command immediately. The result is passed into `pipeline.Options.Metadata`; `Pipeline.Run` queries it during `RunOnce`.
-
-## Test Data
-
-`testdata/metadata.json` — real catalog snapshot (13.6 MB): **690 series, 981 movies**.
-
-Known IDs used by the integration test (`TestRepository_FindByID_RealFile`):
-
-| ID | Kind | Title | Notes |
-|---|---|---|---|
-| 11120 | `series` | Белая королева | season 11393 → episode 12061 |
-| 11393 | `series.season` | Сезон 1 | ParentID = 11120 |
-| 12061 | `series.season.episode` | Любовь короля | ParentID = 11393, SeasonEp = `s01e01` |
-| 9257 | `movie` | Поймать Мэри | no episodes (empty-children case) |
-| 10100 | `movie.episode` | Фил Спектор | ParentID = 9261 |
-
-Synthetic fixtures in tests cover pruning (`WithoutDescendants`), clone independence, nil/empty roots, and not-found errors.
-
-## File Structure
-
-```
-internal/domain/metadata/
-├── types.go         # Product, Kind + constants
-└── port.go          # ProductRepository interface
-
-internal/infra/metadata/
-├── types.go         # JSON types, LoadRoot, Root.FindByID, Found, FoundToProduct, clone helpers
-├── types_test.go    # 16 test functions: tree search, pruning, flattening, clone independence
-├── repository.go    # Repository implements ProductRepository (thread-safe)
-└── repository_test.go  # synthetic fixtures + real-file integration test
-```
+- [ ] Should the domain expose a `Product.WithPrimaryFile() Stream` convenience method, or should the application layer derive this from `Streams` by selecting the first video stream? (Currently not implemented.)
+- [ ] Should `PersonsItem` (directors, actors) be mapped to a field on `Product`, or is discarding them acceptable? Currently stored in JSON but never used.
+- [ ] The `int64` → `int` conversion for `SeasonNumber` and `EpisodeNumber` uses a direct `int(i)` cast, which could overflow on 32-bit systems for very large values. Should this use `int(i)` with a bounds check or switch to `int64` throughout?
+- [ ] Should `SeasonEp` be populated for `movie.episode` kinds as well, or is it intentionally exclusive to `series.season.episode`?
+- [ ] The movies-first search order means a movie and series sharing the same ID would resolve to the movie. Is this ordering intentional, or should it be configurable?

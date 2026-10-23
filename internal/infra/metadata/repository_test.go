@@ -47,7 +47,7 @@ func TestRepository_FindByID(t *testing.T) {
 			}
 		]
 	}`
-	if err := os.WriteFile(metaFile, []byte(data), 0644); err != nil {
+	if err := os.WriteFile(metaFile, []byte(data), 0o644); err != nil {
 		t.Fatalf("failed to write test metadata: %v", err)
 	}
 
@@ -124,7 +124,7 @@ func TestRepository_New_Empty(t *testing.T) {
 	metaFile := filepath.Join(tmpDir, "metadata.json")
 
 	data := `{"series": [], "movies": []}`
-	if err := os.WriteFile(metaFile, []byte(data), 0644); err != nil {
+	if err := os.WriteFile(metaFile, []byte(data), 0o644); err != nil {
 		t.Fatalf("failed to write test metadata: %v", err)
 	}
 

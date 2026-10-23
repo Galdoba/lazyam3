@@ -4,7 +4,15 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 
 **Current State**: Tasks 1-10 complete. Pipeline fully wired end-to-end with HSUB auto-detection, movie naming fix, TOML config, and config-driven paths.
 
-## Documentation Guide
+## Current Feature
+
+> **Work on: `A2` — `Group()` helper for named contexts** (`doc/feature_list.json`)
+>
+> Status: `proposed` · blocked_by: `[]` · effort: 5 min · priority: 3
+
+Selection rule: pick the highest-priority feature in `doc/feature_list.json` whose `blocked_by` list is empty and whose `status` is `proposed`. Queue after A2: **A3** (format toggle), then **A4** (colors, blocked by A3). When a feature is done, set its `status` to `in_rewiew` in `doc/feature_list.json` before moving on.
+
+## Documentation Index
 
 | File | Purpose |
 |---|---|
@@ -13,9 +21,11 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 | `doc/ingest.md` | Ingest domain: types, pure functions, validation rules, test data |
 | `doc/metadata.md` | Metadata domain: Product/Kind, ProductRepository, tree lookup, catalog test data |
 | `doc/script.md` | Script domain: BuildScript, naming derivation, audio filters, SRT/HSUB handling, template |
-| `doc/tasks.json` | Implementation tasks: items with reasons, verification, blocking deps, status tracking |
+| `doc/callname.md` | CallName bounded context: input/output filename construction, transliteration, naming patterns |
+| `doc/feature_list.json` | Feature backlog: status, priority, blocked_by, implementation notes, tests per feature |
+| `doc/logging_suggestions.md` | Logging improvement catalog (A1–A4 quick wins, B1–B5 larger items) with trade-offs |
 | `doc/BACKLOG.md` | Deferred items: language translation, source file naming hook |
-| `AGENTS.md` | This file: commands, dependencies, quick reference |
+| `AGENTS.md` | This file: current feature, commands, rules, quick reference |
 
 ## Commands
 
@@ -23,7 +33,7 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 go build ./...                       # Compile
 go test -race -cover ./...           # Run tests
 go vet ./...                         # Static analysis
-golangci-lint run ./...              # Lint (10 linters, issues-exit-code: 0)
+golangci-lint run ./...              # Lint (strict gate: exit 1 on any issue; config in .golangci.yml)
 go run ./cmd/lazyam3                 # Run CLI
 go run ./cmd/lazyam3 process --help  # Process command help
 ```
@@ -50,17 +60,23 @@ platform (internal/platform/*)     ← Stateless services (no domain deps)
 | `github.com/Galdoba/appcontext` | Config loading via configmanager (TOML; `[hardsub] tag` for HSUB detection) |
 | `github.com/tidwall/gjson` | JSON querying (`scrips/asses` tool) |
 
+## Project Rules
 
+### Workflow
+- Work one feature at a time; the current feature is defined in **Current Feature** above
+- Every feature: analyse → plan → implement → test → `go build` + `go test -race -cover` + `go vet` + `golangci-lint run` → update `status` in `doc/feature_list.json`
+- Every fixed bug MUST produce a test
+- New features MUST list their tests in `doc/feature_list.json`
+- Update **Current Feature** in this file when starting/finishing work
 
-## Development Rules
-
+### Code
 - Domains are pure — no imports from infra or app
 - Pipeline works only with interfaces and DTOs
 - Infrastructure implements domain ports
 - Commands wire dependencies and call Pipeline
-- Make only minimal code edits
 - Infrastructure failures fail fast
 - Simples solutions SHOULD examined first
 - Analyze the problem before solving it
-- Work one feature at the time
-- Every fixed bug MUST produce a test
+- Make only minimal code edits
+- No comments in code unless really needed
+- Do NOT fix the bugs which unrelated to current feature

@@ -33,8 +33,7 @@ func (m Model) Init() tea.Cmd {
 
 // Update processes messages and returns the updated model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
 		switch msg.String() {
 		case "q", "ctrl+c", "esc":
 			m.quit = true

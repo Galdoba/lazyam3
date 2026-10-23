@@ -21,8 +21,8 @@ type translitter struct {
 	wordSeparators                []string
 	keepRegister                  bool
 	keepSegmentatorRepetitions    bool
-	short_SE_form              bool
-	title                      bool
+	short_SE_form                 bool
+	title                         bool
 	caps                          bool
 	DEBUG_panicIfLiteralIsUNKNOWN bool
 }
@@ -70,16 +70,16 @@ func (tr *translitter) convert(input string) string {
 	for i, word := range words {
 		words[i] = excludeBlackListLiterals(word, tr.changeBlackList...)
 	}
-	//for each word:
+	// for each word:
 	for _, word := range words {
 		lits := getLiterals(word)
 		for _, lit := range lits {
 			switch len(tr.changeWhiteList) {
 			case 0:
-				//convert all literals, but keep listed to ignore
+				// convert all literals, but keep listed to ignore
 				outputBuffer += tr.convertNonListed(tr.ignoreList, lit)
 			default:
-				//convert whiteList literals
+				// convert whiteList literals
 				outputBuffer += tr.convertListed(tr.changeWhiteList, lit)
 			}
 		}
@@ -106,14 +106,14 @@ func (tr *translitter) convert(input string) string {
 
 func (tr *translitter) convertListed(list []string, lit literal) string {
 	if listed(list, lit.glyph) {
-		return tr.convertLiteralToText(tr.changeLiteralsMap, lit)
+		return tr.convertLiteralToText(lit)
 	}
 	return lit.glyph
 }
 
 func (tr *translitter) convertNonListed(list []string, lit literal) string {
 	if !listed(list, lit.glyph) {
-		return tr.convertLiteralToText(tr.changeLiteralsMap, lit)
+		return tr.convertLiteralToText(lit)
 	}
 	return lit.glyph
 }
@@ -156,7 +156,6 @@ func listed(list []string, s string) bool {
 }
 
 func applyShort_SE_form(text string) string {
-
 	reS := regexp.MustCompile(`_(\d)+_sezon`)
 	season := reS.FindString(text)
 	reE := regexp.MustCompile(`_(\d)+_seriya`)
@@ -179,7 +178,7 @@ func applyShort_SE_form(text string) string {
 	return text
 }
 
-func (tr *translitter) convertLiteralToText(literalsMap map[string]string, lit literal) string {
+func (tr *translitter) convertLiteralToText(lit literal) string {
 	v, ok := tr.changeLiteralsMap[lit.glyph]
 	if !ok {
 		switch tr.DEBUG_panicIfLiteralIsUNKNOWN {
@@ -202,7 +201,7 @@ func toTitle(str string) string {
 	return str
 }
 
-func removeSegmentstorRepetitions(text string, segmentator string) string {
+func removeSegmentstorRepetitions(text, segmentator string) string {
 	squashed := strings.ReplaceAll(text, segmentator+segmentator, segmentator)
 	for squashed != text {
 		text = squashed

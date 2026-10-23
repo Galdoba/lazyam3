@@ -56,10 +56,10 @@ func TestPRTRegex(t *testing.T) {
 
 func TestSplitExtension(t *testing.T) {
 	tests := []struct {
-		name      string
-		filename  string
-		wantStem  string
-		wantExt   string
+		name     string
+		filename string
+		wantStem string
+		wantExt  string
 	}{
 		{"has extension", "12345.mp4", "12345", "mp4"},
 		{"double extension", "show.s01e01.mp4", "show.s01e01", "mp4"},

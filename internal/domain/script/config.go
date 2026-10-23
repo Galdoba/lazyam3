@@ -11,12 +11,12 @@ import (
 // and environment configuration.
 type ScriptConfig struct {
 	// From ingest domain
-	Filenames        []string               // input filenames in unit order; Filenames[0] is the primary media file (ingest ranks video-containing files first)
-	Streams          []ingest.Stream        // all parsed streams
-	SRT              string                 // subtitle filename (empty if no subtitles)
-	HSUBFile         string                 // hardsub file path (empty if no hardsub)
-	Product          metadata.Product       // the episode/season/movie product (with SeriesTitle set)
-	StreamSelections []StreamSelection      // optional; auto-select if nil/empty
+	Filenames        []string          // input filenames in unit order; Filenames[0] is the primary media file (ingest ranks video-containing files first)
+	Streams          []ingest.Stream   // all parsed streams
+	SRT              string            // subtitle filename (empty if no subtitles)
+	HSUBFile         string            // hardsub file path (empty if no hardsub)
+	Product          metadata.Product  // the episode/season/movie product (with SeriesTitle set)
+	StreamSelections []StreamSelection // optional; auto-select if nil/empty
 
 	// Predictions is the single source of truth for output file names.
 	// Populated by the pipeline layer via callname.PredictOutputs.

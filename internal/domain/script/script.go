@@ -320,7 +320,7 @@ func buildReadyFile(predictions []callname.PredictedOutput) string {
 
 // derivePredictionsFromStreams builds PredictedOutput from Product + Streams.
 // Used as fallback when predictions are not set in config (backward compat).
-func derivePredictionsFromStreams(product metadata.Product, streams []ingest.Stream, targetRoot string, prtTimestamp string) []callname.PredictedOutput {
+func derivePredictionsFromStreams(product metadata.Product, streams []ingest.Stream, targetRoot, prtTimestamp string) []callname.PredictedOutput {
 	// Sort streams for deterministic prediction order
 	slices.SortFunc(streams, func(a, b ingest.Stream) int {
 		if a.FileIndex != b.FileIndex {

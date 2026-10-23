@@ -229,10 +229,10 @@ func buildTestSnapshot(t *testing.T) *Snapshot {
 	}
 
 	files := map[string]string{
-		filepath.Join(dir,    "root.txt"):      "root",
-		filepath.Join(sub1,   "a.txt"):         "a",
-		filepath.Join(sub2,   "b.txt"):         "b",
-		filepath.Join(sub1sub, "c.txt"):        "c",
+		filepath.Join(dir, "root.txt"):  "root",
+		filepath.Join(sub1, "a.txt"):    "a",
+		filepath.Join(sub2, "b.txt"):    "b",
+		filepath.Join(sub1sub, "c.txt"): "c",
 	}
 	for p, content := range files {
 		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {

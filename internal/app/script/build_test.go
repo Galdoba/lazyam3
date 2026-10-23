@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Galdoba/lazyam3/internal/domain/callname"
 	appingest "github.com/Galdoba/lazyam3/internal/app/ingest"
+	"github.com/Galdoba/lazyam3/internal/domain/callname"
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	dscript "github.com/Galdoba/lazyam3/internal/domain/script"
 	mdinfra "github.com/Galdoba/lazyam3/internal/infra/metadata"

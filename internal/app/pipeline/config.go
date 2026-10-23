@@ -105,14 +105,14 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	}
 
 	return script.ScriptConfig{
-		Filenames:      unit.Filenames,
-		Streams:        streams,
-		SRT:            srtCall,
-		HSUBFile:       hsubCall,
-		Product:        prod,
-		Predictions:    predictions,
-		CallNames:      callNames,
-		PRTTimestamp:   timestamp,
+		Filenames:    unit.Filenames,
+		Streams:      streams,
+		SRT:          srtCall,
+		HSUBFile:     hsubCall,
+		Product:      prod,
+		Predictions:  predictions,
+		CallNames:    callNames,
+		PRTTimestamp: timestamp,
 		Env: script.Environment{
 			Buffer:        buffer,
 			InProgress:    inProgress,

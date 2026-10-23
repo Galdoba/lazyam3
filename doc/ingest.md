@@ -1,265 +1,142 @@
-# Ingest Domain
+# Bounded Context: Ingest
 
-The ingest domain handles physical media files: extracting product IDs, parsing stream metadata from ffprobe output, and assembling coherent MediaUnits.
+> **Status:** active  
+> **Owner:** pipeline engineering  
+> **Entropy level:** Medium
 
-## Overview
+## 1. Purpose
 
-```
-Directory → [filter files] → [probe each file] → [parse streams] → MediaUnit
-```
+The ingest domain transforms raw physical media files into structured, validated product units. It scans directories for media files, probes each file with ffprobe to extract stream metadata, groups files by product ID, and produces a `MediaUnit` — a coherent DTO representing one media product ready for downstream metadata resolution and script generation.
 
-The ingest domain transforms raw ffprobe JSON data into structured domain types. It knows nothing about how the data was acquired — only that it arrived as ffprobe JSON output.
+**Out of scope:** Product metadata lookup (belongs to the *Metadata* domain), rendering script generation (belongs to the *Script* domain), file delivery or notification, and any user-facing interface. The domain knows nothing about *what* the media is — only that it exists as files on disk with measurable properties.
 
-## Domain Layer
+## 2. Context & Environment
 
-### Types
+- **Users / Actors:** The automated pipeline is the sole actor. No human directly interacts with this domain; it is invoked by the pipeline orchestrator (`app.Pipeline.RunOnce`) which scans source directories and delegates to `Organizer.Ingest(dir)` per unit.
+- **Adjacent domains and systems:** 
+  - **Metadata** — resolves the product ID from the ingest unit into a `Product` record.
+  - **Script** — consumes the ingest unit's streams and filenames to build rendering scripts.
+  - **ffprobe (external)** — the only external system; its JSON output is the raw input to the domain.
+  - **Filesystem (OS)** — the source of physical files; accessed through infrastructure, never by the domain.
+- **Key business rules:** A product ID is extracted from the filename stem (digits at the start). All files within a single unit must share the same ID. Streams are parsed from ffprobe JSON and validated against quality thresholds (resolution, bitrate, duration consistency). Files that contain only non-media streams (e.g. attachment data) are silently filtered out.
 
-**`MediaUnit`** — aggregated product info from one or more files on disk.
+## 3. Boundaries & Interactions
 
-```go
-type MediaUnit struct {
-    ID         int64             // Product ID extracted from filenames
-    Filenames  []string          // Files ordered by kind rank (video, audio, subtitle, other; lexicographic within a group); Filenames[0] is the primary media file
-    Streams    map[string]Stream // Keyed by stream coordinate (e.g. "[0:v:0]")
-    Validation ValidationIssues  // Problems found during ingest
-}
-```
+- **Inbound interactions:** 
+  - `Organizer.Ingest(dir string) (MediaUnit, error)` — the domain port. Infrastructure scans a directory, probes files with ffprobe, and passes the raw JSON (`map[string][]byte`) to `NewMediaUnit()`.
+  - `NewMediaUnit(map[string][]byte) (MediaUnit, error)` — pure function that parses, orders, and validates.
+- **Outbound interactions:** 
+  - Returns a `MediaUnit` DTO to the application layer.
+  - The domain itself makes no external calls; all I/O is delegated to infrastructure.
+- **Domain Events:** None. The domain is synchronous and returns a DTO directly.
+- **Dependencies:** 
+  - `domain/script` imports `domain/ingest` (`ScriptConfig.Streams []ingest.Stream`) — the only permitted cross-domain dependency.
+  - `domain/metadata` does not depend on ingest.
 
-**`Stream`** — describes a single media stream within a file.
+## 4. Ubiquitous Language
 
-```go
-type Stream struct {
-    FileIndex int           // Which file in the unit (0-based)
-    Index     int           // Stream index within the file
-    Kind      StreamKind    // video, audio, subtitle, data
-    Codec     string        // e.g. "h264", "aac", "mov_text"
-    // Video fields
-    Width, Height int
-    FrameRate   Rational
-    PixelFormat string
-    Interlaced  bool        //not used yet
-    // Audio fields
-    ChannelLayout Layout
-    Language      Language
-    SampleRate    int
-    SampleFormat  string
-    // Subtitle fields
-    Forced bool
-    // Common
-    BitRate  int64
-    Duration Rational
-}
-```
+| Term | Definition | Synonyms/Notes |
+|------|------------|----------------|
+| **MediaUnit** | Aggregated representation of one media product across one or more physical files. | "unit", "product unit" |
+| **Stream** | A single media stream (video, audio, subtitle, or data) within a file. | "track" (informal) |
+| **StreamKind** | Classification of a stream: `video`, `audio`, `subtitle`, or `data`. | "codec_type", "stream type" |
+| **Coordinate** | ffmpeg-style stream selector string, e.g. `"[0:v:0]"`. | "stream selector", "ffmpeg key" |
+| **Rational** | A fraction (numerator / denominator) used for frame rate and duration. | "fraction", "ratio" |
+| **ValidationIssue** | A quality concern found during ingest (resolution, bitrate, duration, duplicates). | "warning", "alert" |
+| **Organizer** | Domain port interface for scanning a directory into a MediaUnit. | "ingester" (informal) |
+| **Product ID** | Numeric identifier extracted from the beginning of a filename stem. | "ID", "product number" |
+| **File rank** | Ordering priority: video-containing=0, audio-only=1, subtitle-only=2, other=3. | "kind rank", "priority" |
+| **Sidecar** | External subtitle file (`.srt`, `.ass`, `.ssa`) that ffprobe cannot probe. | "external subtitle" |
 
-**`StreamKind`** — identifies stream type.
+## 5. Key Scenarios / Use Cases
 
-```go
-const (
-    StreamKindVideo    StreamKind = "video"
-    StreamKindAudio    StreamKind = "audio"
-    StreamKindSubtitle StreamKind = "subtitle"
-    StreamKindData     StreamKind = "data"
-)
-```
+### Scenario 1: Ingest a single-file product
+- **Given** a directory containing one media file (e.g. `63603.mp4`) with video and audio streams
+- **When** `Organizer.Ingest(dir)` is called
+- **Then** a `MediaUnit` is returned with `ID=63603`, one filename, and parsed streams (video + audio)
+- **And** no validation issues are reported
 
-**`Rational`** — represents fractional values (frame rate, duration).
+### Scenario 2: Ingest a multi-file product (video + external subtitle)
+- **Given** a directory containing `65003.mp4` and `65003-eng.srt`
+- **When** `Organizer.Ingest(dir)` is called
+- **Then** the `MediaUnit` includes both files in `Filenames` (video first, subtitle second)
+- **And** the subtitle file is recorded as a sidecar (app layer handles ffprobe probing failure gracefully)
+- **And** streams from both files are aggregated in the `Streams` map
 
-```go
-type Rational struct {
-    Num   int
-    Denom int
-}
-```
+### Scenario 3: Multi-audio unit with language tags
+- **Given** a file with multiple audio tracks (e.g. English stereo + French 5.1)
+- **When** streams are parsed from ffprobe JSON
+- **Then** each audio stream carries its `Language` field (from the `tags.language` attribute)
+- **And** each stream retains its `ChannelLayout` (stereo, 5.1, etc.)
 
-**`ValidationIssue`** — records a problem found during ingest.
+### Scenario 4: Validation — low-resolution video
+- **Given** a video stream with resolution below 720×576
+- **When** `ValidateMediaUnit(streams)` is called
+- **Then** a `ValidationIssue` with `Field="resolution"` is returned
+- **And** the problem message describes the actual resolution (e.g. "320x240")
 
-```go
-type ValidationIssue struct {
-    StreamIndex int    // -1 if file-level, >= 0 if stream-level
-    Field       string // e.g. "resolution", "bitrate", "duration_consistency"
-    Problem     string // human-readable description
-}
-```
+### Scenario 5: Validation — duration inconsistency across files
+- **Given** a MediaUnit with streams whose durations vary by more than 10%
+- **When** `ValidateMediaUnit(streams)` is called
+- **Then** a `ValidationIssue` with `Field="duration_consistency"` is returned
+- **And** the issue is flagged at file-level (`StreamIndex=-1`)
 
-### Pure Functions
+### Scenario 6: Data-only files are filtered
+- **Given** a directory with a media file and a data-only file (e.g. `.dat` with no media streams)
+- **When** `NewMediaUnit(data)` is called
+- **Then** the data-only file is excluded from `Filenames` and its streams are not included
+- **And** the MediaUnit is returned successfully (not an error)
 
-**`ExtractID(filename string) (int64, error)`**
+### Scenario 7: Inconsistent product IDs across files
+- **Given** files `63603.mp4` and `99999.mp4` in the same directory
+- **When** `NewMediaUnit(data)` is called
+- **Then** an error is returned indicating inconsistent IDs
 
-Parses the product ID from a filename stem (name without extension). The stem must start with a digit sequence.
+## 6. High-Level Data Model (Key Entities)
 
-```go
-ExtractID("63603.mp4")        // → 63603, nil
-ExtractID("63604_PRT251205.mp4") // → 63604, nil
-ExtractID("Copy of 63603.mp4")   // → 0, error (doesn't start with digit)
-```
+- **MediaUnit** — aggregate root. Represents one product across its physical files.
+  - Key invariants: all files share the same Product ID; `Filenames[0]` is the primary media file (highest file rank).
+  - Fields: `ID` (int64), `Filenames` ([]string), `Streams` (map[string]Stream), `Validation` (ValidationIssues), `PRTTimestamp` (string, pipeline-provided).
+  
+- **Stream** — describes a single media stream.
+  - Key invariants: `coordinate()` uniquely identifies a stream within a unit; duration is stored as a Rational (milliseconds).
+  - Fields: `FileIndex`, `Index`, `Kind`, `Codec`, `Width`, `Height`, `FrameRate`, `PixelFormat`, `Interlaced`, `ChannelLayout`, `Language`, `SampleRate`, `SampleFormat`, `Forced`, `BitRate`, `Duration`.
 
-**`ParseStreams(ffprobeJSON []byte) ([]Stream, error)`**
+- **StreamKind** — enum: `video`, `audio`, `subtitle`, `data`.
 
-Parses ffprobe JSON output into domain `Stream` objects. The JSON must match the format produced by:
+- **Rational** — fraction (Num/Denom). Used for frame rate and duration. Zero-value (`Num=0, Denom=0`) means "unavailable."
 
-```bash
-ffprobe -v quiet -print_format json -show_streams -show_format <file>
-```
+- **ValidationIssue** — a quality concern with `StreamIndex` (-1 for file-level, ≥0 for stream-level), `Field` (category), and `Problem` (human-readable description).
 
-Only streams with `codec_type` of `video`, `audio`, or `subtitle` are returned. Other types (data, attachment) are mapped to `StreamKindData`.
+- **Organizer** — port interface: `Ingest(dir string) (MediaUnit, error)`. Implemented by infrastructure.
 
-**`ValidateMediaUnit(streams []Stream) ValidationIssues`**
+**Relationships:**
+- MediaUnit 1—N Stream (streams map, keyed by coordinate string)
+- MediaUnit 1—N ValidationIssue (issues list)
+- MediaUnit 1—N File (Filenames slice)
 
-Runs domain-level validation rules and returns a list of issues:
+## 7. Non-Functional Requirements & Constraints
 
-| Rule | Threshold | When triggered |
-|---|---|---|
-| Resolution | ≥ 720×576 (SD) | Video resolution below SD |
-| Video bitrate | ≥ 100 kbps | Suspiciously low bitrate |
-| Audio bitrate | ≥ 32 kbps | Suspiciously low bitrate |
-| Duration | ≥ 0 | Negative duration for video/audio |
-| Duration consistency | ≤ 10% variance | Streams' durations vary by more than 10% |
-| Duplicate detection | Unique coordinates | Same stream coordinate appears twice |
+- **Authorization:** N/A — the domain runs as part of an automated pipeline with no user-facing access control.
+- **Performance/Scale:** Designed for batch processing of hundreds to thousands of media units. Stream parsing and validation are pure functions with no I/O or allocations beyond the input data. File ordering uses `slices.SortFunc` — O(n log n) where n is the number of files per unit (typically ≤ 10).
+- **Data:** No persistence. MediaUnits are DTOs passed through the pipeline and discarded. No PII is stored.
+- **External constraints:** Depends on ffprobe JSON output format (produced by `ffprobe -v quiet -print_format json -show_streams -show_format`). The domain assumes ffprobe is available as an external tool but never invokes it directly.
 
-**`Stream.Coordinate() string`**
+## 8. Acceptance Criteria
 
-Returns the ffmpeg-style stream selector string.
+- [ ] `ExtractID` correctly parses product IDs from filenames with various formats (numeric, underscore suffix, hyphen suffix, no extension) and rejects non-digit-prefixed stems.
+- [ ] `ParseStreams` correctly maps ffprobe JSON to domain `Stream` objects for video, audio, and subtitle streams.
+- [ ] `ValidateMediaUnit` detects all validation rules: resolution below SD, low bitrate (video <100 kbps, audio <32 kbps), negative duration, duration inconsistency (>10%), and duplicate coordinates.
+- [ ] `NewMediaUnit` orders files by kind rank (video > audio > subtitle > data), filters data-only files, assigns `FileIndex`, and validates ID consistency.
+- [ ] `sortUnitFiles` produces deterministic ordering: video-containing files first, lexicographic within each rank group.
+- [ ] `Stream.coordinate()` produces correct ffmpeg-style selectors (e.g. `[0:v:0]`, `[1:a:2]`).
+- [ ] Subtitle sidecar files (`.srt`, `.ass`, `.ssa`) are handled gracefully by infrastructure (probing failure is not a fatal error).
+- [ ] Integration tests pass for all synthetic test scenarios (simple, multi-audio, subtitles, multi-lang, embedded-sub, hardsub).
 
-```go
-Stream{FileIndex: 0, Index: 0, Kind: "video"}.Coordinate() // → "[0:v:0]"
-Stream{FileIndex: 1, Index: 2, Kind: "audio"}.Coordinate() // → "[1:a:2]"
-```
+## 9. Open Questions
 
-### `NewMediaUnit(data map[string][]byte) (MediaUnit, error)`
-
-The main entry point. Takes raw ffprobe JSON data keyed by filename and produces a `MediaUnit`.
-
-**Process:**
-1. Parse streams from ffprobe JSON for every file
-2. Order files by kind rank: video-containing → audio-only → subtitle-only → other;
-   lexicographic within a group (`sortUnitFiles`). `Filenames[0]` is therefore the
-   primary media file whenever the unit contains one — alphabetical order alone is
-   not enough (e.g. `12094-rus.srt` sorts before `12094.mp4`)
-3. **Filter**: skip files with only `data` streams (not media files)
-4. Assign `FileIndex` to each stream based on the ordered position
-5. Build coordinate keys and collect streams into a map
-6. Extract product ID from first filename (validate consistency across files)
-7. Run `ValidateMediaUnit` and store issues
-
-**Error cases:**
-- Invalid ffprobe JSON → returns error with filename
-- Inconsistent IDs across files → returns error
-- All files filtered out → returns empty `MediaUnit` (not an error)
-
-## Implementation Layer
-
-### `Organizer` Interface
-
-```go
-type Organizer interface {
-    Ingest(dir string) (MediaUnit, error)
-}
-```
-
-Defines the contract for turning a directory of files into a `MediaUnit`.
-
-### `app/ingest.Ingest` Implementation
-
-```go
-type Ingest struct {
-    ffprobeBinary string
-}
-
-func New(ffprobeBinaryPath string) *Ingest
-func (ing *Ingest) Ingest(dir string) (MediaUnit, error)
-```
-
-**Process:**
-1. Read directory entries with `os.ReadDir`
-2. **Filter**: skip non-regular files (directories, symlinks, etc.)
-3. Create a single `Prober` instance for reuse
-4. For each regular file:
-   - Probe with ffprobe (`fso.Prober.ProbeFile(path)`)
-   - **Fail fast**: if probing fails, return error immediately
-   - Collect raw JSON into `map[string][]byte`
-5. Pass collected data to `domain.ingest.NewMediaUnit`
-
-**Error handling:**
-- Directory read error → returned directly
-- Probe failure → wrapped error (`failed to probe file "path": <cause>`)
-- Parsing/validation errors → returned from `NewMediaUnit`
-
-### CLI Integration
-
-```bash
-lazyam3 process \
-  --source-root /path/to/media \
-  --target-root /path/to/output \
-  --ffprobe-path /usr/bin/ffprobe \
-  --once
-```
-
-The `--ffprobe-path` flag configures which ffprobe binary to use. Fallback chain: flag → config field `paths.ffprobe_binary` → `ffprobe` (from `$PATH`). The `--once` flag runs a single scan pass and exits (useful for live testing). Without `--once`, the pipeline polls every second until SIGINT/SIGTERM.
-
-## Test Data
-
-Synthetic test files in `testdata/synthetic/` cover common scenarios:
-
-| Product | Files | Streams | Purpose |
-|---|---|---|---|
-| **10001** (simple-unit) | `10001.mp4` (88K) | 1 video (h264), 1 audio (aac) | Basic case |
-| **10002** (multi-audio) | `10002.mp4` (105K) | 1 video, 2 audio (eng, fra) | Multiple audio tracks |
-| **10003** (with-subtitles) | `10003.mp4` + `.srt` (180K) | 1 video, 1 audio, external srt | External subtitle file |
-| **10004** (multi-lang-audio) | `10004.mp4` + `.srt` (236K) | 1 video, 6 audio (3 langs × stereo/5.1) | Complex audio routing |
-| **10005** (embedded-sub) | `10005.mp4` (88K) | 1 video, 1 audio, 1 subtitle stream | Embedded subtitle track |
-
-All files are 2 seconds, SD (720×576), 500kbps video / 64kbps audio. Used by integration tests.
-
-## Validation Rules
-
-### Resolution Check
-Video streams must have resolution ≥ 720×576 (SD). Files with lower resolution trigger:
-```
-Field: "resolution"
-Problem: "video resolution 320x240 is below SD (720x576)"
-```
-
-### Bitrate Sanity
-Video streams below 100 kbps and audio below 32 kbps are flagged:
-```
-Field: "bitrate"
-Problem: "video bitrate 50000 bps is suspiciously low"
-```
-
-### Duration Checks
-- Video/audio streams with negative duration trigger:
-  ```
-  Field: "duration"
-  Problem: "video has negative duration"
-  ```
-- Subtitle streams may have zero duration (normal for SRT)
-
-### Duration Consistency
-When a MediaUnit has multiple streams with durations, they must be within 10% of each other. This catches mismatched or corrupted split files:
-```
-Field: "duration_consistency"
-Problem: "stream durations vary by more than 10%"
-```
-
-### Duplicate Detection
-Each stream's coordinate (file_index + kind + index) must be unique. Duplicates trigger:
-```
-Field: "coordinate"
-Problem: "duplicate stream coordinate"
-```
-
-## File Structure
-
-```
-internal/domain/ingest/
-├── port.go         # Organizer interface (11 lines)
-├── unit.go         # MediaUnit, ValidationIssue, NewMediaUnit, ValidateMediaUnit
-├── stream.go       # Stream, StreamKind, Rational, Layout, Language
-├── parse.go        # ParseStreams, helper functions
-├── extract.go      # ExtractID
-└── unit_test.go    # 70 unit tests (12 test functions)
-
-internal/app/ingest/
-├── ingest.go       # Ingest struct, New, Ingest method (real implementation)
-└── ingest_test.go  # Integration tests with synthetic testdata
-```
+- [ ] Should `ValidateMediaUnit` enforce a minimum audio sample rate (e.g. 44100 Hz)? Currently only bitrate is checked.
+- [ ] Should the domain expose a `MediaUnit.WithPrimaryFile() Stream` convenience method, or should the application layer derive this from `Streams` by selecting the first video stream?
+- [ ] The `PRTTimestamp` field on `MediaUnit` is set by the pipeline, not the domain. Should this field live in the domain DTO or be carried separately by the application layer?
+- [ ] Should `Interlaced` be used by downstream domains (currently marked "not used yet"), or should it be removed to keep the model lean?
+- [ ] Should `Rational` support arbitrary-precision arithmetic for edge-case frame rates (e.g. 29.97 as 30000/1001)? Current implementation uses `int` which may lose precision for very large denominators.

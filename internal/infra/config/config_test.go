@@ -83,7 +83,7 @@ tag = 'Forsirovannye'
 `
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "test.toml")
-	if err := os.WriteFile(path, []byte(toml), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(toml), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

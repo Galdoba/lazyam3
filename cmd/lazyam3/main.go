@@ -7,9 +7,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/Galdoba/lazyam3/internal/app"
 	"github.com/Galdoba/lazyam3/internal/infra/commands"
-	"github.com/urfave/cli/v3"
 )
 
 func main() {

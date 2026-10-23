@@ -57,8 +57,8 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "selection references non-existent stream",
 			cfg: ScriptConfig{
-				Destination:  "/tmp/test.sh",
-				Streams:      []ingest.Stream{videoStream},
+				Destination:      "/tmp/test.sh",
+				Streams:          []ingest.Stream{videoStream},
 				StreamSelections: []StreamSelection{{InputIndex: 0, StreamIndex: 99, Kind: "v"}},
 			},
 			wantErr: true,
@@ -66,8 +66,8 @@ func TestValidateConfig(t *testing.T) {
 		{
 			name: "valid with selections",
 			cfg: ScriptConfig{
-				Destination:  "/tmp/test.sh",
-				Streams:      []ingest.Stream{videoStream},
+				Destination:      "/tmp/test.sh",
+				Streams:          []ingest.Stream{videoStream},
 				StreamSelections: []StreamSelection{{InputIndex: 0, StreamIndex: 0, Kind: "v"}},
 			},
 			wantErr: false,
@@ -137,7 +137,7 @@ func TestFindUnresolved(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestReplaceAll(t *testing.T) {
-	got := replaceAll("hello |=name=| and |=name=|" , "name", "world")
+	got := replaceAll("hello |=name=| and |=name=|", "name", "world")
 	want := "hello world and world"
 	if got != want {
 		t.Errorf("replaceAll() = %q, want %q", got, want)
@@ -520,10 +520,10 @@ func TestAbbrevKind(t *testing.T) {
 
 func TestDerivePredictionsFromStreams(t *testing.T) {
 	prod := metadata.Product{
-		ID:           12254,
-		SeriesTitle:  "Арлисс",
-		Kind:         metadata.KindSeriesEpisode,
-		SeasonNumber: ptrInt(1),
+		ID:            12254,
+		SeriesTitle:   "Арлисс",
+		Kind:          metadata.KindSeriesEpisode,
+		SeasonNumber:  ptrInt(1),
 		EpisodeNumber: ptrInt(6),
 	}
 
@@ -584,13 +584,13 @@ func TestBuildScript(t *testing.T) {
 	}, "/mnt/ROOT/EDIT", "", 12254)
 
 	cfg := ScriptConfig{
-		Filenames:   []string{"12254.mp4"},
-		Streams:     []ingest.Stream{videoStream, audioStream},
-		Product:     prod,
-		Predictions: preds,
-		CallNames:   map[string]string{"12254.mp4": "Arliss_s01e06_PRT261023110725_id12254.mp4"},
-		NameTag:     "_s01e06",
-		SeasonDir:   "_s01",
+		Filenames:    []string{"12254.mp4"},
+		Streams:      []ingest.Stream{videoStream, audioStream},
+		Product:      prod,
+		Predictions:  preds,
+		CallNames:    map[string]string{"12254.mp4": "Arliss_s01e06_PRT261023110725_id12254.mp4"},
+		NameTag:      "_s01e06",
+		SeasonDir:    "_s01",
 		PRTTimestamp: "261023110725",
 		Env: Environment{
 			Buffer:        "/tmp/lazyam/buffer",
@@ -636,10 +636,10 @@ func TestBuildScript(t *testing.T) {
 
 func TestBuildScript_WithSRT(t *testing.T) {
 	prod := metadata.Product{
-		ID:           12254,
-		SeriesTitle:  "Арлисс",
-		Kind:         metadata.KindSeriesEpisode,
-		SeasonNumber: ptrInt(1),
+		ID:            12254,
+		SeriesTitle:   "Арлисс",
+		Kind:          metadata.KindSeriesEpisode,
+		SeasonNumber:  ptrInt(1),
 		EpisodeNumber: ptrInt(6),
 	}
 
@@ -688,10 +688,10 @@ func TestBuildScript_WithSRT(t *testing.T) {
 
 func TestBuildScript_WithHSUB(t *testing.T) {
 	prod := metadata.Product{
-		ID:           12254,
-		SeriesTitle:  "Арлисс",
-		Kind:         metadata.KindSeriesEpisode,
-		SeasonNumber: ptrInt(1),
+		ID:            12254,
+		SeriesTitle:   "Арлисс",
+		Kind:          metadata.KindSeriesEpisode,
+		SeasonNumber:  ptrInt(1),
 		EpisodeNumber: ptrInt(6),
 	}
 
@@ -703,14 +703,14 @@ func TestBuildScript_WithHSUB(t *testing.T) {
 	}, "/mnt/ROOT/EDIT", "", 12254)
 
 	cfg := ScriptConfig{
-		Filenames:  []string{"12254.mp4"},
-		Streams:    []ingest.Stream{videoStream},
-		HSUBFile:   "Arliss_s01e06_PRT261023110725_id12254_hardsub.srt",
-		Product:    prod,
+		Filenames:   []string{"12254.mp4"},
+		Streams:     []ingest.Stream{videoStream},
+		HSUBFile:    "Arliss_s01e06_PRT261023110725_id12254_hardsub.srt",
+		Product:     prod,
 		Predictions: preds,
-		CallNames:  map[string]string{"12254.mp4": "Arliss_s01e06_PRT261023110725_id12254.mp4"},
-		NameTag:    "_s01e06",
-		SeasonDir:  "_s01",
+		CallNames:   map[string]string{"12254.mp4": "Arliss_s01e06_PRT261023110725_id12254.mp4"},
+		NameTag:     "_s01e06",
+		SeasonDir:   "_s01",
 		Env: Environment{
 			Buffer:        "/tmp/lazyam/buffer",
 			InProgress:    "/tmp/lazyam/in_progress",
@@ -735,10 +735,10 @@ func TestBuildScript_WithHSUB(t *testing.T) {
 
 func TestBuildScript_WithInterlaced(t *testing.T) {
 	prod := metadata.Product{
-		ID:           12254,
-		SeriesTitle:  "Арлисс",
-		Kind:         metadata.KindSeriesEpisode,
-		SeasonNumber: ptrInt(1),
+		ID:            12254,
+		SeriesTitle:   "Арлисс",
+		Kind:          metadata.KindSeriesEpisode,
+		SeasonNumber:  ptrInt(1),
 		EpisodeNumber: ptrInt(6),
 	}
 
@@ -794,12 +794,12 @@ func TestBuildScript_DerivePredictionsFallback(t *testing.T) {
 	audioStream := ingest.Stream{Kind: ingest.StreamKindAudio, Index: 1, FileIndex: 0, Language: ingest.Language("eng"), ChannelLayout: ingest.LayoutStereo}
 
 	cfg := ScriptConfig{
-		Filenames:   []string{"99.mp4"},
-		Streams:     []ingest.Stream{videoStream, audioStream},
-		Product:     prod,
-		CallNames:   map[string]string{"99.mp4": "TestShow_s02e03_PRT261023110725_id99.mp4"},
-		NameTag:     "_s02e03",
-		SeasonDir:   "_s02",
+		Filenames:    []string{"99.mp4"},
+		Streams:      []ingest.Stream{videoStream, audioStream},
+		Product:      prod,
+		CallNames:    map[string]string{"99.mp4": "TestShow_s02e03_PRT261023110725_id99.mp4"},
+		NameTag:      "_s02e03",
+		SeasonDir:    "_s02",
 		PRTTimestamp: "261023110725",
 		Env: Environment{
 			Buffer:        "/tmp/lazyam/buffer",
@@ -846,7 +846,7 @@ func TestBuildScript_ValidationErrors(t *testing.T) {
 		Streams:     []ingest.Stream{{Kind: ingest.StreamKindVideo, Index: 0, FileIndex: 0}},
 		Predictions: []callname.PredictedOutput{{MediaType: "video", Path: "/tmp/out.mp4"}},
 		CallNames:   map[string]string{"test.mp4": "Test.mp4"},
-		Env: Environment{TargetRoot: "/tmp"},
+		Env:         Environment{TargetRoot: "/tmp"},
 	}
 	_, err := BuildScript(cfg)
 	if err == nil {
@@ -1091,9 +1091,9 @@ func TestBuildSRTSection_EdgeCases(t *testing.T) {
 func TestBuildReadyFile_EdgeCases(t *testing.T) {
 	// Different file extensions
 	tests := []struct {
-		name  string
-		path  string
-		want  string
+		name string
+		path string
+		want string
 	}{
 		{"mp4", "/mnt/ROOT/EDIT/H_HD.mp4", `touch "/mnt/ROOT/EDIT/H_HD.ready"`},
 		{"mkv", "/mnt/ROOT/EDIT/H_HD.mkv", `touch "/mnt/ROOT/EDIT/H_HD.ready"`},
@@ -1129,7 +1129,7 @@ func TestBuildScript_MultipleAudioTracks(t *testing.T) {
 
 	// Add streams to the MediaUnit so PredictOutputs can create audio predictions
 	mediaUnit := ingest.MediaUnit{
-		ID: 200,
+		ID:           200,
 		PRTTimestamp: "261023110725",
 		Streams: map[string]ingest.Stream{
 			"[0:v:0]": videoStream,
@@ -1393,12 +1393,12 @@ func TestBuildScript_EmptyPredictionsFallback(t *testing.T) {
 
 	// Empty predictions — should trigger derivePredictionsFromStreams
 	cfg := ScriptConfig{
-		Filenames:   []string{"500.mp4"},
-		Streams:     []ingest.Stream{videoStream, audioStream},
-		Product:     prod,
-		CallNames:   map[string]string{"500.mp4": "FallbackTest_s01e01_PRT261023110725_id500.mp4"},
-		NameTag:     "_s01e01",
-		SeasonDir:   "_s01",
+		Filenames:    []string{"500.mp4"},
+		Streams:      []ingest.Stream{videoStream, audioStream},
+		Product:      prod,
+		CallNames:    map[string]string{"500.mp4": "FallbackTest_s01e01_PRT261023110725_id500.mp4"},
+		NameTag:      "_s01e01",
+		SeasonDir:    "_s01",
 		PRTTimestamp: "261023110725",
 		Env: Environment{
 			Buffer:        "/tmp/lazyam/buffer",

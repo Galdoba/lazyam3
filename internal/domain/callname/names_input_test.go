@@ -62,10 +62,10 @@ func TestScriptInput_String(t *testing.T) {
 		{
 			name: "only episode tag, no season",
 			input: ScriptInput{
-				ID:        50,
-				Base:      "Series",
+				ID:         50,
+				Base:       "Series",
 				EpisodeTag: "e10",
-				PRT:       "PRT261020000000",
+				PRT:        "PRT261020000000",
 			},
 			expected: "Series_e10_PRT261020000000_id50",
 		},
@@ -216,21 +216,21 @@ func TestScriptInput_validate(t *testing.T) {
 
 func TestBuildInputName(t *testing.T) {
 	product := metadata.Product{
-		ID:          12345,
-		Kind:        metadata.KindSeries,
-		Title:       "Test Episode",
-		SeriesTitle: "Игра лицевых",
-		SeasonNumber: intPtr(1),
+		ID:            12345,
+		Kind:          metadata.KindSeries,
+		Title:         "Test Episode",
+		SeriesTitle:   "Игра лицевых",
+		SeasonNumber:  intPtr(1),
 		EpisodeNumber: intPtr(26),
 	}
 
 	tests := []struct {
-		name        string
-		product     metadata.Product
-		filename    string
-		timestamp   string
-		wantErr     bool
-		validate    func(ScriptInput) bool
+		name      string
+		product   metadata.Product
+		filename  string
+		timestamp string
+		wantErr   bool
+		validate  func(ScriptInput) bool
 	}{
 		{
 			name:      "basic video file",
@@ -302,10 +302,10 @@ func TestBuildInputName(t *testing.T) {
 
 func TestBuildInputNames(t *testing.T) {
 	product := metadata.Product{
-		ID:          12345,
-		Kind:        metadata.KindSeries,
-		SeriesTitle: "Show",
-		SeasonNumber: intPtr(1),
+		ID:            12345,
+		Kind:          metadata.KindSeries,
+		SeriesTitle:   "Show",
+		SeasonNumber:  intPtr(1),
 		EpisodeNumber: intPtr(1),
 	}
 
@@ -340,10 +340,10 @@ func TestBuildInputNames(t *testing.T) {
 
 func TestExtractID(t *testing.T) {
 	tests := []struct {
-		name      string
-		filename  string
-		wantID    int64
-		wantErr   bool
+		name     string
+		filename string
+		wantID   int64
+		wantErr  bool
 	}{
 		{"basic", "12345.mp4", 12345, false},
 		{"with extension", "99999.mkv", 99999, false},
@@ -380,23 +380,23 @@ func TestDeriveOutBase(t *testing.T) {
 		expected string
 	}{
 		{
-			name:    "cyrillic series title",
-			product: metadata.Product{SeriesTitle: "Игра лицевых"},
+			name:     "cyrillic series title",
+			product:  metadata.Product{SeriesTitle: "Игра лицевых"},
 			expected: "Igra_licevyh",
 		},
 		{
-			name:    "latin series title",
-			product: metadata.Product{SeriesTitle: "Test Show"},
+			name:     "latin series title",
+			product:  metadata.Product{SeriesTitle: "Test Show"},
 			expected: "Test_show",
 		},
 		{
-			name:    "empty series title",
-			product: metadata.Product{},
+			name:     "empty series title",
+			product:  metadata.Product{},
 			expected: "",
 		},
 		{
-			name:    "single word cyrillic",
-			product: metadata.Product{SeriesTitle: "Кино"},
+			name:     "single word cyrillic",
+			product:  metadata.Product{SeriesTitle: "Кино"},
 			expected: "Kino",
 		},
 	}

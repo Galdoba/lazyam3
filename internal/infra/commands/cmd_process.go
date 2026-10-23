@@ -5,12 +5,13 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/Galdoba/lazyam3/internal/app"
 	"github.com/Galdoba/lazyam3/internal/app/ingest"
 	"github.com/Galdoba/lazyam3/internal/app/pipeline"
 	"github.com/Galdoba/lazyam3/internal/infra/metadata"
 	scriptinfra "github.com/Galdoba/lazyam3/internal/infra/script"
-	"github.com/urfave/cli/v3"
 )
 
 const (
