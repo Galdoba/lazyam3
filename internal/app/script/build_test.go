@@ -89,19 +89,13 @@ func realConfig(t *testing.T) (dscript.ScriptConfig, string, string) {
 
 	// Predict outputs (drives naming).
 	unit.PRTTimestamp = timestamp
-	predictions := callname.PredictOutputs(*prod, unit, filepath.Join(envRoot, "target"), "")
+	predictions := callname.PredictOutputs(*prod, unit, filepath.Join(envRoot, "target"), "", prod.ID)
 
 	// Resolve SRT/HSUB to call names.
 	srtOrig := "12254-rus_Russkii.srt"
 	hsubOrig := "12254-rus_Russkii_Forsirovannye.srt"
 	srtCall := callNames[srtOrig]
 	hsubCall := callNames[hsubOrig]
-
-	// Extract OUTBASE from predictions for script filename.
-	outBase := extractOutBase(predictions)
-	if outBase == "" {
-		outBase = "Arliss_s01e06"
-	}
 
 	cfg := dscript.ScriptConfig{
 		Filenames:   unit.Filenames,
@@ -120,32 +114,9 @@ func realConfig(t *testing.T) (dscript.ScriptConfig, string, string) {
 			TargetRoot:    filepath.Join(envRoot, "target"),
 			Priority:      6,
 		},
-		Destination: filepath.Join(envRoot, outBase+".sh"),
+		Destination: callname.PredictScriptName(*prod, unit, filepath.Join(envRoot, "target"), "", timestamp),
 	}
 	return cfg, srcDir, envRoot
-}
-
-func extractOutBase(predictions []callname.PredictedOutput) string {
-	if len(predictions) == 0 {
-		return ""
-	}
-	var path string
-	for _, p := range predictions {
-		if p.MediaType == "video" {
-			path = p.Path
-			break
-		}
-	}
-	if path == "" {
-		path = predictions[0].Path
-	}
-	base := filepath.Base(path)
-	ext := filepath.Ext(base)
-	base = base[:len(base)-len(ext)]
-	if strings.HasSuffix(base, "_HD") {
-		base = base[:len(base)-3]
-	}
-	return base
 }
 
 func TestBuild_RealInputs(t *testing.T) {

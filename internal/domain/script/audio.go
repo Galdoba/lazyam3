@@ -35,56 +35,57 @@ func layoutSuffix(layout ingest.Layout) string {
 // selectAudioTracks returns audio tracks from the config's streams and selections.
 // If selections are provided, only selected audio streams are included.
 // If no selections are provided, all audio streams are included.
-func selectAudioTracks(cfg ScriptConfig) []audioTrack {
-	var tracks []audioTrack
-
-	if len(cfg.StreamSelections) > 0 {
-		for _, sel := range cfg.StreamSelections {
-			if sel.Kind != "a" {
-				continue
-			}
-			for _, stream := range cfg.Streams {
-				if stream.Kind != ingest.StreamKindAudio {
-					continue
-				}
-				if stream.FileIndex != sel.InputIndex || stream.Index != sel.StreamIndex {
-					continue
-				}
-				tracks = append(tracks, audioTrack{
-					StreamIndex: stream.Index,
-					Language:    string(stream.Language),
-					Layout:      string(stream.ChannelLayout),
-				})
-			}
-		}
-	} else {
-		for _, stream := range cfg.Streams {
-			if stream.Kind != ingest.StreamKindAudio {
-				continue
-			}
-			tracks = append(tracks, audioTrack{
-				StreamIndex: stream.Index,
-				Language:    string(stream.Language),
-				Layout:      string(stream.ChannelLayout),
-			})
-		}
-	}
-
-	// Assign suffixes and normalize
-	for i, t := range tracks {
-		if t.Language == "" {
-			t.Language = "und"
-		}
-		if t.Layout == "" {
-			t.Layout = string(ingest.LayoutStereo)
-		}
-		t.Layout = layoutSuffix(ingest.Layout(t.Layout))
-		t.Suffix = fmt.Sprintf("AUDIO_%02d_%s%s", i, strings.ToUpper(t.Language), t.Layout)
-		tracks[i] = t
-	}
-
-	return tracks
-}
+// Deprecated: replaced by callname package.
+// func selectAudioTracks(cfg ScriptConfig) []audioTrack {
+// 	var tracks []audioTrack
+//
+// 	if len(cfg.StreamSelections) > 0 {
+// 		for _, sel := range cfg.StreamSelections {
+// 			if sel.Kind != "a" {
+// 				continue
+// 			}
+// 			for _, stream := range cfg.Streams {
+// 				if stream.Kind != ingest.StreamKindAudio {
+// 					continue
+// 				}
+// 				if stream.FileIndex != sel.InputIndex || stream.Index != sel.StreamIndex {
+// 					continue
+// 				}
+// 				tracks = append(tracks, audioTrack{
+// 					StreamIndex: stream.Index,
+// 					Language:    string(stream.Language),
+// 					Layout:      string(stream.ChannelLayout),
+// 				})
+// 			}
+// 		}
+// 	} else {
+// 		for _, stream := range cfg.Streams {
+// 			if stream.Kind != ingest.StreamKindAudio {
+// 				continue
+// 			}
+// 			tracks = append(tracks, audioTrack{
+// 				StreamIndex: stream.Index,
+// 				Language:    string(stream.Language),
+// 				Layout:      string(stream.ChannelLayout),
+// 			})
+// 		}
+// 	}
+//
+// 	// Assign suffixes and normalize
+// 	for i, t := range tracks {
+// 		if t.Language == "" {
+// 			t.Language = "und"
+// 		}
+// 		if t.Layout == "" {
+// 			t.Layout = string(ingest.LayoutStereo)
+// 		}
+// 		t.Layout = layoutSuffix(ingest.Layout(t.Layout))
+// 		t.Suffix = fmt.Sprintf("AUDIO_%02d_%s%s", i, strings.ToUpper(t.Language), t.Layout)
+// 		tracks[i] = t
+// 	}
+//
+// 	return tracks
+// }
 
 // buildAudioFilter creates the filter_complex segment for audio tracks.
 // Each track gets: [0:N]aresample=48000,atempo=25/(25/1)[audK], where N is the
@@ -107,23 +108,19 @@ func buildAudioFilter(tracks []audioTrack) string {
 	return ";" + strings.Join(parts, ";")
 }
 
-// buildOutputFiles renders the -map output block of the ffmpeg command:
-// the video output line followed by one ALAC output per audio track.
-// All lines except the last end with a "\" continuation — a trailing
-// backslash would glue the next shell command into the ffmpeg argument
-// list ("Unable to find a suitable output format for 'cp'").
-func buildOutputFiles(tracks []audioTrack) string {
-	lines := []string{
-		`  -map "[vidHD]" -c:v libx264 -preset medium -crf 21 -pix_fmt yuv420p -profile:v high -g 0 -map_metadata -1 -map_chapters -1 "${TARGET_DIR}/${OUTBASE}_HD.mp4"`,
-	}
-	for i, t := range tracks {
-		lines = append(lines, fmt.Sprintf(`  -map "[aud%d]" -c:a alac -compression_level 0 "${TARGET_DIR}/${OUTBASE}_HD_%s.m4a"`, i, t.Suffix))
-	}
-	for i := 0; i < len(lines)-1; i++ {
-		lines[i] += ` \`
-	}
-	return strings.Join(lines, "\n")
-}
+// Deprecated: replaced by callname package.
+// func buildOutputFiles(tracks []audioTrack) string {
+// 	lines := []string{
+// 		`  -map "[vidHD]" -c:v libx264 -preset medium -crf 21 -pix_fmt yuv420p -profile:v high -g 0 -map_metadata -1 -map_chapters -1 "${TARGET_DIR}/${OUTBASE}_HD.mp4"`,
+// 	}
+// 	for i, t := range tracks {
+// 		lines = append(lines, fmt.Sprintf(`  -map "[aud%d]" -c:a alac -compression_level 0 "${TARGET_DIR}/${OUTBASE}_HD_%s.m4a"`, i, t.Suffix))
+// 	}
+// 	for i := 0; i < len(lines)-1; i++ {
+// 		lines[i] += ` \`
+// 	}
+// 	return strings.Join(lines, "\n")
+// }
 
 // buildOutputFilesPredictions renders the -map output block using predicted
 // paths. The first prediction is always video; subsequent audio predictions

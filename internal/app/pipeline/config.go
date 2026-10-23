@@ -42,21 +42,22 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 		return a.Index - b.Index
 	})
 
-	// Use executor's target path for predictions so paths are valid on executor.
-	// TOML keys: buffer, in_progress, done, target, archive, notifications
-	targetRoot := executorPaths["target"]
-	if targetRoot == "" {
-		targetRoot = filepath.Join(root, "target")
+	// Predict outputs use the executor's target path — where rendered
+	// video/audio files will land after the script runs.
+	renderRoot := toSlash(executorPaths["target"])
+	if renderRoot == "" {
+		renderRoot = filepath.Join(toSlash(root), "target")
 	}
-	// Normalize paths for Windows (backslash → forward slash)
-	targetRoot = toSlash(targetRoot)
+
+	// Predict script destination uses the generator output directory.
+	scriptRoot := toSlash(root)
 
 	// Predict outputs from the full MediaUnit — this is the single source
 	// of truth for output file names. Called before the script domain is
 	// touched, so predictions drive all downstream logic.
 	timestamp := time.Now().Format("060102150405")
 	unit.PRTTimestamp = timestamp
-	predictions := callname.PredictOutputs(prod, unit, targetRoot, hardsubTag)
+	predictions := callname.PredictOutputs(prod, unit, renderRoot, hardsubTag, prod.ID)
 
 	// Build call names for all unit files (original filename → call name).
 	callNames, err := callname.BuildInputNames(prod, unit.Filenames, timestamp)
@@ -78,12 +79,8 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	srtCall := callNames[srt]
 	hsubCall := callNames[hsubFile]
 
-	// Extract OUTBASE from first video prediction for script filename.
-	outBase := extractOutBase(predictions)
-
-	// Build destination path using OUTBASE with PRT timestamp so concurrent
-	// runs do not overwrite each other.
-	destination := filepath.Join(root, fmt.Sprintf("%s_PRT%s.sh", outBase, timestamp))
+	// Generate script filename using compact naming format (e.g. Show_s01e06_PRT261023120000.sh).
+	destination := callname.PredictScriptName(prod, unit, scriptRoot, hardsubTag, timestamp)
 
 	// Normalize all executor paths for Windows
 	buffer := toSlash(executorPaths["buffer"])
@@ -122,7 +119,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 			Done:          done,
 			Notifications: notifications,
 			Archive:       archive,
-			TargetRoot:    targetRoot,
+			TargetRoot:    scriptRoot,
 			Priority:      defaultPriority,
 		},
 		Destination: destination,
@@ -135,33 +132,6 @@ func toSlash(path string) string {
 		return ""
 	}
 	return filepath.ToSlash(path)
-}
-
-// extractOutBase derives the OUTBASE (filename stem before _HD) from predictions.
-// Returns the base filename without extension and without _HD suffix.
-func extractOutBase(predictions []callname.PredictedOutput) string {
-	if len(predictions) == 0 {
-		return ""
-	}
-	// Find first video prediction
-	var path string
-	for _, p := range predictions {
-		if p.MediaType == "video" {
-			path = p.Path
-			break
-		}
-	}
-	if path == "" {
-		path = predictions[0].Path
-	}
-
-	base := filepath.Base(path) // "Show_s01e06_HD.mp4"
-	ext := filepath.Ext(base)   // ".mp4"
-	base = base[:len(base)-len(ext)]
-	if strings.HasSuffix(base, "_HD") {
-		base = base[:len(base)-3] // "Show_s01e06"
-	}
-	return base
 }
 
 // EnsureEnvDirs creates the work-directory tree under the output root that

@@ -32,7 +32,8 @@ type PredictedOutput struct {
 // produce for the given media unit.  It derives the same naming logic
 // as the script domain (video, audio, SRT) without depending on it.
 // hardsubTag is a filename substring that marks sidecar subtitles as hardsub.
-func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot string, hardsubTag string) []PredictedOutput {
+// prodID is the product ID, used in output filenames as _idN.
+func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot string, hardsubTag string, prodID int64) []PredictedOutput {
 	streams := make([]ingest.Stream, 0, len(unit.Streams))
 	for _, s := range unit.Streams {
 		streams = append(streams, s)
@@ -47,7 +48,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot 
 
 	baseName := deriveOutBase(product)
 	seasonTag := deriveSeasonTag(product)
-	nameTag := deriveNameTagWithUnderscore(seasonTag, deriveEpisodeTag(product))
+	nameTag := deriveOutputNameTag(seasonTag, deriveEpisodeTag(product))
 	seasonDir := ""
 	if seasonTag != "" {
 		seasonDir = "_s" + seasonTag
@@ -64,10 +65,14 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot 
 	// Normalize to forward slashes for cross-platform compatibility
 	targetDir = filepath.ToSlash(targetDir)
 
-	// OUTBASE = baseName + nameTag (e.g. Belaya_koroleva_s01e01)
+	// OUTBASE = baseName + nameTag + "_PRT" + timestamp + "_idN"
+	// (e.g. Belaya_koroleva_s01_01_PRT261001120000_id12345)
 	outBase := baseName + nameTag
 	if unit.PRTTimestamp != "" {
 		outBase = outBase + "_PRT" + unit.PRTTimestamp
+	}
+	if prodID > 0 {
+		outBase = outBase + fmt.Sprintf("_id%d", prodID)
 	}
 
 	// Detect hardsub: a subtitle file whose name contains the hardsub tag.
@@ -108,7 +113,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot 
 	for _, s := range streams {
 		if s.Kind == ingest.StreamKindSubtitle {
 			outputs = append(outputs, PredictedOutput{
-				Path: filepath.ToSlash(filepath.Join(targetDir, outBase+".srt")),
+				Path: filepath.ToSlash(filepath.Join(targetDir, outBase+"_HD.srt")),
 				MediaType: "subtitle",
 			})
 			break
@@ -171,9 +176,9 @@ func deriveEpisodeTag(p metadata.Product) string {
 	return ""
 }
 
-// deriveNameTagWithUnderscore returns the season/episode suffix with leading
-// underscore: "_s01_06", "_s01", "_06", or "" (movie).
-func deriveNameTagWithUnderscore(seasonTag, episodeTag string) string {
+// deriveOutputNameTag returns the season/episode suffix for output filenames:
+// "_s01_06", "_s01", "_06", or "" (movie). The episode tag has no "e" prefix.
+func deriveOutputNameTag(seasonTag, episodeTag string) string {
 	switch {
 	case seasonTag != "" && episodeTag != "":
 		return "_s" + seasonTag + "_" + episodeTag
@@ -183,4 +188,36 @@ func deriveNameTagWithUnderscore(seasonTag, episodeTag string) string {
 		return "_" + episodeTag
 	}
 	return ""
+}
+
+// deriveNameTagCompact returns the season/episode suffix without separators:
+// "s01e06", "s01", "e06", or "" (movie). Used for script filenames.
+func deriveNameTagCompact(seasonTag, episodeTag string) string {
+	switch {
+	case seasonTag != "" && episodeTag != "":
+		return "s" + seasonTag + "e" + episodeTag
+	case seasonTag != "":
+		return "s" + seasonTag
+	case episodeTag != "":
+		return "e" + episodeTag
+	}
+	return ""
+}
+
+// PredictScriptName generates the script filename for the given product and unit.
+// It uses the compact naming format (e.g. "Show_s01e06_PRT261023120000.sh").
+func PredictScriptName(product metadata.Product, unit ingest.MediaUnit, targetRoot string, hardsubTag string, timestamp string) string {
+	baseName := deriveOutBase(product)
+	seasonTag := deriveSeasonTag(product)
+	episodeTag := deriveEpisodeTag(product)
+	nameTag := deriveNameTagCompact(seasonTag, episodeTag)
+
+	scriptName := baseName + "_" + nameTag
+	if unit.PRTTimestamp != "" {
+		scriptName = baseName + "_" + nameTag + "_PRT" + unit.PRTTimestamp
+	} else if timestamp != "" {
+		scriptName = baseName + "_" + nameTag + "_PRT" + timestamp
+	}
+
+	return filepath.ToSlash(filepath.Join(targetRoot, scriptName+".sh"))
 }

@@ -328,7 +328,7 @@ func derivePredictionsFromStreams(product metadata.Product, streams []ingest.Str
 		Streams:      streamMap,
 		PRTTimestamp: prtTimestamp,
 	}
-	return callname.PredictOutputs(product, unit, targetRoot, "")
+	return callname.PredictOutputs(product, unit, targetRoot, "", product.ID)
 }
 
 func abbrevKind(kind ingest.StreamKind) string {

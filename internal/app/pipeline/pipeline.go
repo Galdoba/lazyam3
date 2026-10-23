@@ -13,7 +13,6 @@ import (
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 	"github.com/Galdoba/lazyam3/internal/domain/script"
-	"github.com/Galdoba/lazyam3/internal/infra/config"
 	"github.com/Galdoba/lazyam3/internal/infra/fso"
 )
 
@@ -27,7 +26,6 @@ type Pipeline struct {
 	in         ingest.Organizer
 	md         metadata.ProductRepository
 	rd         script.Renderer
-	cfg        config.Config
 	hardsubTag string
 
 	sourceDir     string
@@ -130,11 +128,11 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 	if err != nil {
 		p.logger.Warn("metadata lookup failed, using fallback naming",
 			"id", unit.ID, "dir", dir, "error", err)
-		prod = fallbackProduct(filepath.Base(dir))
+		prod = fallbackProduct(filepath.Base(dir), unit.ID)
 	} else if prod == nil {
 		p.logger.Warn("metadata not found, using fallback naming",
 			"id", unit.ID, "dir", dir, "fallback_base", filepath.Base(dir))
-		prod = fallbackProduct(filepath.Base(dir))
+		prod = fallbackProduct(filepath.Base(dir), unit.ID)
 	}
 	if p.dryRun {
 		p.logger.Info("dry run: script build skipped", "id", unit.ID)
@@ -200,9 +198,10 @@ func (p *Pipeline) afterPoll() <-chan struct{} {
 
 // fallbackProduct creates a minimal Product from the source directory basename.
 // It treats the unit as a movie (no season/episode numbers).
-func fallbackProduct(seriesTitle string) *metadata.Product {
+func fallbackProduct(seriesTitle string, unitID int64) *metadata.Product {
 	return &metadata.Product{
 		SeriesTitle: seriesTitle,
 		Kind:        metadata.KindMovie,
+		ID:          unitID,
 	}
 }

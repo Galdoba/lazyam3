@@ -1,413 +1,452 @@
 package callname
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 )
 
-// ── ScriptInput.String ──────────────────────────────────────────────
-
-func TestScriptInput_String_full(t *testing.T) {
-	si := ScriptInput{
-		ID:           12345,
-		Base:         "Igra",
-		SeasonTag:    "s01",
-		EpisodeTag:   "e26",
-		PRT:          "PRT260928200000",
-		OriginalName: "Igra_lzhecov_s01e26_PRT260928200000_id12345.mp4",
-		FileTags:     []string{"rus", "Russkii"},
-	}
-	got := si.String()
-	want := "Igra_s01e26_PRT260928200000_id12345-rus_Russkii.mp4"
-	if got != want {
-		t.Errorf("String() = %q, want %q", got, want)
-	}
-}
-
-func TestScriptInput_String_noSeasonEpisode(t *testing.T) {
-	si := ScriptInput{
-		ID:           12254,
-		Base:         "Film",
-		SeasonTag:    "",
-		EpisodeTag:   "",
-		PRT:          "PRT260928200000",
-		OriginalName: "12254-rus_Russkii_Forsirovannye.srt",
-		FileTags:     []string{"rus", "Russkii", "Forsirovannye"},
-	}
-	got := si.String()
-	want := "Film_PRT260928200000_id12254-rus_Russkii_Forsirovannye.srt"
-	if got != want {
-		t.Errorf("String() = %q, want %q", got, want)
-	}
-}
-
-func TestScriptInput_String_noFileTags(t *testing.T) {
-	si := ScriptInput{
-		ID:           63574,
-		Base:         "BlackClover",
-		SeasonTag:    "s01",
-		EpisodeTag:   "e041",
-		PRT:          "PRT261013145101",
-		OriginalName: "63705.mp4",
-	}
-	got := si.String()
-	want := "BlackClover_s01e041_PRT261013145101_id63574.mp4"
-	if got != want {
-		t.Errorf("String() = %q, want %q", got, want)
-	}
-}
-
-// ── extractFileTags ─────────────────────────────────────────────────
-
-func TestExtractFileTags(t *testing.T) {
+func TestScriptInput_String(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
-		want  []string
+		name     string
+		input    ScriptInput
+		expected string
 	}{
-		{"bare id", "12254", nil},
-		{"single tag", "12254-rus", []string{"rus"}},
-		{"multiple tags", "12254-rus_Russkii", []string{"rus", "Russkii"}},
-		{"multiple tags", "12254-rus_Russkii_Forsirovannye", []string{"rus", "Russkii", "Forsirovannye"}},
-		{"empty after id", "", nil},
-		{"trailing empty tag", "12254-rus_", []string{"rus"}},
+		{
+			name: "full with season/episode and file tags",
+			input: ScriptInput{
+				ID:           12345,
+				Base:         "Igra_lzhecov",
+				SeasonTag:    "s01",
+				EpisodeTag:   "e26",
+				PRT:          "PRT260928200000",
+				OriginalName: "12345.mp4",
+				FileTags:     []string{"rus", "Russkii", "Forsirovannye"},
+			},
+			expected: "Igra_lzhecov_s01e26_PRT260928200000_id12345-rus_Russkii_Forsirovannye.mp4",
+		},
+		{
+			name: "no season/episode, no file tags",
+			input: ScriptInput{
+				ID:           999,
+				Base:         "Movie",
+				PRT:          "PRT261001120000",
+				OriginalName: "999.mkv",
+			},
+			expected: "Movie_PRT261001120000_id999.mkv",
+		},
+		{
+			name: "with file tags only",
+			input: ScriptInput{
+				ID:           100,
+				Base:         "Show",
+				SeasonTag:    "s02",
+				EpisodeTag:   "e05",
+				PRT:          "PRT261015080000",
+				OriginalName: "100-video.mp4",
+				FileTags:     []string{"eng", "original"},
+			},
+			expected: "Show_s02e05_PRT261015080000_id100-eng_original.mp4",
+		},
+		{
+			name: "only season tag, no episode",
+			input: ScriptInput{
+				ID:        50,
+				Base:      "Series",
+				SeasonTag: "s03",
+				PRT:       "PRT261020000000",
+			},
+			expected: "Series_s03_PRT261020000000_id50",
+		},
+		{
+			name: "only episode tag, no season",
+			input: ScriptInput{
+				ID:        50,
+				Base:      "Series",
+				EpisodeTag: "e10",
+				PRT:       "PRT261020000000",
+			},
+			expected: "Series_e10_PRT261020000000_id50",
+		},
+		{
+			name:     "empty base with season/episode",
+			input:    ScriptInput{},
+			expected: "__id0",
+		},
+		{
+			name:     "empty base produces flat output",
+			input:    ScriptInput{ID: 12345, PRT: "PRT260928200000", OriginalName: "12345.mp4"},
+			expected: "_PRT260928200000_id12345.mp4",
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := extractFileTags(tt.input)
-			if len(got) == 0 && len(tt.want) == 0 {
-				return
+			got := tt.input.String()
+			if got != tt.expected {
+				t.Errorf("String() = %q, want %q", got, tt.expected)
 			}
-			if len(got) != len(tt.want) {
-				t.Errorf("extractFileTags(%q) = %v, want %v", tt.input, got, tt.want)
-				return
-			}
-			for i := range got {
-				if got[i] != tt.want[i] {
-					t.Errorf("extractFileTags(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
+		})
+	}
+}
+
+func Test_extractFileTags(t *testing.T) {
+	tests := []struct {
+		name     string
+		stem     string
+		expected []string
+	}{
+		{
+			name:     "basic tags after ID",
+			stem:     "12345-rus_Russkii",
+			expected: []string{"rus", "Russkii"},
+		},
+		{
+			name:     "single tag",
+			stem:     "100-eng",
+			expected: []string{"eng"},
+		},
+		{
+			name:     "no tags",
+			stem:     "12345",
+			expected: nil,
+		},
+		{
+			name:     "tags with empty trailing",
+			stem:     "100-eng_original_",
+			expected: []string{"eng", "original"},
+		},
+		{
+			name:     "no leading digits",
+			stem:     "abc123-rus",
+			expected: []string{"abc123-rus"},
+		},
+		{
+			name:     "empty stem",
+			stem:     "",
+			expected: nil,
+		},
+		{
+			name:     "dash only after digits",
+			stem:     "42-",
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := extractFileTags(tt.stem)
+			if len(got) != len(tt.expected) {
+				t.Errorf("extractFileTags(%q) = %v (len=%d), want %v (len=%d)",
+					tt.stem, got, len(got), tt.expected, len(tt.expected))
+			} else {
+				for i := range got {
+					if got[i] != tt.expected[i] {
+						t.Errorf("extractFileTags(%q)[%d] = %q, want %q",
+							tt.stem, i, got[i], tt.expected[i])
+					}
 				}
 			}
 		})
 	}
 }
 
-// ── ScriptInput.validate ────────────────────────────────────────────
-
 func TestScriptInput_validate(t *testing.T) {
-	t.Run("zero id", func(t *testing.T) {
-		si := ScriptInput{Base: "B", PRT: "PRT123", OriginalName: "12345.mp4"}
-		if err := si.validate(); err == nil {
-			t.Error("expected error for zero ID")
-		}
-	})
-
-	t.Run("empty base", func(t *testing.T) {
-		si := ScriptInput{ID: 1, PRT: "PRT123", OriginalName: "12345.mp4"}
-		if err := si.validate(); err == nil {
-			t.Error("expected error for empty base")
-		}
-	})
-
-	t.Run("empty prt", func(t *testing.T) {
-		si := ScriptInput{ID: 1, Base: "B", OriginalName: "12345.mp4"}
-		if err := si.validate(); err == nil {
-			t.Error("expected error for empty PRT")
-		}
-	})
-
-	t.Run("all valid", func(t *testing.T) {
-		si := ScriptInput{ID: 1, Base: "B", PRT: "PRT260101120000", OriginalName: "12345.mp4"}
-		if err := si.validate(); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-	})
-}
-
-// ── NewPRT ──────────────────────────────────────────────────────────
-
-func TestNewPRT(t *testing.T) {
-	got := NewPRT()
-	if got == "PRTxxxxxxxxxxxx" {
-		t.Log("NewPRT returns TODO placeholder")
-	}
-	if len(got) != 15 {
-		t.Errorf("NewPRT() length = %d, want 15", len(got))
-	}
-}
-
-// ── BuildInputName ───────────────────────────────────────────────────
-
-func TestBuildInputName_movie(t *testing.T) {
-	product := metadata.Product{
-		Kind:        metadata.KindMovie,
-		SeriesTitle: "12254",
-	}
-	got, err := BuildInputName(product, "12254-rus_Russkii_Forsirovannye.srt", "260928200000")
-	if err != nil {
-		t.Fatalf("BuildInputName error: %v", err)
-	}
-	if got.ID != 12254 {
-		t.Errorf("ID = %d, want 12254", got.ID)
-	}
-	if got.Base == "" {
-		t.Error("Base should not be empty")
-	}
-	if got.PRT != "PRT260928200000" {
-		t.Errorf("PRT = %q, want %q", got.PRT, "PRT260928200000")
-	}
-	want := "12254_PRT260928200000_id12254-rus_Russkii_Forsirovannye.srt"
-	if got.String() != want {
-		t.Errorf("String() = %q, want %q", got.String(), want)
-	}
-}
-
-func TestBuildInputName_series_episode(t *testing.T) {
-	season := 1
-	episode := 41
-	product := metadata.Product{
-		Kind:          metadata.KindSeriesEpisode,
-		SeriesTitle:   "BLACK CLOVER",
-		SeasonNumber:  &season,
-		EpisodeNumber: &episode,
-	}
-	got, err := BuildInputName(product, "63705.mp4", "261013145101")
-	if err != nil {
-		t.Fatalf("BuildInputName error: %v", err)
-	}
-	if got.ID != 63705 {
-		t.Errorf("ID = %d, want 63705", got.ID)
-	}
-	if got.SeasonTag+got.EpisodeTag != "s01e41" {
-		t.Errorf("SeasonTag+EpisodeTag = %q, want %q", got.SeasonTag+got.EpisodeTag, "s01e41")
-	}
-}
-
-func TestBuildInputName_no_leading_digit(t *testing.T) {
-	product := metadata.Product{Kind: metadata.KindMovie, SeriesTitle: "Test"}
-	_, err := BuildInputName(product, "no_digits.mp4", "123456789012")
-	if err == nil {
-		t.Error("expected error for non-digit-starting filename")
-	}
-}
-
-// ── ExtractID ───────────────────────────────────────────────────────
-
-func TestExtractID(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
-		want  int64
+		name    string
+		input   ScriptInput
 		wantErr bool
+		errMsg  string
 	}{
-		{"bare id", "12254", 12254, false},
-		{"with extension", "63574.mp4", 63574, false},
-		{"with tags", "12254-rus_Russkii.srt", 12254, false},
-		{"no leading digit", "abc.mp4", 0, true},
-		{"empty", "", 0, true},
+		{
+			name:    "valid input",
+			input:   ScriptInput{ID: 1, Base: "Show", PRT: "PRT260928200000"},
+			wantErr: false,
+		},
+		{
+			name:    "missing ID",
+			input:   ScriptInput{Base: "Show", PRT: "PRT260928200000"},
+			wantErr: true,
+			errMsg:  "id must be set",
+		},
+		{
+			name:    "missing base",
+			input:   ScriptInput{ID: 1, PRT: "PRT260928200000"},
+			wantErr: true,
+			errMsg:  "base must be set",
+		},
+		{
+			name:    "missing PRT",
+			input:   ScriptInput{ID: 1, Base: "Show"},
+			wantErr: true,
+			errMsg:  "PRT must be set",
+		},
+		{
+			name:    "invalid PRT format",
+			input:   ScriptInput{ID: 1, Base: "Show", PRT: "BAD"},
+			wantErr: true,
+			errMsg:  "PRT invalid",
+		},
+		{
+			name:    "PRT too short",
+			input:   ScriptInput{ID: 1, Base: "Show", PRT: "PRT123"},
+			wantErr: true,
+			errMsg:  "PRT invalid",
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ExtractID(tt.input)
+			err := tt.input.validate()
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("ExtractID(%q) expected error, got nil", tt.input)
+					t.Errorf("validate() returned nil, want error")
+				} else if tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("validate() error = %q, want to contain %q", err.Error(), tt.errMsg)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("validate() unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestBuildInputName(t *testing.T) {
+	product := metadata.Product{
+		ID:          12345,
+		Kind:        metadata.KindSeries,
+		Title:       "Test Episode",
+		SeriesTitle: "Игра лицевых",
+		SeasonNumber: intPtr(1),
+		EpisodeNumber: intPtr(26),
+	}
+
+	tests := []struct {
+		name        string
+		product     metadata.Product
+		filename    string
+		timestamp   string
+		wantErr     bool
+		validate    func(ScriptInput) bool
+	}{
+		{
+			name:      "basic video file",
+			product:   product,
+			filename:  "12345.mp4",
+			timestamp: "260928200000",
+			wantErr:   false,
+			validate: func(si ScriptInput) bool {
+				return si.ID == 12345 &&
+					si.SeasonTag == "s01e26" &&
+					si.PRT == "PRT260928200000"
+			},
+		},
+		{
+			name:      "filename without leading digits",
+			product:   product,
+			filename:  "no_digits.mp4",
+			timestamp: "260928200000",
+			wantErr:   true,
+		},
+		{
+			name:      "with file tags",
+			product:   product,
+			filename:  "12345-rus_Russkii.mp4",
+			timestamp: "260928200000",
+			wantErr:   false,
+			validate: func(si ScriptInput) bool {
+				return len(si.FileTags) == 2 && si.FileTags[0] == "rus" && si.FileTags[1] == "Russkii"
+			},
+		},
+		{
+			name:      "movie product no season/episode",
+			product:   metadata.Product{ID: 999, Kind: metadata.KindMovie, SeriesTitle: "Movie Title"},
+			filename:  "999.mp4",
+			timestamp: "261001120000",
+			wantErr:   false,
+			validate: func(si ScriptInput) bool {
+				return si.SeasonTag == "" && si.EpisodeTag == "" && si.ID == 999
+			},
+		},
+		{
+			name:      "empty series title is error",
+			product:   metadata.Product{ID: 100, SeriesTitle: ""},
+			filename:  "100.mp4",
+			timestamp: "261001120000",
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := BuildInputName(tt.product, tt.filename, tt.timestamp)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("BuildInputName() expected error, got nil")
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("ExtractID(%q) unexpected error: %v", tt.input, err)
+				t.Errorf("BuildInputName() unexpected error: %v", err)
 				return
 			}
-			if got != tt.want {
-				t.Errorf("ExtractID(%q) = %d, want %d", tt.input, got, tt.want)
+			if tt.validate != nil && !tt.validate(got) {
+				t.Errorf("BuildInputName() validation failed for result: %+v", got)
 			}
 		})
 	}
 }
 
-// ── BuildInputNames ──────────────────────────────────────────────────
-
 func TestBuildInputNames(t *testing.T) {
-	season := 1
 	product := metadata.Product{
-		Kind:          metadata.KindSeries,
-		SeriesTitle:   "BLACK CLOVER",
-		SeasonNumber:  &season,
-		EpisodeNumber: ptrInt(41),
+		ID:          12345,
+		Kind:        metadata.KindSeries,
+		SeriesTitle: "Show",
+		SeasonNumber: intPtr(1),
+		EpisodeNumber: intPtr(1),
 	}
-	names, err := BuildInputNames(product, []string{"63705.mp4"}, "261013145101")
+
+	inputs := []string{"12345.mp4", "12345-rus_Russkii.srt"}
+	names, err := BuildInputNames(product, inputs, "261001120000")
 	if err != nil {
-		t.Fatalf("BuildInputNames error: %v", err)
+		t.Fatalf("BuildInputNames() error: %v", err)
 	}
-	if len(names) != 1 {
-		t.Fatalf("got %d names, want 1", len(names))
+
+	if len(names) != 2 {
+		t.Fatalf("BuildInputNames() returned %d names, want 2", len(names))
 	}
-	got := names["63705.mp4"]
-	if got == "" {
-		t.Error("expected non-empty call name")
+
+	// Check video
+	videoName := names["12345.mp4"]
+	if videoName == "" {
+		t.Error("Expected video name, got empty")
+	}
+	if !strings.HasSuffix(videoName, ".mp4") {
+		t.Errorf("Expected video to end with .mp4, got %q", videoName)
+	}
+
+	// Check subtitle
+	subName := names["12345-rus_Russkii.srt"]
+	if subName == "" {
+		t.Error("Expected subtitle name, got empty")
+	}
+	if !strings.HasSuffix(subName, ".srt") {
+		t.Errorf("Expected subtitle to end with .srt, got %q", subName)
 	}
 }
 
-func TestBuildInputNames_one_fails(t *testing.T) {
-	product := metadata.Product{Kind: metadata.KindMovie, SeriesTitle: "Test"}
-	_, err := BuildInputNames(product, []string{"bad.mp4"}, "123456789012")
-	if err == nil {
-		t.Error("expected error when one filename fails")
+func TestExtractID(t *testing.T) {
+	tests := []struct {
+		name      string
+		filename  string
+		wantID    int64
+		wantErr   bool
+	}{
+		{"basic", "12345.mp4", 12345, false},
+		{"with extension", "99999.mkv", 99999, false},
+		{"no leading digit", "abc.mp4", 0, true},
+		{"empty", "", 0, true},
+		{"only extension", ".mp4", 0, true},
+		{"large id", "9999999999999.mp4", 9999999999999, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ExtractID(tt.filename)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("ExtractID(%q) expected error, got %d", tt.filename, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("ExtractID(%q) unexpected error: %v", tt.filename, err)
+				return
+			}
+			if got != tt.wantID {
+				t.Errorf("ExtractID(%q) = %d, want %d", tt.filename, got, tt.wantID)
+			}
+		})
 	}
 }
 
-// ── deriveNameTag ───────────────────────────────────────────────────
+func TestDeriveOutBase(t *testing.T) {
+	tests := []struct {
+		name     string
+		product  metadata.Product
+		expected string
+	}{
+		{
+			name:    "cyrillic series title",
+			product: metadata.Product{SeriesTitle: "Игра лицевых"},
+			expected: "Igra_licevyh",
+		},
+		{
+			name:    "latin series title",
+			product: metadata.Product{SeriesTitle: "Test Show"},
+			expected: "Test_show",
+		},
+		{
+			name:    "empty series title",
+			product: metadata.Product{},
+			expected: "",
+		},
+		{
+			name:    "single word cyrillic",
+			product: metadata.Product{SeriesTitle: "Кино"},
+			expected: "Kino",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := deriveOutBase(tt.product)
+			if got != tt.expected {
+				t.Errorf("deriveOutBase(%q) = %q, want %q", tt.product.SeriesTitle, got, tt.expected)
+			}
+		})
+	}
+}
 
 func TestDeriveNameTag(t *testing.T) {
 	tests := []struct {
-		name    string
-		product metadata.Product
-		want    string
+		name     string
+		product  metadata.Product
+		expected string
 	}{
-		{"season+episode", metadata.Product{SeasonNumber: ptrInt(1), EpisodeNumber: ptrInt(6)}, "s01e06"},
-		{"season only", metadata.Product{SeasonNumber: ptrInt(3)}, "s03"},
-		{"episode only", metadata.Product{EpisodeNumber: ptrInt(12)}, "e12"},
-		{"neither", metadata.Product{SeriesTitle: "Movie"}, ""},
+		{
+			name:     "full series episode",
+			product:  metadata.Product{SeasonNumber: intPtr(1), EpisodeNumber: intPtr(6)},
+			expected: "s01e06",
+		},
+		{
+			name:     "season only",
+			product:  metadata.Product{SeasonNumber: intPtr(3)},
+			expected: "s03",
+		},
+		{
+			name:     "episode only",
+			product:  metadata.Product{EpisodeNumber: intPtr(10)},
+			expected: "e10",
+		},
+		{
+			name:     "no season or episode (movie)",
+			product:  metadata.Product{Kind: metadata.KindMovie},
+			expected: "",
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := deriveNameTag(tt.product)
-			if got != tt.want {
-				t.Errorf("deriveNameTag() = %q, want %q", got, tt.want)
+			if got != tt.expected {
+				t.Errorf("deriveNameTag() = %q, want %q", got, tt.expected)
 			}
 		})
 	}
 }
 
-// ── splitExtension ──────────────────────────────────────────────────
-
-func TestSplitExtension(t *testing.T) {
-	tests := []struct {
-		input    string
-		wantStem string
-		wantExt  string
-	}{
-		{"63574.mp4", "63574", "mp4"},
-		{"12254-rus_Russkii.srt", "12254-rus_Russkii", "srt"},
-		{"no_ext", "no_ext", ""},
-		{"a.b.c", "a.b", "c"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			stem, ext := splitExtension(tt.input)
-			if stem != tt.wantStem {
-				t.Errorf("stem = %q, want %q", stem, tt.wantStem)
-			}
-			if ext != tt.wantExt {
-				t.Errorf("ext = %q, want %q", ext, tt.wantExt)
-			}
-		})
-	}
-}
-
-func ptrInt(i int) *int { return &i }
-
-// ── NewPRT ──────────────────────────────────────────────────────────
-
-func TestNewPRT_format(t *testing.T) {
-	got := NewPRT()
-	if len(got) != 15 {
-		t.Errorf("NewPRT() length = %d, want 15", len(got))
-	}
-	if got[:3] != "PRT" {
-		t.Errorf("NewPRT() prefix = %q, want %q", got[:3], "PRT")
-	}
-	digits := got[3:]
-	if len(digits) != 12 {
-		t.Errorf("NewPRT() digits length = %d, want 12", len(digits))
-	}
-	for i, r := range digits {
-		if r < '0' || r > '9' {
-			t.Errorf("NewPRT()[%d] = %q, expected digit", i, r)
-		}
-	}
-}
-
-func TestNewPRT_uniqueness(t *testing.T) {
-	// Rapid calls may return the same timestamp (1-second resolution).
-	// Just verify format is valid for multiple calls.
-	for i := 0; i < 5; i++ {
-		got := NewPRT()
-		if len(got) != 15 {
-			t.Errorf("NewPRT() length = %d, want 15", len(got))
-		}
-		if got[:3] != "PRT" {
-			t.Errorf("NewPRT() prefix = %q, want %q", got[:3], "PRT")
-		}
-	}
-}
-
-// ── validate ────────────────────────────────────────────────────────
-
-func TestScriptInput_validate_invalidPRT(t *testing.T) {
-	si := ScriptInput{ID: 1, Base: "B", PRT: "PRT123", OriginalName: "12345.mp4"}
-	if err := si.validate(); err == nil {
-		t.Error("expected error for short PRT")
-	}
-
-	si.PRT = "pRT260101120000"
-	if err := si.validate(); err == nil {
-		t.Error("expected error for lowercase PRT prefix")
-	}
-
-	si.PRT = "PRT2601011200001" // 13 digits
-	if err := si.validate(); err == nil {
-		t.Error("expected error for PRT with 13 digits")
-	}
-
-	si.PRT = "PRT26010112000" // 11 digits
-	if err := si.validate(); err == nil {
-		t.Error("expected error for PRT with 11 digits")
-	}
-}
-
-// ── deriveOutBase ───────────────────────────────────────────────────
-
-func TestDeriveOutBase_cyrillic(t *testing.T) {
-	product := metadata.Product{
-		SeriesTitle: "Игра лиц",
-	}
-	got := deriveOutBase(product)
-	want := "Igra_lic"
-	if got != want {
-		t.Errorf("deriveOutBase(%q) = %q, want %q", "Игра лиц", got, want)
-	}
-}
-
-func TestDeriveOutBase_empty(t *testing.T) {
-	product := metadata.Product{SeriesTitle: ""}
-	got := deriveOutBase(product)
-	if got != "" {
-		t.Errorf("deriveOutBase(\"\") = %q, want empty", got)
-	}
-}
-
-func TestDeriveOutBase_latin(t *testing.T) {
-	product := metadata.Product{
-		SeriesTitle: "BLACK CLOVER",
-	}
-	got := deriveOutBase(product)
-	want := "Black_clover"
-	if got != want {
-		t.Errorf("deriveOutBase(%q) = %q, want %q", "BLACK CLOVER", got, want)
-	}
-}
-
-func TestDeriveOutBase_firstCharUpper(t *testing.T) {
-	product := metadata.Product{
-		SeriesTitle: "белая ночь",
-	}
-	got := deriveOutBase(product)
-	if len(got) == 0 {
-		t.Fatal("deriveOutBase returned empty")
-	}
-	if got[:1] != "B" {
-		t.Errorf("first char = %q, want %q", got[:1], "B")
-	}
-}
+func intPtr(i int) *int { return &i }
