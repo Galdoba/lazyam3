@@ -6,11 +6,11 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 
 ## Current Feature
 
-> **Work on: `A2` — `Group()` helper for named contexts** (`doc/feature_list.json`)
+> **Work on: `A3` — JSON vs text format toggle** (`doc/feature_list.json`)
 >
-> Status: `proposed` · blocked_by: `[]` · effort: 5 min · priority: 3
+> Status: `proposed` · blocked_by: `[]` · effort: 15 min · priority: 2
 
-Selection rule: pick the highest-priority feature in `doc/feature_list.json` whose `blocked_by` list is empty and whose `status` is `proposed`. Queue after A2: **A3** (format toggle), then **A4** (colors, blocked by A3). When a feature is done, set its `status` to `in_rewiew` in `doc/feature_list.json` before moving on.
+Selection rule: pick the highest-priority feature in `doc/feature_list.json` whose `blocked_by` list is empty and whose `status` is `proposed`. Queue after A3: **A4** (colors, blocked by A3). When a feature is done, set its `status` to `in_rewiew` in `doc/feature_list.json` before moving on.
 
 ## Documentation Index
 
@@ -64,7 +64,7 @@ platform (internal/platform/*)     ← Stateless services (no domain deps)
 
 ### Workflow
 - Work one feature at a time; the current feature is defined in **Current Feature** above
-- Every feature: analyse → plan → implement → test → `go build` + `go test -race -cover` + `go vet` + `golangci-lint run` → update `status` in `doc/feature_list.json`
+- Every feature: analyse → plan → implement → test → `go build` + `go test -race -cover` + `go vet` + `golangci-lint run` → update `status` in `doc/feature_list.json` and other related documentation
 - Every fixed bug MUST produce a test
 - New features MUST list their tests in `doc/feature_list.json`
 - Update **Current Feature** in this file when starting/finishing work

@@ -119,7 +119,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 			Done:          done,
 			Notifications: notifications,
 			Archive:       archive,
-			TargetRoot:    scriptRoot,
+			TargetRoot:    renderRoot,
 			Priority:      defaultPriority,
 		},
 		Destination: destination,

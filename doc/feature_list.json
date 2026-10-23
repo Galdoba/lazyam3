@@ -2,7 +2,7 @@
   "A2": {
     "title": "Group() helper for named contexts",
     "source": "doc/logging_suggestions.md#A2",
-    "status": "proposed",
+    "status": "in_rewiew",
     "effort": "5 min",
     "impact": "high",
     "priority": 3,
@@ -29,7 +29,8 @@
     "tests": [
       "TestLogger_Group returns a different instance and logs grouped output",
       "Errorf available on grouped child logger"
-    ]
+    ],
+    "outcome": "Implemented with interface port: pipeline.Logger interface in internal/app/pipeline/dto.go (Debug/Info/Warn/Error; both *slog.Logger and *logging.Logger satisfy it). cmd_process.go fully migrated off Slog(); pipeline.Options.Logger is now the interface."
   },
   "A3": {
     "title": "JSON vs text format toggle",
@@ -94,6 +95,20 @@
     "tests": [
       "color = true emits ANSI escapes for level in text mode",
       "color = false or json mode emits no escapes"
+    ]
+  },
+  "BUG-1": {
+    "title": "Env.TargetRoot regression: scriptRoot instead of executor target",
+    "source": "regression introduced in b3e2988",
+    "status": "done",
+    "effort": "1 min",
+    "impact": "low (latent)",
+    "priority": 1,
+    "blocked_by": [],
+    "problem": "buildScriptConfig set Env.TargetRoot to scriptRoot (generator dir) instead of renderRoot (executorPaths[\"target\"]), breaking the invariant set in 8e09fec (\"paths must be valid on executor\"). No production impact: TargetRoot is only consumed by the test-only fallback in script.BuildScript when Predictions is empty.",
+    "fix": "internal/app/pipeline/config.go: TargetRoot: scriptRoot -> renderRoot",
+    "tests": [
+      "TestBuildScriptConfig_ExecutorPaths (pre-existing; acts as the regression test — red before fix, green after)"
     ]
   }
 }

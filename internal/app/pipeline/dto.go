@@ -1,18 +1,25 @@
 package pipeline
 
 import (
-	"log/slog"
-
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 	"github.com/Galdoba/lazyam3/internal/domain/script"
 	"github.com/Galdoba/lazyam3/internal/infra/config"
 )
 
+// Logger is the structured logging port used by the pipeline.
+// Both *slog.Logger and infra logging.Logger satisfy it.
+type Logger interface {
+	Debug(msg string, args ...any)
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Error(msg string, args ...any)
+}
+
 // Options configures the Pipeline at construction time.
 type Options struct {
 	// Infra
-	Logger *slog.Logger
+	Logger Logger
 	Events chan PipelineEvent
 
 	// Domain ports

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -22,7 +21,7 @@ const (
 
 // Pipeline orchestrates the media processing workflow.
 type Pipeline struct {
-	logger     *slog.Logger
+	logger     Logger
 	in         ingest.Organizer
 	md         metadata.ProductRepository
 	rd         script.Renderer

@@ -113,6 +113,51 @@ func TestLogger_With(t *testing.T) {
 	}
 }
 
+func TestLogger_Group(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.log")
+	cfg := config.Logging{Terminal: false, Path: path}
+	l, err := NewLogger(cfg)
+	if err != nil {
+		t.Fatalf("NewLogger: %v", err)
+	}
+	defer l.Close()
+
+	child := l.Group("command")
+	if child == l {
+		t.Error("Group should return a different Logger instance")
+	}
+
+	child.Info("processed", "unit_id", 42)
+	errVal := child.Errorf("grouped errorf: %d", 42)
+	if errVal == nil {
+		t.Fatal("Errorf should be available on grouped child logger")
+	}
+
+	chained := l.Group("pipeline").With("id", 1)
+	chained.Warn("chained")
+
+	if err := child.Close(); err != nil {
+		t.Fatalf("Close on grouped child: %v", err)
+	}
+	if err := l.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	for _, want := range []string{
+		`"command":{"unit_id":42}`,
+		`"msg":"grouped errorf: 42"`,
+		`"pipeline":{"id":1}`,
+	} {
+		if !bytes.Contains(data, []byte(want)) {
+			t.Errorf("output missing %s:\n%s", want, data)
+		}
+	}
+}
+
 func TestLogger_Methods(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "test.log")
 	cfg := config.Logging{Terminal: false, Path: path}

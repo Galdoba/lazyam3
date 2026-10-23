@@ -60,7 +60,7 @@ func CMDProcess(modules *app.AppModules) *cli.Command {
 func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 	return func(ctx context.Context, c *cli.Command) error {
 		cfg := modules.Config
-		logger := modules.Logger.Slog().WithGroup("command")
+		logger := modules.Logger.Group("command")
 		logger.Info("create pipeline")
 
 		sourceDir := nonEmpty(c.String(pathIn), cfg.Paths.GeneratorInput())
@@ -89,7 +89,7 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 		events := make(chan pipeline.PipelineEvent, 100)
 
 		p := pipeline.NewPipeline(pipeline.Options{
-			Logger:        modules.Logger.Slog().WithGroup("pipeline"),
+			Logger:        modules.Logger.Group("pipeline"),
 			Ingest:        ingest.New(ffprobeBinary),
 			Metadata:      mdRepo,
 			Renderer:      scriptinfra.New(),

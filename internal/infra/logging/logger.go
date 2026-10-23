@@ -54,6 +54,15 @@ func (l *Logger) With(args ...any) *Logger {
 	return &Logger{inner: l.inner.With(args...)}
 }
 
+// Group returns a child logger that prefixes attribute keys with a group name,
+// preserving the typed surface (*Logger, Errorf available).
+//
+// The child logger owns no resources — Close on it is a no-op. Resources are
+// closed only on the original *Logger through AppModules.Shutdown.
+func (l *Logger) Group(name string) *Logger {
+	return &Logger{inner: l.inner.WithGroup(name)}
+}
+
 // Slog provides access to the inner *slog.Logger — an escape hatch in case
 // you need to pass the logger to a third-party library that accepts *slog.Logger.
 func (l *Logger) Slog() *slog.Logger { return l.inner }
