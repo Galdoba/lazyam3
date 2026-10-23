@@ -74,14 +74,25 @@ func defaultCFG() Config {
 				InputDirectory:  "/tmp/lazyam3/input",
 				OutputDirectory: "/tmp/lazyam3/output",
 				MetadataPath:    "/tmp/lazyam3/metadata.json",
-				FfprobeBinary:   "",
+				FfprobeBinary:   "ffprobe",
 			},
-			Executor: map[string]string{},
+			// Executor defaults mirror buildScriptConfig fallbacks for
+			// root = Generator.OutputDirectory — keep them in sync.
+			Executor: map[string]string{
+				"target":        "/tmp/lazyam3/output/target",
+				"buffer":        "/tmp/lazyam3/output",
+				"in_progress":   "/tmp/lazyam3/output",
+				"done":          "/tmp/lazyam3/output",
+				"notifications": "/tmp/lazyam3/output",
+				"archive":       "/tmp/lazyam3/output/archive",
+			},
 		},
 		Logger: Logging{
 			Level:    "info",
-			Path:     "/path/to/file",
+			Path:     "/path/to/file.log",
 			Terminal: true,
+			Format:   "text",
+			Color:    true,
 		},
 		Storage: Storage{
 			Path: "/path/to/file.json",
@@ -90,6 +101,24 @@ func defaultCFG() Config {
 			Tag: "Forsirovannye",
 		},
 	}
+}
+
+func (c Config) Validate() error {
+	switch c.Logger.Level {
+	case "debug", "info", "warn", "error":
+	default:
+		return fmt.Errorf("logger.level: invalid value %q (want debug, info, warn or error)", c.Logger.Level)
+	}
+	if c.Paths.Generator.InputDirectory == "" {
+		return fmt.Errorf("paths.generator.input_directory is required")
+	}
+	if c.Paths.Generator.OutputDirectory == "" {
+		return fmt.Errorf("paths.generator.output_directory is required")
+	}
+	if c.Paths.Generator.MetadataPath == "" {
+		return fmt.Errorf("paths.generator.metadata_path is required")
+	}
+	return nil
 }
 
 func Load(suggestedPath string) (Config, error) {

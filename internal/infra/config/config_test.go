@@ -34,26 +34,115 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestDefaultConfig_FfprobeBinary(t *testing.T) {
 	cfg := defaultCFG()
-	if cfg.Paths.GeneratorFFprobe() != "" {
-		t.Errorf("Paths.Generator.FfprobeBinary = %q, want empty string", cfg.Paths.GeneratorFFprobe())
+	if cfg.Paths.GeneratorFFprobe() != "ffprobe" {
+		t.Errorf("Paths.Generator.FfprobeBinary = %q, want %q", cfg.Paths.GeneratorFFprobe(), "ffprobe")
 	}
 }
 
 func TestDefaultConfig_LoggerPath(t *testing.T) {
 	cfg := defaultCFG()
-	if cfg.Logger.Path != "/path/to/file" {
-		t.Errorf("Logger.Path = %q, want %q", cfg.Logger.Path, "/path/to/file")
+	if cfg.Logger.Path != "/path/to/file.log" {
+		t.Errorf("Logger.Path = %q, want %q", cfg.Logger.Path, "/path/to/file.log")
 	}
 }
 
-func TestDefaultConfig_ExecutorMap(t *testing.T) {
+func TestDefaultConfig_PassesValidation(t *testing.T) {
+	if err := defaultCFG().Validate(); err != nil {
+		t.Errorf("defaultCFG().Validate() = %v, want nil", err)
+	}
+}
+
+func TestConfig_ValidateBadLevel(t *testing.T) {
+	tests := []string{"bogus", "WARNING", "infoo", ""}
+	for _, lvl := range tests {
+		cfg := defaultCFG()
+		cfg.Logger.Level = lvl
+		if err := cfg.Validate(); err == nil {
+			t.Errorf("Validate() with level %q: want error, got nil", lvl)
+		}
+	}
+}
+
+func TestConfig_ValidateEmptyGeneratorPath(t *testing.T) {
+	cfg := defaultCFG()
+	for _, field := range []string{"input_directory", "output_directory", "metadata_path"} {
+		switch field {
+		case "input_directory":
+			cfg.Paths.Generator.InputDirectory = ""
+		case "output_directory":
+			cfg.Paths.Generator.OutputDirectory = ""
+		case "metadata_path":
+			cfg.Paths.Generator.MetadataPath = ""
+		}
+		if err := cfg.Validate(); err == nil {
+			t.Errorf("Validate() with empty %s: want error, got nil", field)
+		}
+	}
+}
+
+func TestDefaultConfig_ExecutorMapSeeded(t *testing.T) {
 	cfg := defaultCFG()
 	if cfg.Paths.Executor == nil {
-		t.Error("Paths.Executor should not be nil")
+		t.Fatal("Paths.Executor should not be nil")
 	}
-	if len(cfg.Paths.Executor) != 0 {
-		t.Errorf("Paths.Executor should be empty, got %d entries", len(cfg.Paths.Executor))
+	tests := map[string]string{
+		"target":        "/tmp/lazyam3/output/target",
+		"buffer":        "/tmp/lazyam3/output",
+		"in_progress":   "/tmp/lazyam3/output",
+		"done":          "/tmp/lazyam3/output",
+		"notifications": "/tmp/lazyam3/output",
+		"archive":       "/tmp/lazyam3/output/archive",
 	}
+	if len(cfg.Paths.Executor) != len(tests) {
+		t.Errorf("Paths.Executor has %d entries, want %d", len(cfg.Paths.Executor), len(tests))
+	}
+	for key, want := range tests {
+		if got := cfg.Paths.ExecutorPath(key); got != want {
+			t.Errorf("Paths.ExecutorPath(%q) = %q, want %q", key, got, want)
+		}
+	}
+}
+
+func TestLoad_ValidateRejectsBadLevel(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("LAZYAM3_CONFIG", "")
+	t.Setenv("LAZYAM3_CONFIG_PATH", "")
+	toml := `[paths.generator]
+input_directory = '/in'
+output_directory = '/out'
+metadata_path = '/meta.json'
+
+[logger]
+level = 'bogus'
+`
+	path := writeConfig(t, toml)
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load() with invalid logger.level: want error, got nil")
+	}
+}
+
+func TestLoad_ValidateRejectsEmptyGeneratorPath(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("LAZYAM3_CONFIG", "")
+	t.Setenv("LAZYAM3_CONFIG_PATH", "")
+	toml := `[paths.generator]
+input_directory = ''
+output_directory = '/out'
+metadata_path = '/meta.json'
+`
+	path := writeConfig(t, toml)
+	if _, err := Load(path); err == nil {
+		t.Fatal("Load() with empty input_directory: want error, got nil")
+	}
+}
+
+func writeConfig(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "test.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func TestTOML_ParseExecutorPaths(t *testing.T) {

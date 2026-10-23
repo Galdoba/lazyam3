@@ -6,9 +6,9 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 
 ## Current Feature
 
-> **Work on: `C1` — Config package refactoring** (`doc/feature_list.json`)
+> **Work on: `S1` — Config struct refactor: ScriptGeneration block** (`doc/feature_list.json`)
 >
-> Status: `proposed` · blocked_by: `["A4" — done, in_rewiew]` · effort: 30 min · priority: 3
+> Status: `proposed` · blocked_by: `[]` · effort: 1 hour · priority: 4
 
 Selection rule: pick the highest-priority feature in `doc/feature_list.json` whose `blocked_by` list is empty and whose `status` is `proposed`. When a feature is done, set its `status` to `in_rewiew` in `doc/feature_list.json` before moving on.
 
@@ -23,8 +23,11 @@ Selection rule: pick the highest-priority feature in `doc/feature_list.json` who
 | `doc/script.md` | Script domain: BuildScript, naming derivation, audio filters, SRT/HSUB handling, template |
 | `doc/callname.md` | CallName bounded context: input/output filename construction, transliteration, naming patterns |
 | `doc/feature_list.json` | Feature backlog: status, priority, blocked_by, implementation notes, tests per feature |
+| `doc/feature_index.md` | Synced feature table from feature_list.json |
 | `doc/logging_suggestions.md` | Logging improvement catalog (A1–A4 quick wins, B1–B5 larger items) with trade-offs |
-| `doc/BACKLOG.md` | Deferred items: language translation, source file naming hook |
+| `doc/HANDOFF.md` | Session handoff: decisions, known issues, what to watch for |
+| `doc/PROGRESS.md` | Session progress log: work completed, findings, metrics |
+| `doc/BACKLOG.md` | Known issues/footguns and deferred items |
 | `AGENTS.md` | This file: current feature, commands, rules, quick reference |
 
 ## Commands
@@ -80,3 +83,5 @@ platform (internal/platform/*)     ← Stateless services (no domain deps)
 - Make only minimal code edits
 - No comments in code unless really needed
 - Do NOT fix the bugs which unrelated to current feature
+- Be hornest
+- Be carefull on your judjements
