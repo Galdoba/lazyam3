@@ -20,11 +20,11 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 ## Commands
 
 ```bash
-go build ./...          # Compile
-go test ./...           # Run tests
-go vet ./...            # Static analysis
-golangci-lint run ./... # Lint (10 linters, issues-exit-code: 0)
-go run ./cmd/lazyam3    # Run CLI
+go build ./...                       # Compile
+go test -race -cover ./...           # Run tests
+go vet ./...                         # Static analysis
+golangci-lint run ./...              # Lint (10 linters, issues-exit-code: 0)
+go run ./cmd/lazyam3                 # Run CLI
 go run ./cmd/lazyam3 process --help  # Process command help
 ```
 
@@ -60,4 +60,7 @@ platform (internal/platform/*)     ← Stateless services (no domain deps)
 - Commands wire dependencies and call Pipeline
 - Make only minimal code edits
 - Infrastructure failures fail fast
-
+- Simples solutions SHOULD examined first
+- Analyze the problem before solving it
+- Work one feature at the time
+- Every fixed bug MUST produce a test

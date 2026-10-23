@@ -201,7 +201,7 @@ func buildSRTMove(srt string) string {
 }
 
 // buildSRTSection generates the shell line to copy the SRT file to the target directory.
-// Uses the prediction path to determine the output directory structure.
+// Uses the prediction path to determine both the output directory and filename.
 func buildSRTSection(srt string, predictions []callname.PredictedOutput) string {
 	if srt == "" || len(predictions) == 0 {
 		return ""
@@ -219,8 +219,18 @@ func buildSRTSection(srt string, predictions []callname.PredictedOutput) string 
 	}
 	// Extract directory from prediction path.
 	dir := filepath.ToSlash(filepath.Dir(predPath))
-	// SRT already includes the .srt extension, use it as-is for the destination filename.
-	return fmt.Sprintf(`cp "${IN_PROGRESS}/${SRT}" "%s/%s"`, dir, srt)
+
+	// Use the subtitle prediction's filename as the destination,
+	// falling back to the input SRT filename if no subtitle prediction exists.
+	dstName := srt
+	for _, p := range predictions {
+		if p.MediaType == "subtitle" {
+			dstName = filepath.Base(p.Path)
+			break
+		}
+	}
+
+	return fmt.Sprintf(`cp "${IN_PROGRESS}/${SRT}" "%s/%s"`, dir, dstName)
 }
 
 // buildSRTCleanup generates the shell line to move the SRT file to done.
