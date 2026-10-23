@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/Galdoba/lazyam3/internal/infra/config"
 )
@@ -118,6 +119,9 @@ func newTermHandler(cfg config.Logging) slog.Handler {
 	}
 	opts := &slog.HandlerOptions{
 		Level: levelFromString(cfg.Level),
+	}
+	if strings.EqualFold(cfg.Format, "text") {
+		return slog.NewTextHandler(os.Stderr, opts)
 	}
 	return slog.NewJSONHandler(os.Stderr, opts)
 }

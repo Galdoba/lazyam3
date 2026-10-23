@@ -17,12 +17,13 @@ Config (TOML)
   └─ Logger
      ├─ Level (string)
      ├─ Path (string)
-     └─ Terminal (bool)
+     ├─ Terminal (bool)
+     └─ Format (string: "json"|"text", terminal only)
 
 Logger (*logging.Logger)
   └─ multiHandler (wraps slog.Handler)
      ├─ newFileHandler (JSON, append-only)
-     └─ newTermHandler (JSON, stderr)
+     └─ newTermHandler (JSON or Text per cfg.Format, stderr)
 ```
 
 ### What Works Well

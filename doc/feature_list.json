@@ -35,7 +35,7 @@
   "A3": {
     "title": "JSON vs text format toggle",
     "source": "doc/logging_suggestions.md#A3",
-    "status": "proposed",
+    "status": "in_rewiew",
     "effort": "15 min",
     "impact": "medium",
     "priority": 2,
@@ -46,7 +46,7 @@
       "file": "internal/infra/config + internal/infra/logging/logger.go",
       "config_field": "Format string `toml:\"format\"` on config.Logging",
       "notes": [
-        "newTermHandler switches on strings.ToLower(cfg.Format): \"text\" -> slog.NewTextHandler(os.Stderr, opts), default -> slog.NewJSONHandler",
+        "newTermHandler switches on strings.EqualFold(cfg.Format, \"text\"): text -> slog.NewTextHandler(os.Stderr, opts), default -> slog.NewJSONHandler",
         "File handler stays JSON (machine-consumed)",
         "Empty format defaults to \"json\" — no breaking change"
       ]
@@ -60,9 +60,13 @@
       "Text output less structured"
     ],
     "tests": [
-      "Terminal with format \"text\" writes non-JSON lines",
-      "Terminal with format \"\" or \"json\" keeps JSON output"
-    ]
+      "TestNewTermHandler_FormatText — text format writes non-JSON lines",
+      "TestNewTermHandler_FormatJSON — format \"json\" and \"\" keep JSON output",
+      "TestNewTermHandler_FormatCaseInsensitive — \"TEXT\" accepted",
+      "TestNewTermHandler_NoTerminal — nil handler when Terminal=false",
+      "TestNewLogger_TerminalTextFormat — end-to-end NewLogger with text format"
+    ],
+    "outcome": "Implemented. config.Logging gained Format field; newTermHandler switches Text/JSON (case-insensitive \"text\"); file handler unchanged. Terminal-only tests capture os.Stderr via pipe."
   },
   "A4": {
     "title": "Color support for terminal logs",
@@ -95,6 +99,41 @@
     "tests": [
       "color = true emits ANSI escapes for level in text mode",
       "color = false or json mode emits no escapes"
+    ]
+  },
+  "C1": {
+    "title": "Config package refactoring",
+    "source": "agent analysis of defaultCFG() — internal/infra/config/config.go",
+    "status": "proposed",
+    "effort": "30 min",
+    "impact": "medium",
+    "priority": 3,
+    "blocked_by": ["A4"],
+    "problem": "defaultCFG() has weak defaults: logger.path is the placeholder \"/path/to/file\" (file handler tries to open this bogus path on every run) and the executor map is empty (all 6 runtime keys silently fall back to the generator output root, giving no hint they exist).",
+    "proposal": "Clean up the config package after A4 settles the Logging struct: fix placeholder defaults and make executor keys discoverable.",
+    "implementation": {
+      "file": "internal/infra/config/config.go",
+      "notes": [
+        "Logger.Path default \"/path/to/file\" -> \"\" (empty disables file logging, already supported by newFileHandler)",
+        "Seed defaultCFG executor map with the 6 runtime keys (target, buffer, in_progress, done, notifications, archive) using the same fallback values buildScriptConfig computes, so a generated config documents them",
+        "Add Validate() (configmanager.Validator hook) for logger.level whitelisting and non-empty generator paths",
+        "Re-check struct shape after A4 adds Color — do not start before A4 is done"
+      ]
+    },
+    "benefits": [
+      "Freshly generated config no longer attempts to write /path/to/file",
+      "Executor keys self-documenting in generated config",
+      "Load-time validation catches bad logger.level early instead of silently coercing to info"
+    ],
+    "trade_offs": [
+      "Seeded executor defaults duplicate fallback logic in buildScriptConfig",
+      "Validate() adds a failure mode for configs that previously loaded with warnings"
+    ],
+    "tests": [
+      "TestDefaultConfig_LoggerPathEmpty — default Path is \"\", no file handler created",
+      "TestDefaultConfig_ExecutorMapSeeded — default map contains all 6 keys",
+      "TestLoad_ValidateRejectsBadLevel — invalid logger.level fails Load",
+      "Existing TestDefaultConfig_ExecutorMap must be updated (currently asserts empty map)"
     ]
   },
   "BUG-1": {
