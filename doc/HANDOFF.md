@@ -2,8 +2,8 @@
 
 ## Current State
 
-- **Current Feature:** `S2` — Make ffmpeg binary configurable via app configuration (proposed, priority 4, no blockers)
-- **Previous:** `S1` — Config struct refactor: ScriptGeneration block (done)
+- **Current Feature:** `A5` — Custom slog text handler with format template (proposed, priority 5, no blockers)
+- **Previous:** `S2` — Make ffmpeg binary configurable via app configuration (done)
 - **Also proposed:** `A5` — Custom slog text handler (priority 5, no blockers)
 
 ## What's Done
@@ -12,12 +12,13 @@
 |---|---|---|
 | C1 — Config package refactoring | done | `Logger.Path` → `""`; executor map seeded with 6 keys; `Validate()` added |
 | S1 — ScriptGeneration block | done | `Hardsub` moved from top-level to `ScriptGeneration.Hardsub`; `FfmpegBinary` added; breaking config change |
+| S2 — ffmpeg binary configurable | done | `|=ffmpeg_binary=|` placeholder in template; fallback to "ffmpeg"; config-driven path |
 
 ## What's Proposed
 
 | Feature | Priority | Blocked By | Effort |
 |---|---|---|---|
-| S2 — ffmpeg binary configurable | 4 | — | 2-3 hours |
+| A5 — Custom slog text handler | 5 | — | 2-3 hours |
 
 ## S1 Implementation Summary (for S2 context)
 
@@ -39,27 +40,32 @@ type ScriptGeneration struct {
 
 **S1 tests:** `TestScriptGeneration_HardsubTag`, `TestScriptGeneration_FfmpegBinary`, `TestScriptGeneration_TOMLNewFormat`, `TestDefaultConfig_ScriptGeneration` (in `config_test.go`)
 
-## S2 Plan (next feature)
+## S2 Implementation Summary
 
 **Goal:** Make ffmpeg binary path configurable instead of hardcoded literal in template.
 
-**Files to touch:**
-- `internal/infra/config/config.go` — `ScriptGeneration.FfmpegBinary` already exists (added in S1)
-- `internal/app/pipeline/dto.go` — add `FfmpegBinary string` to `Options`
-- `internal/app/pipeline/config.go` — pass `FfmpegBinary` through `buildScriptConfig`
-- `internal/domain/script/config.go` — add `FfmpegBinary string` to `ScriptConfig`
-- `internal/domain/script/template.go` — replace hardcoded `ffmpeg` with `|=ffmpeg_binary=|` placeholder
-- `internal/infra/commands/cmd_process.go` — wire `cfg.ScriptGeneration.FfmpegBinary` → pipeline options
+**Files changed:**
+| File | Change |
+|---|---|
+| `internal/domain/script/config.go` | Added `FfmpegBinary string` field to `ScriptConfig` |
+| `internal/domain/script/template.go` | Replaced hardcoded `ffmpeg` with `|=ffmpeg_binary=|` placeholder (line 43) |
+| `internal/domain/script/script.go` | Added `replaceAll` for `ffmpeg_binary` with fallback to `"ffmpeg"` when empty |
+| `internal/app/pipeline/dto.go` | Added `FfmpegBinary string` field to `Options` |
+| `internal/app/pipeline/pipeline.go` | Added `ffmpegBinary` field to `Pipeline` struct; wired from `opts.FfmpegBinary` |
+| `internal/app/pipeline/config.go` | Added `ffmpegBinary` parameter to `buildScriptConfig`; passes to `ScriptConfig` |
+| `internal/infra/commands/cmd_process.go` | Wires `cfg.ScriptGeneration.FfmpegBinary` → pipeline options with `nonEmpty` fallback |
 
-**Data flow:** config → Pipeline.Options.FfmpegBinary → buildScriptConfig → ScriptConfig.FfmpegBinary → template placeholder → rendered script
+**Data flow:** config → Pipeline.Options.FfmpegBinary → Pipeline.ffmpegBinary → buildScriptConfig → ScriptConfig.FfmpegBinary → BuildScript template replacement → rendered script
 
 **Fallback:** empty string → `"ffmpeg"` (same pattern as ffprobe)
 
-**Tests needed:**
-- `TestBuildScriptConfig_FfmpegBinary` — custom path appears in generated script
-- `TestBuildScriptConfig_FfmpegBinaryFallback` — default `"ffmpeg"` when not configured
-- `TestBuildScriptConfig_FfmpegBinaryEmpty` — empty string falls back to `"ffmpeg"`
-- `TestTemplate_FfmpegPlaceholder` — `|=ffmpeg_binary=|` replaced in rendered template
+**Tests added:**
+- `TestBuildScript_FfmpegBinary` — custom path `/opt/bin/ffmpeg-nvenc` appears in generated script
+- `TestBuildScript_FfmpegBinaryFallback` — empty FfmpegBinary falls back to `"ffmpeg"` in rendered script
+- `TestBuildScriptConfig_FfmpegBinary` — custom path stored in ScriptConfig
+- `TestBuildScriptConfig_FfmpegBinaryFallback` — empty FfmpegBinary in config
+- `TestBuildScriptConfig_FfmpegBinaryEmpty` — empty config still produces valid script with fallback
+
 
 ## Key Technical Decisions
 
@@ -110,38 +116,33 @@ In `cmd_process.go`, the `--out` flag overrides `cfg.Paths.GeneratorOutput()`. I
 ## Testing
 
 ### Live Test Script
-`scripts/live_test.sh` — end-to-end pipeline test:
-1. Wipes all files in `~/workspace/lazyam3/` (keeps directories)
-2. Copies `testdata/synthetic/` → `incoming/`
-3. Builds lazyam3 and runs `process --once` (no flags — uses config)
-4. Prints all files in the test ground
-
-Run before/after any pipeline change to verify end-to-end behavior.
+`scripts/live_test.sh` — end-to-end pipeline test: Run before/after any pipeline change to verify end-to-end behavior.
 
 ### Test Suite
 ```bash
 go test -race -cover ./...   # all tests
-go test -race -cover ./internal/infra/config/...  # config tests (13 tests)
 ```
 
-## Files Changed This Session (S1)
+## Files Changed This Session (S2)
 
 | File | Change |
 |---|---|
-| `internal/infra/config/config.go` | `ScriptGeneration` struct added, `Hardsub` moved from top-level, `FfmpegBinary` added |
-| `internal/infra/config/config_test.go` | 4 new tests for ScriptGeneration (HardsubTag, FfmpegBinary, TOMLNewFormat, DefaultConfig) |
-| `internal/infra/commands/cmd_process.go` | `cfg.Hardsub.Tag` → `cfg.ScriptGeneration.Hardsub.Tag` |
-| `doc/feature_list.json` | S1 status → done, S2 blocked_by → empty |
-| `doc/feature_index.md` | S1 → done, S2 unblocked |
-| `AGENTS.md` | Current feature → S2, live_test.sh documented |
-| `~/.config/lazyam3/config.toml` | `[hardsub]` → `[script_generation.hardsub]` |
+| `internal/domain/script/config.go` | Added `FfmpegBinary string` field to `ScriptConfig` |
+| `internal/domain/script/template.go` | Replaced hardcoded `ffmpeg` with `|=ffmpeg_binary=|` placeholder |
+| `internal/domain/script/script.go` | Added `ffmpeg_binary` placeholder replacement with fallback to `"ffmpeg"` |
+| `internal/app/pipeline/dto.go` | Added `FfmpegBinary string` field to `Options` |
+| `internal/app/pipeline/pipeline.go` | Added `ffmpegBinary` field to `Pipeline`; wired from `opts.FfmpegBinary` |
+| `internal/app/pipeline/config.go` | Added `ffmpegBinary` parameter to `buildScriptConfig` |
+| `internal/app/pipeline/pipeline_test.go` | Updated existing tests for new `buildScriptConfig` signature; added 3 new tests |
+| `internal/domain/script/script_test.go` | Added `TestBuildScript_FfmpegBinary` and `TestBuildScript_FfmpegBinaryFallback` |
+| `internal/infra/commands/cmd_process.go` | Wires `cfg.ScriptGeneration.FfmpegBinary` with `nonEmpty("ffmpeg")` fallback |
+| `doc/feature_list.json` | S2 status → done, added outcome |
+| `doc/HANDOFF.md` | Updated with S2 summary |
 
 ## What to Watch For
 
-1. **S2** touches domain layer (`ScriptConfig`) — add one field, propagate through pipeline. Template placeholder `|=ffmpeg_binary=|` is straightforward. Ffmpeg binary path flows: config → Pipeline.Options → buildScriptConfig → ScriptConfig → template.
-2. **A5** if chosen: custom handler replaces `slog.TextHandler`. `colorLevelWriter` still works as post-processing wrapper.
-3. **configmanager limitation:** No `UnmarshalTOML` support. Any TOML custom parsing must be done in `Load()` after `configmanager` returns.
-4. **Breaking configs:** S1 changed `[hardsub]` to `[script_generation.hardsub]`. Any user with old config will get default values (empty hardsub tag) until they update.
+1. **A5** if chosen: custom handler replaces `slog.TextHandler`. `colorLevelWriter` still works as post-processing wrapper.
+3. **Breaking configs:** S1 changed `[hardsub]` to `[script_generation.hardsub]`. Any user with old config will get default values (empty hardsub tag) until they update.
 
 ## Commands
 

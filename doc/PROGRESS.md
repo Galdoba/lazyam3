@@ -104,3 +104,37 @@
 
 - **Lines changed:** ~30 lines of code, ~40 lines of tests
 - **Gates passed:** `go build`, `go test -race -cover`, `go vet`, `golangci-lint run` — all clean
+
+## Session: S2 — Make ffmpeg binary configurable via app configuration
+
+### Work Completed
+
+#### S2 — Ffmpeg binary configurable (done)
+
+- **Problem:** ffmpeg binary path was hardcoded in template (`ffmpeg -n -r 25 -i ...`)
+- **Solution:** Config-driven path via `ScriptGeneration.FfmpegBinary` (already existed from S1)
+- **Data flow:** config → Pipeline.Options.FfmpegBinary → Pipeline.ffmpegBinary → buildScriptConfig → ScriptConfig.FfmpegBinary → template placeholder → rendered script
+- **Fallback:** empty string → `"ffmpeg"` (same pattern as ffprobe)
+
+**Files changed:**
+- `internal/domain/script/config.go` — added `FfmpegBinary string` to `ScriptConfig`
+- `internal/domain/script/template.go` — replaced hardcoded `ffmpeg` with `|=ffmpeg_binary=|` placeholder
+- `internal/domain/script/script.go` — added placeholder replacement with fallback
+- `internal/app/pipeline/dto.go` — added `FfmpegBinary string` to `Options`
+- `internal/app/pipeline/pipeline.go` — added `ffmpegBinary` field to `Pipeline`, wired from options
+- `internal/app/pipeline/config.go` — added `ffmpegBinary` parameter to `buildScriptConfig`
+- `internal/infra/commands/cmd_process.go` — wired config → pipeline with `nonEmpty` fallback
+- `internal/app/pipeline/pipeline_test.go` — updated existing tests, added 3 new tests
+- `internal/domain/script/script_test.go` — added 2 new tests
+
+**Tests added:**
+- `TestBuildScript_FfmpegBinary` — custom path `/opt/bin/ffmpeg-nvenc` in generated script
+- `TestBuildScript_FfmpegBinaryFallback` — empty FfmpegBinary falls back to `"ffmpeg"`
+- `TestBuildScriptConfig_FfmpegBinary` — custom path stored in ScriptConfig
+- `TestBuildScriptConfig_FfmpegBinaryFallback` — empty FfmpegBinary in config
+- `TestBuildScriptConfig_FfmpegBinaryEmpty` — empty config produces valid script with fallback
+
+**Metrics:**
+- **Lines changed:** ~50 lines of code, ~100 lines of tests
+- **Gates passed:** `go build`, `go test -race -cover`, `go vet`, `golangci-lint run` — all clean
+- **Live test:** passed end-to-end pipeline

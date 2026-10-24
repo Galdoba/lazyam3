@@ -247,7 +247,7 @@
   "S2": {
     "title": "Make ffmpeg binary configurable via app configuration",
     "source": "internal/domain/script/template.go:43 — ffmpeg hardcoded as literal",
-    "status": "proposed",
+    "status": "done",
     "effort": "2-3 hours",
     "impact": "medium",
     "priority": 4,
@@ -282,6 +282,7 @@
       "TestBuildScriptConfig_FfmpegBinaryFallback — default \"ffmpeg\" used when not configured",
       "TestBuildScriptConfig_FfmpegBinaryEmpty — empty string falls back to \"ffmpeg\"",
       "TestTemplate_FfmpegPlaceholder — |=ffmpeg_binary=| replaced in rendered template"
-    ]
+    ],
+    "outcome": "Implemented. ScriptConfig gained FfmpegBinary field; template replaced hardcoded ffmpeg with |=ffmpeg_binary=| placeholder; BuildScript falls back to 'ffmpeg' when empty; Pipeline.Options gained FfmpegBinary; buildScriptConfig passes it through; cmd_process.go wires cfg.ScriptGeneration.FfmpegBinary with nonEmpty fallback. Tests added: TestBuildScript_FfmpegBinary, TestBuildScript_FfmpegBinaryFallback, TestBuildScriptConfig_FfmpegBinary, TestBuildScriptConfig_FfmpegBinaryFallback, TestBuildScriptConfig_FfmpegBinaryEmpty."
   }
 }

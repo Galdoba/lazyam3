@@ -23,7 +23,7 @@ const defaultPriority = 6
 // Predictions are computed against the executor's target path so that
 // ffmpeg output paths are accessible to the executor.
 // The script destination is named by OUTBASE extracted from predictions.
-func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string, executorPaths map[string]string, hardsubTag string) (script.ScriptConfig, error) {
+func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string, executorPaths map[string]string, hardsubTag, ffmpegBinary string) (script.ScriptConfig, error) {
 	if root == "" {
 		return script.ScriptConfig{}, fmt.Errorf("pipeline: destination root is required")
 	}
@@ -113,6 +113,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 		Predictions:  predictions,
 		CallNames:    callNames,
 		PRTTimestamp: timestamp,
+		FfmpegBinary: ffmpegBinary,
 		Env: script.Environment{
 			Buffer:        buffer,
 			InProgress:    inProgress,

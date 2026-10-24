@@ -40,7 +40,7 @@ var AmediaGeneric = strings.Join([]string{
 	``,
 	`# Сборка команды`,
 	``,
-	`ffmpeg -n -r 25 -i "${IN_PROGRESS}/${SOURCE}" \`,
+	`|=ffmpeg_binary=| -n -r 25 -i "${IN_PROGRESS}/${SOURCE}" \`,
 	`  -filter_complex "[0:v:0]${HSUB}${YADIF}setsar=(1/1)[vidHD]|=audio_filter=|" \`,
 	`|=output_files=|`,
 	`\`,

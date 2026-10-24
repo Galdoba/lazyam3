@@ -300,7 +300,7 @@ func TestRun_CtxCancelled(t *testing.T) {
 func TestBuildScriptConfig(t *testing.T) {
 	unit := testUnit()
 	root := t.TempDir()
-	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "")
+	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "", "")
 	if err != nil {
 		t.Fatalf("buildScriptConfig() error: %v", err)
 	}
@@ -350,7 +350,7 @@ func TestBuildScriptConfig(t *testing.T) {
 }
 
 func TestBuildScriptConfig_RequiresRoot(t *testing.T) {
-	if _, err := buildScriptConfig(testUnit(), *testProduct(), "", nil, ""); err == nil {
+	if _, err := buildScriptConfig(testUnit(), *testProduct(), "", nil, "", ""); err == nil {
 		t.Fatal("expected error for empty destination root, got nil")
 	}
 }
@@ -365,7 +365,7 @@ func TestBuildScriptConfig_ExecutorPaths(t *testing.T) {
 		"notifications": "/exec/notifications",
 		"target":        "/exec/target",
 	}
-	cfg, err := buildScriptConfig(unit, *testProduct(), root, execPaths, "")
+	cfg, err := buildScriptConfig(unit, *testProduct(), root, execPaths, "", "")
 	if err != nil {
 		t.Fatalf("buildScriptConfig() error: %v", err)
 	}
@@ -426,5 +426,51 @@ func TestFindSRT(t *testing.T) {
 				t.Errorf("findSubtitle(%v, %q) hsub = %q, want %q", tt.names, tt.hardsubTag, gotHsub, tt.wantHsub)
 			}
 		})
+	}
+}
+
+func TestBuildScriptConfig_FfmpegBinary(t *testing.T) {
+	unit := testUnit()
+	root := t.TempDir()
+	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "", "/opt/bin/ffmpeg")
+	if err != nil {
+		t.Fatalf("buildScriptConfig() error: %v", err)
+	}
+	if cfg.FfmpegBinary != "/opt/bin/ffmpeg" {
+		t.Errorf("FfmpegBinary = %q, want /opt/bin/ffmpeg", cfg.FfmpegBinary)
+	}
+}
+
+func TestBuildScriptConfig_FfmpegBinaryFallback(t *testing.T) {
+	unit := testUnit()
+	root := t.TempDir()
+	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "", "")
+	if err != nil {
+		t.Fatalf("buildScriptConfig() error: %v", err)
+	}
+	if cfg.FfmpegBinary != "" {
+		t.Errorf("FfmpegBinary = %q, want empty (fallback handled in BuildScript)", cfg.FfmpegBinary)
+	}
+}
+
+func TestBuildScriptConfig_FfmpegBinaryEmpty(t *testing.T) {
+	// Empty ffmpeg binary should still produce a valid config.
+	// The fallback to "ffmpeg" happens in BuildScript, not here.
+	unit := testUnit()
+	root := t.TempDir()
+	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "", "")
+	if err != nil {
+		t.Fatalf("buildScriptConfig() error: %v", err)
+	}
+	if cfg.FfmpegBinary != "" {
+		t.Errorf("FfmpegBinary = %q, want empty", cfg.FfmpegBinary)
+	}
+	// But BuildScript should still produce valid output with fallback.
+	script, err := script.BuildScript(cfg)
+	if err != nil {
+		t.Fatalf("BuildScript() error: %v", err)
+	}
+	if !strings.Contains(script.Content, "ffmpeg") {
+		t.Error("BuildScript() with empty FfmpegBinary should fallback to 'ffmpeg'")
 	}
 }

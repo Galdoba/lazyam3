@@ -27,21 +27,23 @@ type Pipeline struct {
 	rd         script.Renderer
 	hardsubTag string
 
-	sourceDir   string
-	destination string
-	execPaths   map[string]string
-	dryRun      bool
-	events      chan PipelineEvent
+	sourceDir    string
+	destination  string
+	execPaths    map[string]string
+	dryRun       bool
+	ffmpegBinary string
+	events       chan PipelineEvent
 }
 
 // NewPipeline creates a new Pipeline instance.
 func NewPipeline(opts Options) *Pipeline {
 	return &Pipeline{
-		logger:     opts.Logger,
-		in:         opts.Ingest,
-		md:         opts.Metadata,
-		rd:         opts.Renderer,
-		hardsubTag: opts.HardsubTag,
+		logger:       opts.Logger,
+		in:           opts.Ingest,
+		md:           opts.Metadata,
+		rd:           opts.Renderer,
+		hardsubTag:   opts.HardsubTag,
+		ffmpegBinary: opts.FfmpegBinary,
 
 		sourceDir:   opts.SourceDir,
 		destination: opts.Destination,
@@ -138,7 +140,7 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 		p.emit(EventUnitDone, unit.ID, nil)
 		return nil
 	}
-	cfg, err := buildScriptConfig(unit, *prod, p.destination, p.execPaths, p.hardsubTag)
+	cfg, err := buildScriptConfig(unit, *prod, p.destination, p.execPaths, p.hardsubTag, p.ffmpegBinary)
 	if err != nil {
 		p.emit(EventUnitFailed, unit.ID, err)
 		return err

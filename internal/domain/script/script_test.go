@@ -1654,3 +1654,109 @@ func TestBuildScript_ReadyFile_DirectoryMatch(t *testing.T) {
 		t.Error("BuildScript() missing .ready file touch command")
 	}
 }
+
+func TestBuildScript_FfmpegBinary(t *testing.T) {
+	prod := metadata.Product{
+		ID:            900,
+		SeriesTitle:   "FfmpegTest",
+		Kind:          metadata.KindSeriesEpisode,
+		SeasonNumber:  ptrInt(1),
+		EpisodeNumber: ptrInt(1),
+	}
+
+	videoStream := ingest.Stream{Kind: ingest.StreamKindVideo, Index: 0, FileIndex: 0}
+	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
+		ID:           900,
+		PRTTimestamp: "261023110725",
+	}, "/mnt/ROOT/EDIT", "", 900)
+
+	callName := "FfmpegTest_s01e01_PRT261023110725_id900.mp4"
+
+	// Custom ffmpeg path
+	cfg := ScriptConfig{
+		Filenames:    []string{"900.mp4"},
+		Streams:      []ingest.Stream{videoStream},
+		Product:      prod,
+		Predictions:  preds,
+		CallNames:    map[string]string{"900.mp4": callName},
+		NameTag:      "_s01e01",
+		SeasonDir:    "_s01",
+		PRTTimestamp: "261023110725",
+		FfmpegBinary: "/opt/bin/ffmpeg-nvenc",
+		Env: Environment{
+			Buffer:        "/tmp/lazyam/buffer",
+			InProgress:    "/tmp/lazyam/in_progress",
+			Done:          "/tmp/lazyam/done",
+			Notifications: "/tmp/lazyam/notifications",
+			Archive:       "/tmp/lazyam/done/bash",
+			TargetRoot:    "/mnt/ROOT/EDIT",
+			Priority:      6,
+		},
+		Destination: "/tmp/lazyam/scripts/test.sh",
+	}
+
+	script, err := BuildScript(cfg)
+	if err != nil {
+		t.Fatalf("BuildScript() error = %v", err)
+	}
+
+	if !strings.Contains(script.Content, "/opt/bin/ffmpeg-nvenc") {
+		t.Error("BuildScript() with custom FfmpegBinary should contain custom path")
+	}
+}
+
+func TestBuildScript_FfmpegBinaryFallback(t *testing.T) {
+	prod := metadata.Product{
+		ID:            950,
+		SeriesTitle:   "FfmpegFallback",
+		Kind:          metadata.KindSeriesEpisode,
+		SeasonNumber:  ptrInt(1),
+		EpisodeNumber: ptrInt(1),
+	}
+
+	videoStream := ingest.Stream{Kind: ingest.StreamKindVideo, Index: 0, FileIndex: 0}
+	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
+		ID:           950,
+		PRTTimestamp: "261023110725",
+	}, "/mnt/ROOT/EDIT", "", 950)
+
+	callName := "FfmpegFallback_s01e01_PRT261023110725_id950.mp4"
+
+	// Empty ffmpeg binary — should fallback to "ffmpeg"
+	cfg := ScriptConfig{
+		Filenames:    []string{"950.mp4"},
+		Streams:      []ingest.Stream{videoStream},
+		Product:      prod,
+		Predictions:  preds,
+		CallNames:    map[string]string{"950.mp4": callName},
+		NameTag:      "_s01e01",
+		SeasonDir:    "_s01",
+		PRTTimestamp: "261023110725",
+		FfmpegBinary: "",
+		Env: Environment{
+			Buffer:        "/tmp/lazyam/buffer",
+			InProgress:    "/tmp/lazyam/in_progress",
+			Done:          "/tmp/lazyam/done",
+			Notifications: "/tmp/lazyam/notifications",
+			Archive:       "/tmp/lazyam/done/bash",
+			TargetRoot:    "/mnt/ROOT/EDIT",
+			Priority:      6,
+		},
+		Destination: "/tmp/lazyam/scripts/test.sh",
+	}
+
+	script, err := BuildScript(cfg)
+	if err != nil {
+		t.Fatalf("BuildScript() error = %v", err)
+	}
+
+	if !strings.Contains(script.Content, "ffmpeg") {
+		t.Error("BuildScript() with empty FfmpegBinary should fallback to 'ffmpeg'")
+	}
+
+	// No unresolved placeholders
+	unresolved := findUnresolved(script.Content)
+	if len(unresolved) > 0 {
+		t.Errorf("BuildScript() has unresolved placeholders: %v", unresolved)
+	}
+}

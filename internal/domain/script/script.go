@@ -84,6 +84,12 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 	content = replaceAll(content, "archive", cfg.Env.Archive)
 	content = replaceAll(content, "mkdir_target", mkdirTarget)
 	content = replaceAll(content, "ready_file", buildReadyFile(predictions))
+	// Fallback to "ffmpeg" when not configured.
+	ffmpegBinary := cfg.FfmpegBinary
+	if ffmpegBinary == "" {
+		ffmpegBinary = "ffmpeg"
+	}
+	content = replaceAll(content, "ffmpeg_binary", ffmpegBinary)
 
 	// Validate no unresolved placeholders remain
 	if unresolved := findUnresolved(content); len(unresolved) > 0 {

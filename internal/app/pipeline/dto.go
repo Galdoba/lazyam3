@@ -32,6 +32,7 @@ type Options struct {
 	Destination   string
 	DryRun        bool
 	HardsubTag    string            // filename tag marking sidecar subtitles as hardsub (burn-in)
+	FfmpegBinary  string            // path to ffmpeg binary for generated scripts
 	ExecutorPaths map[string]string // executor filesystem paths from config
 	CFG           config.Config
 }

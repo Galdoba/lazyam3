@@ -35,6 +35,9 @@ type ScriptConfig struct {
 	// Environment paths (filled from app config)
 	Env Environment
 
+	// FfmpegBinary is the path to the ffmpeg binary used in the generated script.
+	FfmpegBinary string
+
 	// Output path for the .sh file
 	Destination string
 }
