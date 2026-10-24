@@ -1,7 +1,10 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 
 	"github.com/Galdoba/appcontext/configmanager"
 )
@@ -9,6 +12,28 @@ import (
 const (
 	APPNAME = "lazyam3"
 )
+
+// ErrDefaultConfig is returned when the effective configuration equals the built-in default.
+var ErrDefaultConfig = errors.New("default configuration in use")
+
+// requiredConfigFields lists the config fields the user must fill in before processing can run.
+var requiredConfigFields = []string{
+	"paths.generator.input_directory",
+	"paths.generator.output_directory",
+	"paths.generator.metadata_path",
+}
+
+// DefaultConfigError reports that the effective configuration equals the built-in default and
+// the user must edit the pointed config file to fill in the required fields.
+type DefaultConfigError struct {
+	ConfigPath string
+}
+
+func (e *DefaultConfigError) Error() string {
+	return fmt.Sprintf("default configuration in use: edit the config file %q and fill in the required fields (%s) to enable processing", e.ConfigPath, strings.Join(requiredConfigFields, ", "))
+}
+
+func (e *DefaultConfigError) Unwrap() error { return ErrDefaultConfig }
 
 type Config struct {
 	Paths            Paths            `toml:"paths"`
@@ -75,39 +100,46 @@ type Logging struct {
 
 func defaultCFG() Config {
 	return Config{
+		// All paths are obvious placeholders — the user must edit the config
+		// file before the effective configuration equals the built-in default.
 		Paths: Paths{
 			Generator: GeneratorPaths{
-				InputDirectory:  "/tmp/lazyam3/input",
-				OutputDirectory: "/tmp/lazyam3/output",
-				MetadataPath:    "/tmp/lazyam3/metadata.json",
+				InputDirectory:  "/path/to/lazyam3/input",
+				OutputDirectory: "/path/to/lazyam3/output",
+				MetadataPath:    "/path/to/lazyam3/metadata.json",
 				FfprobeBinary:   "ffprobe",
 			},
 			// Executor defaults mirror buildScriptConfig fallbacks for
 			// root = Generator.OutputDirectory — keep them in sync.
 			Executor: map[string]string{
-				"target":        "/tmp/lazyam3/output/target",
-				"buffer":        "/tmp/lazyam3/output",
-				"in_progress":   "/tmp/lazyam3/output",
-				"done":          "/tmp/lazyam3/output",
-				"notifications": "/tmp/lazyam3/output",
-				"archive":       "/tmp/lazyam3/output/archive",
+				"target":        "/path/to/lazyam3/output/target",
+				"buffer":        "/path/to/lazyam3/output",
+				"in_progress":   "/path/to/lazyam3/output",
+				"done":          "/path/to/lazyam3/output",
+				"notifications": "/path/to/lazyam3/output",
+				"archive":       "/path/to/lazyam3/output/archive",
 			},
 		},
 		Logger: Logging{
 			Level:    "info",
-			Path:     "/path/to/file.log",
+			Path:     "/path/to/lazyam3/lazyam3.log",
 			Terminal: true,
 			Format:   "text",
 			Color:    true,
 		},
 		Storage: Storage{
-			Path: "/path/to/file.json",
+			Path: "/path/to/lazyam3/storage.json",
 		},
 		ScriptGeneration: ScriptGeneration{
 			Hardsub:      Hardsub{Tag: "Forsirovannye"},
 			FfmpegBinary: "ffmpeg",
 		},
 	}
+}
+
+// IsDefault reports whether the effective configuration equals the built-in default.
+func (c Config) IsDefault() bool {
+	return reflect.DeepEqual(c, defaultCFG())
 }
 
 func (c Config) Validate() error {
@@ -133,15 +165,22 @@ func Load(suggestedPath string) (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("failed to create configmanager: %w", err)
 	}
+	var configPath string
 	switch suggestedPath {
 	case "":
 		if err := cm.EnsureLoaded(); err != nil {
 			return Config{}, fmt.Errorf("failed to load config: %w", err)
 		}
+		configPath = cm.Path()
 	default:
 		if err := cm.DiscoverAndLoad(suggestedPath); err != nil {
 			return Config{}, fmt.Errorf("failed to load config: %w", err)
 		}
+		configPath = suggestedPath
 	}
-	return cm.Config(), nil
+	cfg := cm.Config()
+	if cfg.IsDefault() {
+		return Config{}, &DefaultConfigError{ConfigPath: configPath}
+	}
+	return cfg, nil
 }

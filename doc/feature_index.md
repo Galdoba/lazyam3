@@ -10,3 +10,6 @@
 | `S1` | done | 4 | Config struct refactor: ScriptGeneration block | — |
 | `S2` | done | 4 | Make ffmpeg binary configurable via app configuration | — |
 | `A5` | proposed | 5 | Custom slog text handler with format template | — |
+| `D1` | done | 5 | Default configuration refactoring | — |
+| `S3` | proposed | 4 | Configurable hardsub parameters | — |
+| `S4` | proposed | 4 | Configurable script generation command parameters | — |

@@ -10,7 +10,9 @@
 
 ### BUG-3 — Storage.Path Placeholder
 **Severity:** medium · **Source:** `defaultCFG()` in `internal/infra/config/config.go`
-`Storage.Path` still has `"/path/to/file.json"` in `defaultCFG()`. Same class as the `Logger.Path` bug — would fail on first `Store()` use with permission denied. **Out of scope** for C1; flag for future.
+`Storage.Path` still had `"/path/to/file.json"` in `defaultCFG()`. Same class as the `Logger.Path` bug — would fail on first `Store()` use with permission denied. **Out of scope** for C1; flag for future.
+
+**Resolution (D1):** resolved — `defaultCFG()` now returns the self-documenting placeholder `/path/to/lazyam3/storage.json`, and the built-in default now fails fast with the default-config error before reaching runtime.
 
 ### BUG-4 — ffmpeg Hardcoded in Template
 **Severity:** low · **Source:** `internal/domain/script/template.go:43`

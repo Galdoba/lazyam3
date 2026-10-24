@@ -138,3 +138,42 @@
 - **Lines changed:** ~50 lines of code, ~100 lines of tests
 - **Gates passed:** `go build`, `go test -race -cover`, `go vet`, `golangci-lint run` — all clean
 - **Live test:** passed end-to-end pipeline
+
+## Session: D1 — Default configuration refactoring
+
+### Work Completed
+
+#### D1 — Default configuration refactoring (done)
+- **Problem:** built-in default config used usable-looking paths (`/tmp/lazyam3/input`) or dummy placeholders (`/path/to/file.log`, `/path/to/file.json`); fresh installs silently ran on unusable defaults and users had no idea which fields existed.
+- **Solution:**
+  - `defaultCFG()` refactored to self-documenting placeholders: `/path/to/lazyam3/input`, `/path/to/lazyam3/output`, `/path/to/lazyam3/metadata.json`, `/path/to/lazyam3/storage.json`, `/path/to/lazyam3/lazyam3.log`, executor mirrors `/path/to/lazyam3/output/<key>`.
+  - `Config.IsDefault()` added (reflect.DeepEqual against `defaultCFG()`).
+  - Typed error `*DefaultConfigError{ConfigPath}` wrapping sentinel `ErrDefaultConfig` added.
+  - `Load()` returns the default-config error when the effective config equals the default; `AppModules.Init` fails fast (unwrapped) before logger/pipeline creation.
+
+#### D1 — Error message
+```
+default configuration in use: edit the config file "<config file path>" and fill in the required fields (paths.generator.input_directory, paths.generator.output_directory, paths.generator.metadata_path) to enable processing
+```
+
+### Tests Added/Updated
+- `TestDefaultConfig_ContainsPlaceholders` — defaults are self-documenting placeholders.
+- `TestIsDefault` — detects effective config equal to the built-in default; edited config → false.
+- `TestLoad_DefaultConfigDetected` — fresh install (no user config) → `ErrDefaultConfig` with `ConfigPath` = `<home>/.config/lazyam3/config.toml`.
+- `TestLoad_UserConfigNotDefault` — user-edited config loads normally.
+- `TestLoad_ExplicitConfigEqualToDefault` — explicit default-equal config → `ErrDefaultConfig`.
+- Updated: `TestDefaultConfig` (new placeholder expectations), `TestDefaultConfig_LoggerPath`, `TestDefaultConfig_ExecutorMapSeeded`.
+
+### Key Technical Findings
+1. configmanager `Manager.Path()` after `EnsureLoaded` reflects the just-written default path → `DefaultConfigError.ConfigPath` points to the fresh-install default file.
+2. TOML absent keys keep seeded values (struct/map merge) — user configs omitting `[logger]` inherit seeded `Logger.Path` placeholder → file handler fails later at logger init.
+
+### Metrics
+- Lines changed: ~90 in `internal/infra/config`, ~5 in `internal/app`, ~200 in tests.
+- Features completed this session: `D1` — Default configuration refactoring (plus previously done: A2, A3, A4, C1, BUG-1, S1, S2).
+- Gates passed: `go build`, `go test -race -cover`, `go vet`, `golangci-lint run` — all clean.
+- Live test: passed end-to-end after D1 (6 units processed, 0 failed).
+
+### What to Watch For
+- Next feature: `A5` — Custom slog text handler with format template (proposed, priority 5, no blockers).
+- D1 trade-off: equality-based detection also flags user configs that intentionally mirror the defaults.

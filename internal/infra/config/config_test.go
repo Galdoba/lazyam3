@@ -1,22 +1,24 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := defaultCFG()
 
-	if cfg.Paths.GeneratorInput() != "/tmp/lazyam3/input" {
-		t.Errorf("Paths.Generator.InputDirectory = %q, want %q", cfg.Paths.GeneratorInput(), "/tmp/lazyam3/input")
+	if cfg.Paths.GeneratorInput() != "/path/to/lazyam3/input" {
+		t.Errorf("Paths.Generator.InputDirectory = %q, want %q", cfg.Paths.GeneratorInput(), "/path/to/lazyam3/input")
 	}
-	if cfg.Paths.GeneratorOutput() != "/tmp/lazyam3/output" {
-		t.Errorf("Paths.Generator.OutputDirectory = %q, want %q", cfg.Paths.GeneratorOutput(), "/tmp/lazyam3/output")
+	if cfg.Paths.GeneratorOutput() != "/path/to/lazyam3/output" {
+		t.Errorf("Paths.Generator.OutputDirectory = %q, want %q", cfg.Paths.GeneratorOutput(), "/path/to/lazyam3/output")
 	}
-	if cfg.Paths.GeneratorMetadata() != "/tmp/lazyam3/metadata.json" {
-		t.Errorf("Paths.Generator.MetadataPath = %q, want %q", cfg.Paths.GeneratorMetadata(), "/tmp/lazyam3/metadata.json")
+	if cfg.Paths.GeneratorMetadata() != "/path/to/lazyam3/metadata.json" {
+		t.Errorf("Paths.Generator.MetadataPath = %q, want %q", cfg.Paths.GeneratorMetadata(), "/path/to/lazyam3/metadata.json")
 	}
 	if cfg.Logger.Level != "info" {
 		t.Errorf("Logger.Level = %q, want %q", cfg.Logger.Level, "info")
@@ -24,11 +26,31 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Logger.Terminal != true {
 		t.Errorf("Logger.Terminal = %v, want %v", cfg.Logger.Terminal, true)
 	}
-	if cfg.Storage.Path != "/path/to/file.json" {
-		t.Errorf("Storage.Path = %q, want %q", cfg.Storage.Path, "/path/to/file.json")
+	if cfg.Storage.Path != "/path/to/lazyam3/storage.json" {
+		t.Errorf("Storage.Path = %q, want %q", cfg.Storage.Path, "/path/to/lazyam3/storage.json")
 	}
 	if cfg.ScriptGeneration.Hardsub.Tag != "Forsirovannye" {
 		t.Errorf("ScriptGeneration.Hardsub.Tag = %q, want %q", cfg.ScriptGeneration.Hardsub.Tag, "Forsirovannye")
+	}
+}
+
+func TestDefaultConfig_ContainsPlaceholders(t *testing.T) {
+	cfg := defaultCFG()
+
+	if cfg.Paths.GeneratorInput() != "/path/to/lazyam3/input" {
+		t.Errorf("Paths.Generator.InputDirectory = %q, want self-documenting placeholder %q", cfg.Paths.GeneratorInput(), "/path/to/lazyam3/input")
+	}
+	if cfg.Paths.GeneratorOutput() != "/path/to/lazyam3/output" {
+		t.Errorf("Paths.Generator.OutputDirectory = %q, want self-documenting placeholder %q", cfg.Paths.GeneratorOutput(), "/path/to/lazyam3/output")
+	}
+	if cfg.Paths.GeneratorMetadata() != "/path/to/lazyam3/metadata.json" {
+		t.Errorf("Paths.Generator.MetadataPath = %q, want self-documenting placeholder %q", cfg.Paths.GeneratorMetadata(), "/path/to/lazyam3/metadata.json")
+	}
+	if cfg.Storage.Path != "/path/to/lazyam3/storage.json" {
+		t.Errorf("Storage.Path = %q, want self-documenting placeholder %q", cfg.Storage.Path, "/path/to/lazyam3/storage.json")
+	}
+	if cfg.Logger.Path != "/path/to/lazyam3/lazyam3.log" {
+		t.Errorf("Logger.Path = %q, want self-documenting placeholder %q", cfg.Logger.Path, "/path/to/lazyam3/lazyam3.log")
 	}
 }
 
@@ -41,8 +63,79 @@ func TestDefaultConfig_FfprobeBinary(t *testing.T) {
 
 func TestDefaultConfig_LoggerPath(t *testing.T) {
 	cfg := defaultCFG()
-	if cfg.Logger.Path != "/path/to/file.log" {
-		t.Errorf("Logger.Path = %q, want %q", cfg.Logger.Path, "/path/to/file.log")
+	if cfg.Logger.Path != "/path/to/lazyam3/lazyam3.log" {
+		t.Errorf("Logger.Path = %q, want %q", cfg.Logger.Path, "/path/to/lazyam3/lazyam3.log")
+	}
+}
+
+func TestIsDefault(t *testing.T) {
+	if !defaultCFG().IsDefault() {
+		t.Error("IsDefault() for the built-in default: want true, got false")
+	}
+
+	cfg := defaultCFG()
+	cfg.Paths.Generator.InputDirectory = "/home/user/lazyam3/input"
+	if cfg.IsDefault() {
+		t.Error("IsDefault() for a user-edited config: want false, got true")
+	}
+}
+
+func TestLoad_DefaultConfigDetected(t *testing.T) {
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("LAZYAM3_CONFIG", "")
+	t.Setenv("LAZYAM3_CONFIG_PATH", "")
+
+	cfg, err := Load("")
+	if !errors.Is(err, ErrDefaultConfig) {
+		t.Fatalf("Load() on fresh install: want ErrDefaultConfig, got %v", err)
+	}
+	var defErr *DefaultConfigError
+	if !errors.As(err, &defErr) {
+		t.Fatalf("Load() on fresh install: want *DefaultConfigError, got %T", err)
+	}
+	wantPath := filepath.Join(homeDir, ".config", "lazyam3", "config.toml")
+	if defErr.ConfigPath != wantPath {
+		t.Errorf("DefaultConfigError.ConfigPath = %q, want %q", defErr.ConfigPath, wantPath)
+	}
+	if !reflect.DeepEqual(cfg, Config{}) {
+		t.Errorf("Load() on fresh install: want zero Config on error, got %+v", cfg)
+	}
+}
+
+func TestLoad_UserConfigNotDefault(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("LAZYAM3_CONFIG", "")
+	t.Setenv("LAZYAM3_CONFIG_PATH", "")
+	toml := `[paths.generator]
+input_directory = '/home/user/lazyam3/input'
+output_directory = '/home/user/lazyam3/output'
+metadata_path = '/home/user/lazyam3/metadata.json'
+
+[storage]
+path = '/home/user/lazyam3/storage.json'
+`
+	path := writeConfig(t, toml)
+	if _, err := Load(path); err != nil {
+		t.Fatalf("Load() with user-edited config: want nil error, got %v", err)
+	}
+}
+
+func TestLoad_ExplicitConfigEqualToDefault(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("LAZYAM3_CONFIG", "")
+	t.Setenv("LAZYAM3_CONFIG_PATH", "")
+	toml := `[paths.generator]
+input_directory = '/path/to/lazyam3/input'
+output_directory = '/path/to/lazyam3/output'
+metadata_path = '/path/to/lazyam3/metadata.json'
+
+[storage]
+path = '/path/to/lazyam3/storage.json'
+`
+	path := writeConfig(t, toml)
+	if _, err := Load(path); !errors.Is(err, ErrDefaultConfig) {
+		t.Fatalf("Load() with an explicit config equal to the default: want ErrDefaultConfig, got %v", err)
 	}
 }
 
@@ -86,12 +179,12 @@ func TestDefaultConfig_ExecutorMapSeeded(t *testing.T) {
 		t.Fatal("Paths.Executor should not be nil")
 	}
 	tests := map[string]string{
-		"target":        "/tmp/lazyam3/output/target",
-		"buffer":        "/tmp/lazyam3/output",
-		"in_progress":   "/tmp/lazyam3/output",
-		"done":          "/tmp/lazyam3/output",
-		"notifications": "/tmp/lazyam3/output",
-		"archive":       "/tmp/lazyam3/output/archive",
+		"target":        "/path/to/lazyam3/output/target",
+		"buffer":        "/path/to/lazyam3/output",
+		"in_progress":   "/path/to/lazyam3/output",
+		"done":          "/path/to/lazyam3/output",
+		"notifications": "/path/to/lazyam3/output",
+		"archive":       "/path/to/lazyam3/output/archive",
 	}
 	if len(cfg.Paths.Executor) != len(tests) {
 		t.Errorf("Paths.Executor has %d entries, want %d", len(cfg.Paths.Executor), len(tests))

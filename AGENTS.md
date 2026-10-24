@@ -10,6 +10,8 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 >
 > Status: `proposed` · blocked_by: `[]` · effort: 2-3 hours · priority: 5
 
+> **Just finished: `D1` — Default configuration refactoring** (`doc/feature_list.json`) — status: `done` · effort: 2-3 hours · priority: 5
+
 Selection rule: pick the highest-priority feature in `doc/feature_list.json` whose `blocked_by` list is empty and whose `status` is `proposed`. When a feature is done, set its `status` to `in_rewiew` in `doc/feature_list.json` before moving on.
 
 ## Live Test

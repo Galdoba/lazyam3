@@ -167,7 +167,7 @@
     "status": "proposed",
     "effort": "2-3 hours",
     "impact": "medium",
-    "priority": 5,
+    "priority": 2,
     "blocked_by": [],
     "problem": "slog.TextHandler has no format customization options — field order, separators, timestamp format, and structure are all fixed.",
     "proposal": "Replace slog.TextHandler with a custom handler that renders a format string like '{time} [{level}] {msg} {attrs}'. Minimal template set: {time}, {level}, {msg}, {attrs}. colorLevelWriter post-processing continues to work on the writer.",
@@ -284,5 +284,107 @@
       "TestTemplate_FfmpegPlaceholder — |=ffmpeg_binary=| replaced in rendered template"
     ],
     "outcome": "Implemented. ScriptConfig gained FfmpegBinary field; template replaced hardcoded ffmpeg with |=ffmpeg_binary=| placeholder; BuildScript falls back to 'ffmpeg' when empty; Pipeline.Options gained FfmpegBinary; buildScriptConfig passes it through; cmd_process.go wires cfg.ScriptGeneration.FfmpegBinary with nonEmpty fallback. Tests added: TestBuildScript_FfmpegBinary, TestBuildScript_FfmpegBinaryFallback, TestBuildScriptConfig_FfmpegBinary, TestBuildScriptConfig_FfmpegBinaryFallback, TestBuildScriptConfig_FfmpegBinaryEmpty."
+  },
+  "D1": {
+    "title": "Default configuration refactoring",
+    "source": "User request: the default configuration must let the user start working immediately and must tell which fields to fill in",
+    "status": "done",
+    "effort": "2-3 hours",
+    "impact": "high",
+    "priority": 5,
+    "blocked_by": [],
+    "problem": "The built-in default configuration does not let the user start working immediately and, most importantly, the user does not know which fields in the configuration are available. Default values look like usable paths (/tmp/lazyam3/input) or dummy placeholders (/path/to/file.log), so a fresh setup silently runs with unusable settings and gives no guidance.",
+    "proposal": "Refactor the default configuration into self-documenting placeholder values and fail fast with a message pointing to the config file when the effective configuration equals the built-in default.",
+    "implementation": {
+      "file": "internal/infra/config/config.go",
+      "notes": [
+        "Replace defaultCFG() placeholder values with self-documenting placeholders (e.g. /path/to/lazyam3/input)",
+        "Detect effective config equal to defaultCFG() and return a default-configuration error",
+        "Error message must include the config file path the user has to edit and the required fields"
+      ]
+    },
+    "benefits": [
+      "User immediately understands which fields to fill in the default config",
+      "Startup fails fast with an actionable message instead of running on unusable defaults",
+      "No silent misconfiguration on fresh installs"
+    ],
+    "trade_offs": [
+      "Default configuration is no longer directly usable — the user must always create or edit a config file",
+      "Equality-based detection also flags user configs that intentionally mirror the defaults"
+    ],
+    "tests": [
+      "TestDefaultConfig_ContainsPlaceholders — defaults are self-documenting",
+      "TestIsDefault — detects effective config equal to the built-in default",
+      "TestLoad_DefaultConfigDetected — fresh install without a config file returns the default-config error",
+      "TestLoad_UserConfigNotDefault — user-edited config loads normally",
+      "TestLoad_ExplicitConfigEqualToDefault — explicit config equal to the default returns the default-config error"
+    ],
+    "outcome": "Implemented. defaultCFG() now returns self-documenting placeholders (/path/to/lazyam3/input, /path/to/lazyam3/output, /path/to/lazyam3/metadata.json, /path/to/lazyam3/storage.json, /path/to/lazyam3/lazyam3.log, executor mirrors /path/to/lazyam3/output). Config gained IsDefault() (reflect.DeepEqual vs defaultCFG()) and typed *DefaultConfigError (wraps ErrDefaultConfig, carries ConfigPath). Load() returns the default-config error when the effective config equals the default; AppModules.Init fails fast before the pipeline is created. Fresh install terminates with: 'default configuration in use: edit the config file \"<path>\" and fill in the required fields (paths.generator.input_directory, paths.generator.output_directory, paths.generator.metadata_path) to enable processing'. Trade-offs accepted: default config is no longer directly usable; equality-based detection also flags user configs that intentionally mirror the defaults."
+  },
+  "S3": {
+    "title": "Configurable hardsub parameters",
+    "source": "User request: all parameters we are using in the script template for hardsub are worthy to be configurable",
+    "status": "proposed",
+    "effort": "2-4 hours",
+    "impact": "medium",
+    "priority": 4,
+    "blocked_by": [],
+    "problem": "Hardsub burn-in in the generated ffmpeg script hardcodes subtitles filter parameters such as font, colours and margins in BuildScript; users cannot tune burn-in behaviour.",
+    "proposal": "Make all hardsub parameters used in the script template configurable via the config, for example under script_generation.hardsub.",
+    "implementation": {
+      "file": "internal/domain/script + internal/infra/config + internal/app/pipeline",
+      "config_change": "Extend ScriptGeneration.Hardsub with configurable burn-in parameters",
+      "notes": [
+        "Move hardcoded subtitles filter arguments from buildHSUB into config-driven parameters",
+        "Extend Harsub struct or add nested parameter structs as fields are added"
+      ]
+    },
+    "benefits": [
+      "Hardsub burn-in behaviour tunable without code changes",
+      "All script-template hardsub parameters become user-configurable"
+    ],
+    "trade_offs": [
+      "More config fields to keep in sync with the script template",
+      "Default values needed for IsDefault equality detection"
+    ],
+    "tests": [
+      "TestBuildScript_HardsubParameters — configurable hardsub parameters appear in generated script",
+      "TestBuildScript_HardsubParametersFallback — defaults used when not configured"
+    ],
+    "outcome": "Not started — proposed."
+  },
+  "S4": {
+    "title": "Configurable script generation command parameters",
+    "source": "User request: same as Harsub, add more structs: GlobalParameters, VideoStream, AudioStream — all of them can contain individual repeatable parameters",
+    "status": "proposed",
+    "effort": "3-5 hours",
+    "impact": "medium",
+    "priority": 4,
+    "blocked_by": [],
+    "problem": "ffmpeg command construction in the generated script such as binary, rate, filter_complex and output options is assembled in code; users cannot add custom command parameters.",
+    "proposal": "Group script-generation command parameters into GlobalParameters, VideoStream and AudioStream structs, each holding individual repeatable parameters.",
+    "implementation": {
+      "file": "internal/domain/script + internal/infra/config + internal/app/pipeline",
+      "config_change": "Add ScriptGeneration.Command block with GlobalParameters, VideoStream and AudioStream",
+      "notes": [
+        "GlobalParameters: global ffmpeg options such as binary and rate",
+        "VideoStream: per-stream filters and options",
+        "AudioStream: per-stream filters and options",
+        "Repeatable parameters via slices"
+      ]
+    },
+    "benefits": [
+      "Users can tune ffmpeg commands without code changes",
+      "Repeatable per-stream parameters"
+    ],
+    "trade_offs": [
+      "Larger config surface and validation burden",
+      "Template placeholders for new parameters needed"
+    ],
+    "tests": [
+      "TestBuildScript_CommandParameters — custom command parameters appear in generated script",
+      "TestBuildScript_CommandParametersFallback — defaults used when not configured"
+    ],
+    "outcome": "Not started — proposed."
   }
 }

@@ -294,6 +294,7 @@ type Config struct {
 
 - Loaded via `github.com/Galdoba/appcontext/configmanager` with `WithFormat(configmanager.TOML)`
 - Defaults are hardcoded (`defaultCFG()`); app name constant is `lazyam3`
+- Defaults are self-documenting placeholders (e.g. `/path/to/lazyam3/input`) — the built-in default now fails fast with `config.ErrDefaultConfig` before the pipeline is created
 - `configs/config.yaml` and `configs/config.local.yaml` are empty placeholders
 
 ## Workflow

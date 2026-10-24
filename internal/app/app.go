@@ -45,6 +45,9 @@ func (m *AppModules) Init(configPath string) error {
 
 	cfg, err := config.Load(configPath)
 	if err != nil {
+		if errors.Is(err, config.ErrDefaultConfig) {
+			return err
+		}
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 

@@ -2,116 +2,60 @@
 
 ## Current State
 
+- **Just completed:** `D1` — Default configuration refactoring (status: `done`)
 - **Current Feature:** `A5` — Custom slog text handler with format template (proposed, priority 5, no blockers)
 - **Previous:** `S2` — Make ffmpeg binary configurable via app configuration (done)
-- **Also proposed:** `A5` — Custom slog text handler (priority 5, no blockers)
 
 ## What's Done
 
 | Feature | Status | Notes |
 |---|---|---|
+| D1 — Default configuration refactoring | done | Self-documenting defaults, `IsDefault`, `ErrDefaultConfig`, fail-fast startup |
 | C1 — Config package refactoring | done | `Logger.Path` → `""`; executor map seeded with 6 keys; `Validate()` added |
-| S1 — ScriptGeneration block | done | `Hardsub` moved from top-level to `ScriptGeneration.Hardsub`; `FfmpegBinary` added; breaking config change |
-| S2 — ffmpeg binary configurable | done | `|=ffmpeg_binary=|` placeholder in template; fallback to "ffmpeg"; config-driven path |
+| S1 — ScriptGeneration block | done | `Hardsub` moved into `ScriptGeneration.Hardsub`; `FfmpegBinary` added; breaking config change |
+| S2 — ffmpeg binary configurable | done | `|=ffmpeg_binary=|` placeholder in template; fallback to `"ffmpeg"`; config-driven path |
 
-## What's Proposed
+## D1 Implementation Summary
 
-| Feature | Priority | Blocked By | Effort |
-|---|---|---|---|
-| A5 — Custom slog text handler | 5 | — | 2-3 hours |
+**Goal:** built-in default config must be self-documenting placeholders; startup must fail fast when effective config equals the default.
 
-## S1 Implementation Summary (for S2 context)
-
-S1 introduced `ScriptGeneration` struct grouping all script-generation settings:
-
-```go
-type ScriptGeneration struct {
-    Hardsub      Hardsub `toml:"hardsub"`
-    FfmpegBinary string  `toml:"ffmpeg_binary,omitempty"`
-}
-```
-
-- `Hardsub` struct kept as standalone type, now only used within `ScriptGeneration`
-- TOML format: `[script_generation]` → `[script_generation.hardsub]` → `tag` + `ffmpeg_binary`
-- Breaking change: old `[hardsub]` section no longer works — users must migrate
-- All accessors updated: `cfg.Hardsub.Tag` → `cfg.ScriptGeneration.Hardsub.Tag`
-- `cmd_process.go` line 100: `HardsubTag: cfg.ScriptGeneration.Hardsub.Tag`
-- Default values: `Hardsub.Tag = "Forsirovannye"`, `FfmpegBinary = "ffmpeg"`
-
-**S1 tests:** `TestScriptGeneration_HardsubTag`, `TestScriptGeneration_FfmpegBinary`, `TestScriptGeneration_TOMLNewFormat`, `TestDefaultConfig_ScriptGeneration` (in `config_test.go`)
-
-## S2 Implementation Summary
-
-**Goal:** Make ffmpeg binary path configurable instead of hardcoded literal in template.
-
-**Files changed:**
+**Changes:**
 | File | Change |
 |---|---|
-| `internal/domain/script/config.go` | Added `FfmpegBinary string` field to `ScriptConfig` |
-| `internal/domain/script/template.go` | Replaced hardcoded `ffmpeg` with `|=ffmpeg_binary=|` placeholder (line 43) |
-| `internal/domain/script/script.go` | Added `replaceAll` for `ffmpeg_binary` with fallback to `"ffmpeg"` when empty |
-| `internal/app/pipeline/dto.go` | Added `FfmpegBinary string` field to `Options` |
-| `internal/app/pipeline/pipeline.go` | Added `ffmpegBinary` field to `Pipeline` struct; wired from `opts.FfmpegBinary` |
-| `internal/app/pipeline/config.go` | Added `ffmpegBinary` parameter to `buildScriptConfig`; passes to `ScriptConfig` |
-| `internal/infra/commands/cmd_process.go` | Wires `cfg.ScriptGeneration.FfmpegBinary` → pipeline options with `nonEmpty` fallback |
+| `internal/infra/config/config.go` | `defaultCFG()` now returns self-documenting placeholders (`/path/to/lazyam3/input`, `/path/to/lazyam3/output`, `/path/to/lazyam3/metadata.json`, `/path/to/lazyam3/storage.json`, `/path/to/lazyam3/lazyam3.log`, executor mirrors `/path/to/lazyam3/output/<key>`); added `ErrDefaultConfig` sentinel, `*DefaultConfigError{ConfigPath}`, `Config.IsDefault()` (reflect.DeepEqual vs `defaultCFG()`); `Load()` returns the typed error when the effective config equals the default |
+| `internal/app/app.go` | `AppModules.Init` passes `config.ErrDefaultConfig` through unwrapped (fail fast before logger/pipeline) |
+| `internal/infra/config/config_test.go` | Updated defaults tests; added `TestDefaultConfig_ContainsPlaceholders`, `TestIsDefault`, `TestLoad_DefaultConfigDetected`, `TestLoad_UserConfigNotDefault`, `TestLoad_ExplicitConfigEqualToDefault` |
 
-**Data flow:** config → Pipeline.Options.FfmpegBinary → Pipeline.ffmpegBinary → buildScriptConfig → ScriptConfig.FfmpegBinary → BuildScript template replacement → rendered script
-
-**Fallback:** empty string → `"ffmpeg"` (same pattern as ffprobe)
-
-**Tests added:**
-- `TestBuildScript_FfmpegBinary` — custom path `/opt/bin/ffmpeg-nvenc` appears in generated script
-- `TestBuildScript_FfmpegBinaryFallback` — empty FfmpegBinary falls back to `"ffmpeg"` in rendered script
-- `TestBuildScriptConfig_FfmpegBinary` — custom path stored in ScriptConfig
-- `TestBuildScriptConfig_FfmpegBinaryFallback` — empty FfmpegBinary in config
-- `TestBuildScriptConfig_FfmpegBinaryEmpty` — empty config still produces valid script with fallback
-
-
-## Key Technical Decisions
-
-### TOML Map Merge Semantics
-`go-toml/v2` **merges** decoded maps into existing seeded maps — missing keys keep seed values. This means:
-- Seeded executor paths become effective runtime values for configs lacking `[paths.executor]`
-- Partial sections (e.g. only 5 of 6 keys) fill the missing key from seed
-- `[hardsub]` is a breaking change — existing configs must migrate to `[script_generation.hardsub]` manualy
-
-### Config Loading
-`configmanager` uses `go-toml/v2` for TOML unmarshaling. **Does NOT support** `UnmarshalTOML` methods — uses standard `encoding/json`-style field mapping via TOML tags. Custom unmarshal hooks must be done in the `Load()` function after `configmanager` returns.
-
-### Pipeline Architecture
+**Error message (as implemented):**
+```text
+default configuration in use: edit the config file "<config file path>" and fill in the required fields (paths.generator.input_directory, paths.generator.output_directory, paths.generator.metadata_path) to enable processing
 ```
-cmd_process.go → Pipeline.Options → buildScriptConfig() → ScriptConfig → Build() → Renderer.Render()
-```
-- `p.destination` (from `cfg.Paths.GeneratorOutput()`) is where **both** source files and scripts land
-- `prepareFiles()` moves source files to `p.destination`
-- `Build()` writes scripts to `p.destination`
-- Executor paths (`target`, `buffer`, etc.) are separate from `p.destination` — they're used by generated scripts at runtime
 
-### S1 Seeding Strategy
-Executor seeds are derived paths (chosen by user):
-```
-target:        /tmp/lazyam3/output/target
-buffer:        /tmp/lazyam3/output
-in_progress:   /tmp/lazyam3/output
-done:          /tmp/lazyam3/output
-notifications: /tmp/lazyam3/output
-archive:       /tmp/lazyam3/output/archive
-```
-These mirror `buildScriptConfig` fallbacks for `root = Generator.OutputDirectory`. Trade-off: stale if user changes `output_directory` without updating executor keys.
+**Data flow:** `cmd/lazyam3` → Root `Before` → `AppModules.Init(configPath)` → `config.Load(configPath)` → `cfg.IsDefault()` → `*DefaultConfigError{ConfigPath}` → returned before logger creation / pipeline.
+
+## Key Technical Findings (D1)
+
+1. **configmanager `Manager.Path()` after `EnsureLoaded`:** on a fresh install the manager writes the default to the XDG path and `m.path` is then set to that file → the `DefaultConfigError.ConfigPath` points at the just-written default config file. `Load("")` uses `cm.EnsureLoaded()`; `Load(suggested)` uses `cm.DiscoverAndLoad(suggested)`.
+
+2. **TOML seed-merge semantics:** absent keys keep seeded values (verified: user TOML without `[logger]` inherits seeded `Logger.Level="info"`, `Terminal=true`, `Format="text"`, `Color=true`, and now `Path="/path/to/lazyam3/lazyam3.log"`). This became critical with D1: a user config that fills only the required generator paths inherits the new placeholder log path → file handler fails at logger init. Known trade-off, see below.
+
+3. **`reflect.DeepEqual` on `Config`:** works (all fields are strings/bools/maps of strings).
+
+4. **DiscoverAndLoad swallows validation errors:** falls through to standard paths; invalid explicit configs silently load the user's real config. Pre-existing BUG-2, not fixed here.
 
 ## Known Issues / Footguns
+
+### Default config detection misses partial defaults
+Equality-based detection (`IsDefault`) only fires when the effective config *fully* equals `defaultCFG()`. A user config that sets real input/output/metadata paths but leaves `[logger]` absent inherits the placeholder `logger.path` → startup fails at logger creation with "failed to create file handler: failed to open /path/to/lazyam3/lazyam3.log". Not a default-config error, so fail-fast does not catch it. Accepted trade-off of D1 placeholders; watch when A5 lands.
 
 ### DiscoverAndLoad Validation Swallowing
 `configmanager.DiscoverAndLoad` **swallows validation errors** and falls through to standard paths (e.g. `~/.config/lazyam3/config.toml`). An invalid explicit config silently loads the user's real config. Only surfaces when *no* candidate loads. This is a `configmanager` library behavior — not in scope to fix.
 
 ### Storage.Path Placeholder
-`Storage.Path` still has `"/path/to/file.json"` in `defaultCFG()`. Same class as the `Logger.Path` bug (would fail on first `Store()` use). **Out of scope** for C1; flag for future.
+Resolved by D1 — `defaultCFG()` now uses the self-documenting `/path/to/lazyam3/storage.json` placeholder.
 
 ### `--out` Flag Overrides Config
 In `cmd_process.go`, the `--out` flag overrides `cfg.Paths.GeneratorOutput()`. If you pass `--out /some/path`, both source files AND scripts land there — not the buffer directory. Use without flags to use config value.
-
-### configmanager Doesn't Support UnmarshalTOML
-`go-toml/v2` (used by `configmanager`) does NOT call custom `UnmarshalTOML` methods. If you need custom TOML handling, do it in `Load()` after `configmanager` returns, or add struct fields with TOML tags that capture the legacy format.
 
 ## Testing
 
@@ -120,29 +64,30 @@ In `cmd_process.go`, the `--out` flag overrides `cfg.Paths.GeneratorOutput()`. I
 
 ### Test Suite
 ```bash
-go test -race -cover ./...   # all tests
+go build ./...
+go test -race -cover ./...
+go vet ./...
+golangci-lint run ./...
 ```
 
-## Files Changed This Session (S2)
+## Files Changed This Session (D1)
 
 | File | Change |
 |---|---|
-| `internal/domain/script/config.go` | Added `FfmpegBinary string` field to `ScriptConfig` |
-| `internal/domain/script/template.go` | Replaced hardcoded `ffmpeg` with `|=ffmpeg_binary=|` placeholder |
-| `internal/domain/script/script.go` | Added `ffmpeg_binary` placeholder replacement with fallback to `"ffmpeg"` |
-| `internal/app/pipeline/dto.go` | Added `FfmpegBinary string` field to `Options` |
-| `internal/app/pipeline/pipeline.go` | Added `ffmpegBinary` field to `Pipeline`; wired from `opts.FfmpegBinary` |
-| `internal/app/pipeline/config.go` | Added `ffmpegBinary` parameter to `buildScriptConfig` |
-| `internal/app/pipeline/pipeline_test.go` | Updated existing tests for new `buildScriptConfig` signature; added 3 new tests |
-| `internal/domain/script/script_test.go` | Added `TestBuildScript_FfmpegBinary` and `TestBuildScript_FfmpegBinaryFallback` |
-| `internal/infra/commands/cmd_process.go` | Wires `cfg.ScriptGeneration.FfmpegBinary` with `nonEmpty("ffmpeg")` fallback |
-| `doc/feature_list.json` | S2 status → done, added outcome |
-| `doc/HANDOFF.md` | Updated with S2 summary |
+| `internal/infra/config/config.go` | Self-documenting `defaultCFG()` placeholders; `ErrDefaultConfig` + `*DefaultConfigError`; `Config.IsDefault()`; `Load()` default detection |
+| `internal/app/app.go` | `AppModules.Init` fail-fast passthrough for `config.ErrDefaultConfig` |
+| `internal/infra/config/config_test.go` | Updated defaults tests; added D1 tests (placeholders, IsDefault, fresh-install detection, user-config-not-default, explicit-default) |
+| `doc/feature_list.json` | D1 status → done, outcome + tests updated |
+| `doc/feature_index.md` | D1 status → done |
+| `doc/BACKLOG.md` | BUG-3 resolved note |
+| `doc/architecture.md` | Default fail-fast documented |
 
 ## What to Watch For
 
-1. **A5** if chosen: custom handler replaces `slog.TextHandler`. `colorLevelWriter` still works as post-processing wrapper.
-3. **Breaking configs:** S1 changed `[hardsub]` to `[script_generation.hardsub]`. Any user with old config will get default values (empty hardsub tag) until they update.
+1. **A5** next: custom slog text handler. `colorLevelWriter` still works as post-processing wrapper; file handler stays JSON.
+2. **Breaking configs:** S1 changed `[hardsub]` → `[script_generation.hardsub]`. Any user with old config gets default values until they update.
+3. **D1 trade-off:** equality-based detection also flags user configs that intentionally mirror the defaults.
+4. **`logger.path` placeholder:** with D1, a user config that omits `[logger]` inherits the placeholder and fails at logger init — known footgun above.
 
 ## Commands
 
@@ -152,3 +97,6 @@ go test -race -cover ./...
 go vet ./...
 golangci-lint run ./...
 ```
+
+## Live Test
+`scripts/live_test.sh` — passed end-to-end after D1 (6 units processed, 0 failed) with the real user config at `~/.config/lazyam3/config.toml`.
