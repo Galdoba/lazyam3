@@ -38,7 +38,7 @@
 - **A5** — Custom slog text handler with format template (proposed, priority 5)
   - Analysis saved to `doc/custom_slog_handler_proposal.md`
   - 4 options analyzed; Option 1 (custom handler + basic template) recommended
-- **S1** — Config struct refactor: ScriptGeneration block (proposed, priority 4)
+- **S1** — Config struct refactor: ScriptGeneration block (in_rewiew, priority 4)
   - Groups Hardsub + FfmpegBinary under one config block
   - Iterative: start with Hardsub + FfmpegBinary, add more later
 - **S2** — Make ffmpeg binary configurable (proposed, priority 4, blocked by S1)
@@ -67,4 +67,40 @@
 - **Features completed:** 5 (A2, A3, A4, C1, BUG-1)
 - **Features added:** 3 (A5, S1, S2)
 - **Tests added:** 9 (across config and logging packages)
+- **Gates passed:** `go build`, `go test -race -cover`, `go vet`, `golangci-lint run` — all clean
+
+## Session: S1 — Config struct refactor: ScriptGeneration block
+
+### Work Completed
+
+#### S1 — ScriptGeneration config block (done)
+- New `ScriptGeneration` struct in `internal/infra/config/config.go`:
+  ```go
+  type ScriptGeneration struct {
+      Hardsub      Hardsub `toml:"hardsub"`
+      FfmpegBinary string  `toml:"ffmpeg_binary,omitempty"`
+  }
+  ```
+- `Hardsub` moved from top-level `Config` into `ScriptGeneration.Hardsub`
+- `FfmpegBinary` added (default: `"ffmpeg"`)
+- TOML format changed: `[hardsub]` → `[script_generation.hardsub]` with `tag` + `ffmpeg_binary`
+- Breaking change: no backward compat — old `[hardsub]` section ignored by `go-toml/v2`
+- All accessors updated: `cfg.Hardsub.Tag` → `cfg.ScriptGeneration.Hardsub.Tag`
+- `cmd_process.go` line 100: `HardsubTag: cfg.ScriptGeneration.Hardsub.Tag`
+- Default values: `Hardsub.Tag = "Forsirovannye"`, `FfmpegBinary = "ffmpeg"`
+- 4 tests added: `TestScriptGeneration_HardsubTag`, `TestScriptGeneration_FfmpegBinary`, `TestScriptGeneration_TOMLNewFormat`, `TestDefaultConfig_ScriptGeneration`
+- `~/.config/lazyam3/config.toml` migrated manually
+- `scripts/live_test.sh` created — end-to-end pipeline test script
+
+### Key Technical Findings
+
+1. **configmanager doesn't support UnmarshalTOML:** `go-toml/v2` (used by configmanager) ignores custom `UnmarshalTOML` methods. Custom TOML handling must be done in `Load()` after `configmanager` returns, or via struct fields with TOML tags.
+
+2. **S1+S2 prepare template for configurable ffmpeg:** `ScriptGeneration.FfmpegBinary` field added in S1; S2 will wire it through pipeline → ScriptConfig → template placeholder.
+
+3. **Breaking config change:** `[hardsub]` → `[script_generation.hardsub]`. User config at `~/.config/lazyam3/config.toml` updated manually.
+
+### Metrics
+
+- **Lines changed:** ~30 lines of code, ~40 lines of tests
 - **Gates passed:** `go build`, `go test -race -cover`, `go vet`, `golangci-lint run` — all clean

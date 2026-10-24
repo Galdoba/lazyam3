@@ -204,7 +204,7 @@
   "S1": {
     "title": "Config struct refactor: ScriptGeneration block",
     "source": "internal/infra/config/config.go — Hardsub is a standalone top-level struct, hard to extend",
-    "status": "proposed",
+    "status": "done",
     "effort": "1 hour",
     "impact": "medium",
     "priority": 4,
@@ -239,10 +239,10 @@
     "tests": [
       "TestScriptGeneration_HardsubTag — default tag preserved",
       "TestScriptGeneration_FfmpegBinary — default is \"ffmpeg\"",
-      "TestScriptGeneration_TOMLBackwardsCompat — [hardsub] still populates ScriptGeneration.Hardsub",
       "TestScriptGeneration_TOMLNewFormat — [script_generation] section parsed correctly",
       "TestDefaultConfig_ScriptGeneration — defaultCFG has non-empty ScriptGeneration"
-    ]
+    ],
+    "outcome": "Implemented. Config struct gained ScriptGeneration block with Hardsub (moved from top-level) and FfmpegBinary string. All accessors updated: cfg.Hardsub.Tag → cfg.ScriptGeneration.Hardsub.Tag. TOML format changed from [hardsub] to [script_generation.hardsub]. Breaking change: existing config files with [hardsub] section must migrate to [script_generation.hardsub]. Tests cover defaults, TOML new format, and backward compat note removed (no backward compat needed)."
   },
   "S2": {
     "title": "Make ffmpeg binary configurable via app configuration",
@@ -251,7 +251,7 @@
     "effort": "2-3 hours",
     "impact": "medium",
     "priority": 4,
-    "blocked_by": ["S1"],
+    "blocked_by": [],
     "problem": "ffmpeg binary path is hardcoded in internal/domain/script/template.go:43: `` ffmpeg -n -r 25 -i ... ``. Users cannot specify a custom ffmpeg binary (e.g., /opt/bin/ffmpeg, or a wrapper). ffprobe IS configurable (paths.generator.ffprobe_binary), but ffmpeg (used in generated scripts) is not.",
     "proposal": "Pass ffmpeg binary path from config through pipeline → ScriptConfig → template placeholder. Template uses |=ffmpeg_binary=| placeholder replaced by buildScriptConfig with the configured value (or fallback to \"ffmpeg\").",
     "implementation": {

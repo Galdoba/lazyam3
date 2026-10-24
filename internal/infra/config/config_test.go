@@ -27,8 +27,8 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Storage.Path != "/path/to/file.json" {
 		t.Errorf("Storage.Path = %q, want %q", cfg.Storage.Path, "/path/to/file.json")
 	}
-	if cfg.Hardsub.Tag != "Forsirovannye" {
-		t.Errorf("Hardsub.Tag = %q, want %q", cfg.Hardsub.Tag, "Forsirovannye")
+	if cfg.ScriptGeneration.Hardsub.Tag != "Forsirovannye" {
+		t.Errorf("ScriptGeneration.Hardsub.Tag = %q, want %q", cfg.ScriptGeneration.Hardsub.Tag, "Forsirovannye")
 	}
 }
 
@@ -167,7 +167,8 @@ terminal = true
 [storage]
 path = 'c:\Users\pemaltynov\.config\lazyam3\storage.json'
 
-[hardsub]
+[script_generation]
+[script_generation.hardsub]
 tag = 'Forsirovannye'
 `
 	tmpDir := t.TempDir()
@@ -201,5 +202,57 @@ tag = 'Forsirovannye'
 		if got != tc.expected {
 			t.Errorf("Paths.ExecutorPath(%q) = %q, want %q", tc.key, got, tc.expected)
 		}
+	}
+}
+
+func TestScriptGeneration_HardsubTag(t *testing.T) {
+	cfg := defaultCFG()
+	if cfg.ScriptGeneration.Hardsub.Tag != "Forsirovannye" {
+		t.Errorf("ScriptGeneration.Hardsub.Tag = %q, want %q", cfg.ScriptGeneration.Hardsub.Tag, "Forsirovannye")
+	}
+}
+
+func TestScriptGeneration_FfmpegBinary(t *testing.T) {
+	cfg := defaultCFG()
+	if cfg.ScriptGeneration.FfmpegBinary != "ffmpeg" {
+		t.Errorf("ScriptGeneration.FfmpegBinary = %q, want %q", cfg.ScriptGeneration.FfmpegBinary, "ffmpeg")
+	}
+}
+
+func TestScriptGeneration_TOMLNewFormat(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("LAZYAM3_CONFIG", "")
+	t.Setenv("LAZYAM3_CONFIG_PATH", "")
+	toml := `[paths.generator]
+input_directory = '/in'
+output_directory = '/out'
+metadata_path = '/meta.json'
+
+[script_generation]
+ffmpeg_binary = '/opt/bin/ffmpeg'
+
+[script_generation.hardsub]
+tag = 'NewFormatTag'
+`
+	path := writeConfig(t, toml)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg.ScriptGeneration.Hardsub.Tag != "NewFormatTag" {
+		t.Errorf("ScriptGeneration.Hardsub.Tag = %q, want %q", cfg.ScriptGeneration.Hardsub.Tag, "NewFormatTag")
+	}
+	if cfg.ScriptGeneration.FfmpegBinary != "/opt/bin/ffmpeg" {
+		t.Errorf("ScriptGeneration.FfmpegBinary = %q, want %q", cfg.ScriptGeneration.FfmpegBinary, "/opt/bin/ffmpeg")
+	}
+}
+
+func TestScriptGeneration_DefaultConfig(t *testing.T) {
+	cfg := defaultCFG()
+	if cfg.ScriptGeneration.Hardsub.Tag == "" {
+		t.Error("ScriptGeneration.Hardsub.Tag should be non-empty")
+	}
+	if cfg.ScriptGeneration.FfmpegBinary == "" {
+		t.Error("ScriptGeneration.FfmpegBinary should be non-empty")
 	}
 }

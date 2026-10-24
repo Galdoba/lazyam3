@@ -97,7 +97,7 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 			SourceDir:     sourceDir,
 			Destination:   destination,
 			ExecutorPaths: cfg.Paths.Executor,
-			HardsubTag:    cfg.Hardsub.Tag,
+			HardsubTag:    cfg.ScriptGeneration.Hardsub.Tag,
 			CFG:           cfg,
 		})
 

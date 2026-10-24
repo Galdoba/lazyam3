@@ -11,10 +11,16 @@ const (
 )
 
 type Config struct {
-	Paths   Paths   `toml:"paths"`
-	Logger  Logging `toml:"logger"`
-	Storage Storage `toml:"storage"`
-	Hardsub Hardsub `toml:"hardsub"`
+	Paths            Paths            `toml:"paths"`
+	Logger           Logging          `toml:"logger"`
+	Storage          Storage          `toml:"storage"`
+	ScriptGeneration ScriptGeneration `toml:"script_generation"`
+}
+
+// ScriptGeneration holds all script-generation settings.
+type ScriptGeneration struct {
+	Hardsub      Hardsub `toml:"hardsub"`
+	FfmpegBinary string  `toml:"ffmpeg_binary,omitempty"`
 }
 
 // Hardsub holds hardsub classification rules.
@@ -97,8 +103,9 @@ func defaultCFG() Config {
 		Storage: Storage{
 			Path: "/path/to/file.json",
 		},
-		Hardsub: Hardsub{
-			Tag: "Forsirovannye",
+		ScriptGeneration: ScriptGeneration{
+			Hardsub:      Hardsub{Tag: "Forsirovannye"},
+			FfmpegBinary: "ffmpeg",
 		},
 	}
 }

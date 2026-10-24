@@ -6,11 +6,21 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 
 ## Current Feature
 
-> **Work on: `S1` — Config struct refactor: ScriptGeneration block** (`doc/feature_list.json`)
+> **Work on: `S2` — Make ffmpeg binary configurable via app configuration** (`doc/feature_list.json`)
 >
-> Status: `proposed` · blocked_by: `[]` · effort: 1 hour · priority: 4
+> Status: `proposed` · blocked_by: `[]` · effort: 2-3 hours · priority: 4
 
 Selection rule: pick the highest-priority feature in `doc/feature_list.json` whose `blocked_by` list is empty and whose `status` is `proposed`. When a feature is done, set its `status` to `in_rewiew` in `doc/feature_list.json` before moving on.
+
+## Live Test
+
+`scripts/live_test.sh` — resets the testing ground and runs a full pipeline pass:
+- Wipes all files in `~/workspace/lazyam3/` (files only, keeps directories)
+- Copies `testdata/synthetic/` → `incoming/`
+- Builds lazyam3 and runs `process --once` (no flags — uses config)
+- Prints all files in the test ground
+
+Run before/after any pipeline change to verify end-to-end behavior.
 
 ## Documentation Index
 
@@ -60,7 +70,7 @@ platform (internal/platform/*)     ← Stateless services (no domain deps)
 |---|---|
 | `github.com/urfave/cli/v3` | CLI framework (direct dependency) |
 | `charm.land/bubbletea/v2` | TUI framework (`internal/presentation/tui`, not wired yet) |
-| `github.com/Galdoba/appcontext` | Config loading via configmanager (TOML; `[hardsub] tag` for HSUB detection) |
+| `github.com/Galdoba/appcontext` | Config loading via configmanager (TOML; `[script_generation.hardsub.tag]` for HSUB detection) |
 | `github.com/tidwall/gjson` | JSON querying (`scrips/asses` tool) |
 
 ## Project Rules
@@ -71,6 +81,8 @@ platform (internal/platform/*)     ← Stateless services (no domain deps)
 - Every fixed bug MUST produce a test
 - New features MUST list their tests in `doc/feature_list.json`
 - Update **Current Feature** in this file when starting/finishing work
+- HANDOFF.md is always to be REWRITTEN completly with your personal findings
+- PROGRESS.md is APPEND only
 
 ### Code
 - Domains are pure — no imports from infra or app
