@@ -1,7 +1,7 @@
 // Package callname is the pure source-file naming domain. It constructs
 // self-documenting call names for MediaUnit files before the rendering
 // script operates on them. Translit logic is duplicated from
-// script/translit (deprecated once callname replaces it — §8 Decisions
+// internal to callname — transliteration engine for Cyrillic→Latin conversion
 // in doc/callname_plan.md).
 //
 // Examples

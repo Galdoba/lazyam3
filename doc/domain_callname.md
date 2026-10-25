@@ -17,7 +17,7 @@ The callname domain constructs self-documenting filenames for both input (source
   - **Ingest** — provides the `MediaUnit` (streams, filenames, PRT timestamp) consumed by `PredictOutputs()`.
   - **Metadata** — provides the `Product` record (SeriesTitle, SeasonNumber, EpisodeNumber, Kind) used by both input and output naming logic.
   - **Script** — consumes `PredictedOutput` and `CallNames` from callname to build rendering scripts that reference the correct filenames.
-  - **Translit (internal)** — a self-contained Cyrillic transliteration subsystem (`callname/translit/`) that converts Unicode titles into ASCII-safe filename components. Duplicated from `script/translit` to maintain domain purity.
+  - **Translit (internal)** — a self-contained Cyrillic transliteration subsystem (`callname/translit/`) that converts Unicode titles into ASCII-safe filename components.
 - **Key business rules:** Input call names follow the pattern `{Base}_{sN}{eM}_PRT{timestamp}_id{ID}[-{file_tags}]{ext}`. Output predictions follow `{Base}{seasonDir}/{Base}{nameTag}_PRT{timestamp}_HD.{ext}` for video, `{Base}{nameTag}_PRT{timestamp}_HD_AUDIO{index}_{lang}{layout}.m4a` for audio, and `{Base}{nameTag}_PRT{timestamp}_HD.srt` for subtitles. Products without season/episode numbers (movies) omit the `s`/`e` fragments. Cyrillic titles are transliterated using a configurable transliteration engine with a default Russian→Latin literal map.
 
 ## 3. Boundaries & Interactions
@@ -51,7 +51,7 @@ The callname domain constructs self-documenting filenames for both input (source
 | **FileTags** | Per-file suffixes extracted from the original filename (e.g. `["rus", "Russkii", "Forsirovannye"]`). | "filename tags", "file descriptors" |
 | **HSUB** | Hardsub file — a subtitle file whose name contains the configured hardsub tag. | "hard subtitle", "burned subtitle" |
 | **layoutTag** | Channel-layout suffix used in output filenames ("20"=stereo, "51"=5.1, "70"=7.1, "10"=mono). | "audio layout", "channel suffix" |
-| **Translit** | Cyrillic-to-Latin transliteration subsystem. Duplicated from `script/translit` for domain purity. | "transliteration", "Cyrillic converter" |
+| **Translit** | Cyrillic-to-Latin transliteration subsystem. Self-contained, no external dependencies. | "transliteration", "Cyrillic converter" |
 
 ## 5. Key Scenarios / Use Cases
 
@@ -165,6 +165,6 @@ The callname domain constructs self-documenting filenames for both input (source
 - [ ] Should `deriveOutBase` handle edge cases where the SeriesTitle is entirely numeric or contains characters not covered by the transliteration map?
 - [ ] The `ScriptInput` struct is used both as a builder (via `BuildInputName`) and as a DTO (via `String()`). Should these be separate types to clarify intent?
 - [ ] Should `PredictScriptName` accept a `MediaUnit` parameter for the PRT timestamp, or keep the separate `timestamp` argument (which can be redundant with `unit.PRTTimestamp`)?
-- [ ] The transliteration subsystem is duplicated from `script/translit`. Should it be moved to a shared `platform/translit` package to eliminate duplication, or is the duplication intentional for domain purity?
+- [ ] The transliteration subsystem is duplicated from `script/translit` — the duplication was intentional for domain purity. Should it be moved to a shared `platform/translit` package instead?
 - [ ] Should `PredictOutputs` include a prediction for the ready-file (the marker file written after rendering completes), or is that entirely within the Script domain's responsibility?
 - [ ] The `prodID` parameter in `PredictOutputs` is used to append `_idN` to output base names. Should this be derived from `unit.ID` instead of passed separately?

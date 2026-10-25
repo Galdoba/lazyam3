@@ -60,7 +60,6 @@ Language of rendering script generation. Types: `Script`, `ScriptConfig`, `Strea
 │   │   ├── ingest/                 # physical files and streams (see doc/ingest.md)
 │   │   ├── metadata/               # product catalog (see doc/metadata.md)
 │   │   └── script/                 # rendering script generation
-│   │       └── translit/           # Cyrillic→Latin transliteration (script subdomain)
 │   │
 │   ├── infra/                      # PORT IMPLEMENTATIONS. Knows about the outside world. Depends on domain.
 │   │   ├── cache/                  # in-memory cache
