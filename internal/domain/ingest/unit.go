@@ -15,17 +15,20 @@ type MediaUnit struct {
 }
 
 func newMediaUnit() MediaUnit {
+	//log=debug msg="new media unit created"
 	mu := MediaUnit{}
 	mu.Streams = make(map[string]Stream)
 	return mu
 }
 
 func NewMediaUnit(data map[string][]byte) (MediaUnit, error) {
+	//log=info msg="parsing media unit from %d files", len(data)
 	mu := newMediaUnit()
 	parsed := make(map[string][]Stream, len(data))
 	for filename, probe := range data {
 		streams, err := parseStreams(probe)
 		if err != nil {
+			//log=error msg="failed to parse probe data for %q: %v", filename, err
 			return MediaUnit{}, fmt.Errorf("failed to parse data for %q: %w", filename, err)
 		}
 		parsed[filename] = streams
@@ -50,9 +53,11 @@ func NewMediaUnit(data map[string][]byte) (MediaUnit, error) {
 		}
 		id, err := ExtractID(filename)
 		if err != nil {
+			//log=error msg="failed to extract ID from %q: %v", filename, err
 			return MediaUnit{}, err
 		}
 		if mu.ID != 0 && mu.ID != id {
+			//log=error msg="inconsistent IDs: %d and %d in same unit", mu.ID, id
 			return MediaUnit{}, fmt.Errorf("inconsistent IDs: %d and %d in same unit", mu.ID, id)
 		} else {
 			mu.ID = id
@@ -87,6 +92,7 @@ func rationalMeanFloat(rs []Rational) float64 {
 }
 
 // ValidateMediaUnit returns domain-level validation issues for the given streams.
+//log=info msg="validating media unit: %d streams", len(streams)
 func ValidateMediaUnit(streams []Stream) ValidationIssues {
 	var issues ValidationIssues
 
@@ -99,6 +105,7 @@ func ValidateMediaUnit(streams []Stream) ValidationIssues {
 	for i, s := range streams {
 		// Duplicate stream detection
 		if seen[s.coordinate()] {
+			//log=warn msg="duplicate stream coordinate at index %d: %s", i, s.coordinate()
 			issues = append(issues, ValidationIssue{
 				StreamIndex: i,
 				Field:       "coordinate",
@@ -110,6 +117,7 @@ func ValidateMediaUnit(streams []Stream) ValidationIssues {
 		if s.Kind == StreamKindVideo {
 			// Resolution must be at least SD
 			if s.Width > 0 && s.Height > 0 && (s.Width < 720 || s.Height < 576) {
+				//log=warn msg="video resolution %dx%d below SD (720x576) at stream %d", s.Width, s.Height, i
 				issues = append(issues, ValidationIssue{
 					StreamIndex: i,
 					Field:       "resolution",
@@ -127,6 +135,7 @@ func ValidateMediaUnit(streams []Stream) ValidationIssues {
 			durations = append(durations, s.Duration)
 			// Bitrate sanity
 			if s.BitRate > 0 && s.BitRate < 100000 {
+				//log=warn msg="video bitrate %d bps suspiciously low at stream %d", s.BitRate, i
 				issues = append(issues, ValidationIssue{
 					StreamIndex: i,
 					Field:       "bitrate",

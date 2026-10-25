@@ -40,6 +40,7 @@ type Pipeline struct {
 }
 
 // NewPipeline creates a new Pipeline instance.
+//log=debug msg="pipeline created: source=%s, destination=%s", opts.SourceDir, opts.Destination
 func NewPipeline(opts Options) *Pipeline {
 	pollInterval := opts.PollInterval
 	if pollInterval <= 0 {
@@ -66,6 +67,7 @@ func NewPipeline(opts Options) *Pipeline {
 
 // Run executes the pipeline loop until the context is cancelled.
 // Totals are aggregated across all scan passes.
+//log=info msg="pipeline loop started, poll_interval=%v", pollInterval
 func (p *Pipeline) Run(ctx context.Context) (RunOutput, error) {
 	var total RunOutput
 	ticker := time.NewTicker(p.pollInterval)
@@ -73,6 +75,7 @@ func (p *Pipeline) Run(ctx context.Context) (RunOutput, error) {
 	for {
 		select {
 		case <-ctx.Done():
+			//log=info msg="pipeline stopped: %v", ctx.Err()
 			return total, ctx.Err()
 		default:
 		}
@@ -86,6 +89,7 @@ func (p *Pipeline) Run(ctx context.Context) (RunOutput, error) {
 				return total, err
 			}
 			p.logger.Warn("scan failed", "error", err)
+		//log=warn msg="scan failed: %v", err
 		}
 		total.Processed += out.Processed
 		total.Failed += out.Failed
@@ -116,22 +120,26 @@ func (p *Pipeline) Run(ctx context.Context) (RunOutput, error) {
 func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 	var out RunOutput
 	if err := ctx.Err(); err != nil {
+		//log=error msg="scan %q failed: %v", p.sourceDir, err
 		return out, err
 	}
 
 	p.logger.Info("scan")
+	//log=info msg="scan started"
 	snap, err := fso.Scan(p.sourceDir, fso.DefaultOptions())
 	if err != nil {
 		return out, fmt.Errorf("scan %q: %w", p.sourceDir, err)
 	}
 	dirs := snap.TopDirsAllFilesWritable()
 	p.logger.Info("dirs found", "count", len(dirs))
+	//log=info msg="scan complete: %d writable directories found", len(dirs)
 
 	for _, d := range dirs {
 		if err := ctx.Err(); err != nil {
 			return out, err
 		}
 		if err := p.processUnit(ctx, d.Path); err != nil {
+			//log=error msg="processing failed for unit: dir=%s", d.Path
 			out.Failed++
 			continue
 		}
@@ -143,10 +151,12 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 }
 
 // processUnit runs the full chain for one media unit directory.
+//log=info msg="processing unit: %s", dir
 func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 	p.logger.Info("processing", "dir", dir)
 	unit, err := p.in.Ingest(dir)
 	if err != nil {
+		//log=error msg="ingest failed for %s: %v", dir, err
 		p.emit(EventUnitFailed, 0, err)
 		return err
 	}
@@ -154,13 +164,16 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 	if err != nil {
 		p.logger.Warn("metadata lookup failed, using fallback naming",
 			"id", unit.ID, "dir", dir, "error", err)
+		//log=warn msg="metadata not found for unit %d, using fallback", unit.ID
 		prod = fallbackProduct(filepath.Base(dir), unit.ID)
 	} else if prod == nil {
+		//log=warn msg="metadata not found for unit %d, using fallback naming", unit.ID
 		p.logger.Warn("metadata not found, using fallback naming",
 			"id", unit.ID, "dir", dir, "fallback_base", filepath.Base(dir))
 		prod = fallbackProduct(filepath.Base(dir), unit.ID)
 	}
 	if p.dryRun {
+		//log=info msg="dry run: skipping script build for unit %d", unit.ID
 		p.logger.Info("dry run: script build skipped", "id", unit.ID)
 		p.emit(EventUnitDone, unit.ID, nil)
 		return nil
@@ -172,11 +185,13 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 	}
 	// Move source files to OUTPUT directory (same place where scripts land).
 	if err := p.prepareFiles(dir, cfg.CallNames, p.destination); err != nil {
+		//log=error msg="prepare files failed for unit %d: %v", unit.ID, err
 		p.emit(EventUnitFailed, unit.ID, fmt.Errorf("prepare files: %w", err))
 		return err
 	}
 	// Build and write the script.
 	if err := appscript.Build(ctx, cfg, p.rd); err != nil {
+		//log=error msg="script build failed for unit %d: %v", unit.ID, err
 		p.emit(EventUnitFailed, unit.ID, err)
 		return err
 	}
@@ -205,6 +220,7 @@ func (p *Pipeline) prepareFiles(sourceDir string, callNames map[string]string, b
 }
 
 func (p *Pipeline) emit(t EventType, id int64, err error) {
+	//log=debug msg="event emitted: type=%s, id=%d", t, id
 	if p.events != nil {
 		p.events <- PipelineEvent{Type: t, ID: id, Error: err}
 	}

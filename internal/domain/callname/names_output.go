@@ -33,6 +33,7 @@ type PredictedOutput struct {
 // as the script domain (video, audio, SRT) without depending on it.
 // hardsubTag is a filename substring that marks sidecar subtitles as hardsub.
 // prodID is the product ID, used in output filenames as _idN.
+//log=info msg="predicting outputs for unit %d", unit.ID
 func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot, hardsubTag string, prodID int64) []PredictedOutput {
 	streams := make([]ingest.Stream, 0, len(unit.Streams))
 	for _, s := range unit.Streams {
@@ -77,6 +78,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot,
 
 	// Detect hardsub: a subtitle file whose name contains the hardsub tag.
 	hsubFile := detectHSUB(unit.Filenames, hardsubTag)
+	//log=debug msg="hardsub detected: %s", hsubFile
 
 	var outputs []PredictedOutput
 

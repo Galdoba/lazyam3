@@ -21,11 +21,11 @@ Write a replacement handler implementing `slog.Handler`, rendering a format stri
 ```toml
 [logger]
 format = 'text'
-format_text = '{time} [{level}] {msg} {attrs}'
+format_text = '{time} [{level}] {module}: {msg} {attrs}'
 ```
 
 **How it works:**
-- Parse template into segments (literal text + `{time}`, `{level}`, `{msg}`, `{attrs}` placeholders)
+- Parse template into segments (literal text + `{time}`, `{level}`, `{moduule}`, `{msg}`, `{attrs}` placeholders)
 - `Handle()` renders each segment against the `slog.Record`
 - `WithAttrs()` accumulates attrs in the handler; `WithGroup()` adds a key prefix
 - `Enabled()` compares level; `Attrs()` iterates over accumulated attrs + record attrs

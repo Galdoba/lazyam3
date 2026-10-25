@@ -11,6 +11,7 @@ type Cache struct {
 }
 
 // New creates an empty cache.
+//log=debug msg="cache created"
 func New() *Cache {
 	return &Cache{
 		data: make(map[string]any),
@@ -26,6 +27,7 @@ func (c *Cache) Get(key string) (any, bool) {
 }
 
 // Set writes a value.
+//log=debug msg="cache set key=%s", key
 func (c *Cache) Set(key string, value any) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -33,6 +35,7 @@ func (c *Cache) Set(key string, value any) {
 }
 
 // Delete removes a key.
+//log=debug msg="cache delete key=%s", key
 func (c *Cache) Delete(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -40,6 +43,7 @@ func (c *Cache) Delete(key string) {
 }
 
 // Clear clears the cache.
+//log=debug msg="cache cleared"
 func (c *Cache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()

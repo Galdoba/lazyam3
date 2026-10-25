@@ -17,6 +17,7 @@ type Ingest struct {
 }
 
 // New creates an Ingest that uses the given ffprobe binary path.
+//log=debug msg="ingest created with ffprobe=%s", ffprobeBinaryPath
 func New(ffprobeBinaryPath string) *Ingest {
 	return &Ingest{ffprobeBinary: ffprobeBinaryPath}
 }
@@ -25,9 +26,11 @@ func New(ffprobeBinaryPath string) *Ingest {
 // a MediaUnit. Non-regular entries (directories, symlinks, etc.) are skipped.
 // Subtitle sidecar files (.srt, .ass, .ssa) that ffprobe cannot probe are
 // recorded in Filenames so the pipeline can later classify them as SRT or HSUB.
+//log=info msg="ingesting directory: %s", dir
 func (ing *Ingest) Ingest(dir string) (ingest.MediaUnit, error) {
 	fls, err := os.ReadDir(dir)
 	if err != nil {
+		//log=error msg="failed to read directory %s: %v", dir, err
 		return ingest.MediaUnit{}, err
 	}
 	dirData := make(map[string][]byte)
@@ -45,11 +48,13 @@ func (ing *Ingest) Ingest(dir string) (ingest.MediaUnit, error) {
 				continue
 			}
 			return ingest.MediaUnit{}, fmt.Errorf("failed to probe file %q: %w", path, err)
+		//log=error msg="failed to probe file %q: %v", path, err
 		}
 		dirData[f.Name()] = data
 	}
 	mu, err := ingest.NewMediaUnit(dirData)
 	if err != nil {
+		//log=error msg="failed to parse data for unit: %v", err
 		return ingest.MediaUnit{}, err
 	}
 	mu.Filenames = append(mu.Filenames, sidecars...)

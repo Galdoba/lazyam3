@@ -38,6 +38,7 @@ func New() *AppModules {
 
 // Init loads the config (respecting the explicit path from the flag) and creates the logger.
 // Called once from Root.Before. Idempotent.
+//log=info msg="modules initialized"
 func (m *AppModules) Init(configPath string) error {
 	if m.Logger != nil {
 		return nil // already initialized
@@ -45,6 +46,7 @@ func (m *AppModules) Init(configPath string) error {
 
 	cfg, err := config.Load(configPath)
 	if err != nil {
+		//log=error msg="failed to load config: %v", err
 		if errors.Is(err, config.ErrDefaultConfig) {
 			return err
 		}
@@ -53,6 +55,7 @@ func (m *AppModules) Init(configPath string) error {
 
 	logger, err := logging.NewLogger(cfg.Logger)
 	if err != nil {
+		//log=error msg="failed to init logger: %v", err
 		return fmt.Errorf("failed to init logger: %w", err)
 	}
 

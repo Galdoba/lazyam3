@@ -216,8 +216,10 @@ func (c Config) Validate() error {
 }
 
 func Load(suggestedPath string) (Config, error) {
+	//log=info msg="loading config from: %s", suggestedPath
 	cm, err := configmanager.New(APPNAME, defaultCFG(), configmanager.WithFormat(configmanager.TOML))
 	if err != nil {
+		//log=error msg="failed to create configmanager: %v", err
 		return Config{}, fmt.Errorf("failed to create configmanager: %w", err)
 	}
 	var configPath string
@@ -235,6 +237,7 @@ func Load(suggestedPath string) (Config, error) {
 	}
 	cfg := cm.Config()
 	if cfg.IsDefault() {
+		//log=warn msg="using default configuration, user must edit: %s", configPath
 		return Config{}, &DefaultConfigError{ConfigPath: configPath}
 	}
 	return cfg, nil

@@ -69,25 +69,30 @@ func DefaultOptions() *Options {
 // Scan recursively traverses root and returns a Snapshot.
 // It returns an error only if the snapshot cannot be built
 // (root does not exist / is not a directory / is not readable).
+//log=info msg="scanning directory: %s", root
 func Scan(root string, opts *Options) (*Snapshot, error) {
 	if opts == nil {
 		opts = DefaultOptions()
 	}
 	rootAbs, err := filepath.Abs(root)
 	if err != nil {
+		//log=error msg="failed to resolve root path: %v", err
 		return nil, fmt.Errorf("resolve root: %w", err)
 	}
 	info, err := os.Stat(rootAbs)
 	if err != nil {
+		//log=error msg="failed to stat root %q: %v", rootAbs, err
 		return nil, fmt.Errorf("stat root: %w", err)
 	}
 	if !info.IsDir() {
+		//log=error msg="root %q is not a directory", rootAbs
 		return nil, fmt.Errorf("root %q is not a directory", rootAbs)
 	}
 	// Preflight: if the root is not readable, there's no point going further —
 	// we'd get an empty snapshot with no data. This is the only case
 	// where a directory problem is considered fatal.
 	if _, err := os.ReadDir(rootAbs); err != nil {
+		//log=error msg="failed to read root directory: %v", err
 		return nil, fmt.Errorf("readdir root: %w", err)
 	}
 

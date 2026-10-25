@@ -28,9 +28,11 @@ type Script struct {
 // BuildScript creates a rendering script from the given config.
 // Predictions are the single source of truth for output names.
 // If predictions are not set, they are derived from Product + Streams.
+//log=info msg="building script for destination: %s", cfg.Destination
 func BuildScript(cfg ScriptConfig) (Script, error) {
 	// Validate inputs
 	if err := validateConfig(cfg); err != nil {
+		//log=error msg="script config validation failed: %v", err
 		return Script{}, err
 	}
 
@@ -93,6 +95,7 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 
 	// Validate no unresolved placeholders remain
 	if unresolved := findUnresolved(content); len(unresolved) > 0 {
+		//log=error msg="unresolved placeholders in template: %s", strings.Join(unresolved, ", ")
 		return Script{}, fmt.Errorf("unresolved placeholders: %s", strings.Join(unresolved, ", "))
 	}
 
@@ -104,6 +107,7 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 
 // selectAudioTracksFromPredictions extracts audio stream indices from predictions
 // for use in the audio filter_complex.
+//log=debug msg="selecting %d audio tracks", len(cfg.Streams)
 func selectAudioTracksFromPredictions(cfg ScriptConfig) []audioTrack {
 	var tracks []audioTrack
 	// Collect audio streams in order
@@ -143,12 +147,15 @@ func selectAudioTracksFromPredictions(cfg ScriptConfig) []audioTrack {
 }
 
 // validateConfig checks that the config has all required data.
+//log=debug msg="validating script config: destination=%s, streams=%d", cfg.Destination, len(cfg.Streams)
 func validateConfig(cfg ScriptConfig) error {
 	if cfg.Destination == "" {
+		//log=error msg="script destination must not be empty"
 		return fmt.Errorf("script: destination must not be empty")
 	}
 
 	if len(cfg.Streams) == 0 {
+		//log=error msg="at least one stream is required"
 		return fmt.Errorf("script: at least one stream is required")
 	}
 
@@ -161,6 +168,7 @@ func validateConfig(cfg ScriptConfig) error {
 		}
 	}
 	if !hasVideo {
+		//log=error msg="at least one video stream is required"
 		return fmt.Errorf("script: at least one video stream is required")
 	}
 
@@ -174,6 +182,7 @@ func validateConfig(cfg ScriptConfig) error {
 			}
 		}
 		if !found {
+			//log=error msg="selection [%d:%s:%d] references non-existent stream", sel.InputIndex, sel.Kind, sel.StreamIndex
 			return fmt.Errorf("script: selection [%d:%s:%d] references non-existent stream", sel.InputIndex, sel.Kind, sel.StreamIndex)
 		}
 	}
