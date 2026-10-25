@@ -6,11 +6,11 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 
 ## Current Feature
 
-> **Work on**: refactoring
+> **Work on**: dormancy period for cyclic mode
 >
-> Status: `planning` 
+> Status: `in_review` 
 
-> **Just finished: `S3` — Configurable hardsub parameters** (`doc/feature_list.json`) — status: `done` · effort: 2-3 hours · priority: 4
+> **Just finished: `D1` — Dormancy period for cyclic mode** (`doc/cycling_mode.md`) — status: `in_review` · effort: 1-2 hours · priority: 4
 
 Selection rule: pick the highest-priority feature in `doc/feature_list.json` whose `blocked_by` list is empty and whose `status` is `proposed`. When a feature is done, set its `status` to `in_rewiew` in `doc/feature_list.json` before moving on.
 
@@ -99,63 +99,7 @@ platform (internal/platform/*)     ← Stateless services (no domain deps)
 - Do NOT fix the bugs which unrelated to current feature
 - Be honest
 - Be carefull on your judjements
+- If unsure: ASK!!!
 
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
-## 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-## 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.

@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"time"
+
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 	"github.com/Galdoba/lazyam3/internal/domain/script"
@@ -28,14 +30,16 @@ type Options struct {
 	Renderer script.Renderer
 
 	// Config
-	SourceDir     string
-	Destination   string
-	DryRun        bool
-	HardsubTag    string              // filename tag marking sidecar subtitles as hardsub (burn-in)
-	Harsub        script.HarsubConfig // hardsub burn-in parameters for the subtitles filter
-	FfmpegBinary  string              // path to ffmpeg binary for generated scripts
-	ExecutorPaths map[string]string   // executor filesystem paths from config
-	CFG           config.Config
+	SourceDir      string
+	Destination    string
+	DryRun         bool
+	HardsubTag     string              // filename tag marking sidecar subtitles as hardsub (burn-in)
+	Harsub         script.HarsubConfig // hardsub burn-in parameters for the subtitles filter
+	FfmpegBinary   string              // path to ffmpeg binary for generated scripts
+	ExecutorPaths  map[string]string   // executor filesystem paths from config
+	PollInterval   time.Duration       // interval between scan passes; 0 → default
+	DormancyPeriod time.Duration       // sleep after each pass; 0 → disabled (polling)
+	CFG            config.Config
 }
 
 // PipelineEvent is a signal emitted by the Pipeline during processing.

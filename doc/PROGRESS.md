@@ -198,3 +198,65 @@ default configuration in use: edit the config file "<config file path>" and fill
 #### Notes
 - S3 is ready to commit. The feature_list.json `status` is already `done`.
 - Next feature: `S4` — Configurable ffmpeg/filter command parameters (in_review).
+
+### Pipeline loop: poll interval + ticker (this session)
+
+#### Changes
+- `internal/app/pipeline/pipeline.go` — `Run` now waits via `time.NewTicker(p.pollInterval)`; ad-hoc `afterPoll` channel + `debugTumeout` sleep removed; `defaultPollInterval = 1s`.
+- `internal/app/pipeline/dto.go` — `Options.PollInterval` added (0 → default).
+
+#### Tests
+- Added `TestNewPipeline_PollIntervalDefault`, `TestRun_LoopsUntilContextCancelled`; full suite green.
+
+#### Gates
+- `go build ./...`, `go vet ./...`, `gofmt -l`, `golangci-lint run ./...` → clean; `go test -race ./...` → ok.
+
+## Session: D1 — Dormancy period for cyclic mode
+
+### Work Completed
+
+#### D1 — Dormancy period for cyclic mode (done)
+
+- **Problem:** The cyclic mode polls every 1 second even when the pipeline is idle, wasting CPU cycles. No concept of "process once, then rest for N minutes."
+- **Solution:** Configurable dormancy period after each scan pass. Zero value preserves current polling behaviour.
+
+**Config:**
+- `internal/infra/config/config.go` — new `PipelineConfig` struct with `DormancyPeriod int` (seconds); `Config` gains `Pipeline` field; `defaultCFG()` sets `DormancyPeriod: 0`
+- TOML: `[pipeline]` section with `dormancy_period = 10` (integer seconds)
+
+**Pipeline:**
+- `internal/app/pipeline/dto.go` — `DormancyPeriod time.Duration` added to `Options`
+- `internal/app/pipeline/pipeline.go` — `Pipeline.dormancyPeriod` field; `NewPipeline` copies from options; `Run()` sleeps `dormancyPeriod` after each pass when > 0 (cancellable via context), falls back to polling ticker when == 0
+
+**Wiring:**
+- `internal/infra/commands/cmd_process.go` — `--dormancy` flag (Duration); falls back to `cfg.Pipeline.DormancyPeriod * time.Second`
+
+**Files changed:**
+- `internal/infra/config/config.go` — `PipelineConfig` struct, `Pipeline` field on `Config`, `defaultCFG` update
+- `internal/app/pipeline/dto.go` — `DormancyPeriod` on `Options`
+- `internal/app/pipeline/pipeline.go` — `dormancyPeriod` field, `NewPipeline` wiring, `Run()` dormancy logic
+- `internal/infra/commands/cmd_process.go` — `--dormancy` flag, config wiring with int→Duration conversion
+- `internal/app/pipeline/pipeline_test.go` — 5 new tests
+- `doc/feature_list.json` — D1 feature entry
+- `AGENTS.md` — current feature updated
+
+**Tests added:**
+- `TestNewPipeline_DormancyPeriodDefault` — zero value means disabled
+- `TestRun_DormancyMode_SleepsBetweenPasses` — verifies sleep between passes with fast duration
+- `TestRun_DormancyMode_ContextCancelledDuringSleep` — context cancellation during dormancy exits loop
+- `TestRun_DormancyDisabled_Polling` — zero dormancy uses polling ticker
+- `TestRun_DormancyMode_ContinuesAfterScanFailure` — sleep happens even after failed passes
+
+**Live test:**
+- Config loads correctly: `[pipeline]` section with `dormancy_period = 10` parses as int
+- Cyclic mode: scans 10 seconds apart (20:33:10 → 20:33:20) confirmed via debug timestamps
+- `--once` mode unaffected (bypasses `Run()`)
+
+**Metrics:**
+- **Lines changed:** ~60 lines of code, ~200 lines of tests (including test file additions)
+- **Gates passed:** `go build`, `go test -race -cover`, `go vet`, `golangci-lint run` — all clean
+- **Live test:** passed end-to-end with config-driven 10s dormancy
+
+### What to Watch For
+- Next feature: `S4` — Configurable ffmpeg/filter command parameters (in_review).
+- `--dormancy` flag overrides config value; flag takes precedence.

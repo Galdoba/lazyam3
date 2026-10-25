@@ -225,7 +225,7 @@ The scan/probe/parse implementation is complete:
 4. Each directory is probed, parsed, and validated into a `MediaUnit`
 5. Events (`EventUnitDone`, `EventUnitFailed`) are emitted per unit
 
-By default `Pipeline.Run` polls every second until SIGINT/SIGTERM: the context is cancelled, the run stops after the current unit and the command logs `pipeline stopped` with the processed/failed totals and exits 0. `--once` runs a single scan pass (`RunOnce`) and exits the same way.
+By default `Pipeline.Run` polls every second (interval configurable via `Pipeline.Options.PollInterval`) until SIGINT/SIGTERM: the context is cancelled, the run stops after the current unit and the command logs `pipeline stopped` with the processed/failed totals and exits 0. `--once` runs a single scan pass (`RunOnce`) and exits the same way.
 
 `infra/fso.Prober` handles ffprobe execution and JSON parsing.
 
@@ -306,7 +306,7 @@ type Config struct {
 4. commands.CMDProcess action:
    a. Validate --source-root flag; resolve metadata/ffprobe paths (flag → config → default)
    b. Create app/ingest.Ingest, metadata.Repository, ensure work dirs, create Pipeline
-   c. --once → RunOnce (single pass); default → Run (polls until the context is cancelled)
+   c. --once → RunOnce (single pass); default → Run (polls until the context is cancelled; interval via `Pipeline.Options.PollInterval`)
    d. Log "pipeline finished/stopped" with processed/failed totals (exit 0 on signal)
 5. Root After: modules.Shutdown() closes store and logger
 ```

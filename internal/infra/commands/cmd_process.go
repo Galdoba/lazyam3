@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/urfave/cli/v3"
 
@@ -20,6 +21,7 @@ const (
 	pathFfprobe  = "ffprobe-path"
 	pathMetadata = "metadata-path"
 	pathOnce     = "once"
+	pathDormancy = "dormancy"
 )
 
 // CMDProcess is the process command — scans input directory, resolves metadata,
@@ -51,6 +53,10 @@ func CMDProcess(modules *app.AppModules) *cli.Command {
 			&cli.BoolFlag{
 				Name:  pathOnce,
 				Usage: "run a single scan pass and exit instead of polling",
+			},
+			&cli.DurationFlag{
+				Name:  pathDormancy,
+				Usage: "dormancy period between scan passes (0 = disabled, uses polling)",
 			},
 		},
 		Action: cmdProcessAction(modules),
@@ -88,20 +94,26 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 
 		events := make(chan pipeline.PipelineEvent, 100)
 
+		dormancy := c.Duration(pathDormancy)
+		if dormancy <= 0 {
+			dormancy = time.Duration(cfg.Pipeline.DormancyPeriod) * time.Second
+		}
+
 		p := pipeline.NewPipeline(pipeline.Options{
-			Logger:        modules.Logger.Group("pipeline"),
-			Ingest:        ingest.New(ffprobeBinary),
-			Metadata:      mdRepo,
-			Renderer:      scriptinfra.New(),
-			Events:        events,
-			SourceDir:     sourceDir,
-			Destination:   destination,
-			DryRun:        false,
-			HardsubTag:    cfg.ScriptGeneration.Hardsub.Tag,
-			Harsub:        pipeline.HardsubRulesToDomain(cfg.ScriptGeneration.Hardsub),
-			FfmpegBinary:  nonEmpty(cfg.ScriptGeneration.FfmpegBinary, "ffmpeg"),
-			ExecutorPaths: cfg.Paths.Executor,
-			CFG:           cfg,
+			Logger:         modules.Logger.Group("pipeline"),
+			Ingest:         ingest.New(ffprobeBinary),
+			Metadata:       mdRepo,
+			Renderer:       scriptinfra.New(),
+			Events:         events,
+			SourceDir:      sourceDir,
+			Destination:    destination,
+			DryRun:         false,
+			HardsubTag:     cfg.ScriptGeneration.Hardsub.Tag,
+			Harsub:         pipeline.HardsubRulesToDomain(cfg.ScriptGeneration.Hardsub),
+			FfmpegBinary:   nonEmpty(cfg.ScriptGeneration.FfmpegBinary, "ffmpeg"),
+			ExecutorPaths:  cfg.Paths.Executor,
+			DormancyPeriod: dormancy,
+			CFG:            cfg,
 		})
 
 		// TODO: start event consumer goroutine (analytics, TUI, etc.)

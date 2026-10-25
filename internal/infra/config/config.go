@@ -40,6 +40,7 @@ type Config struct {
 	Logger           Logging          `toml:"logger"`
 	Storage          Storage          `toml:"storage"`
 	ScriptGeneration ScriptGeneration `toml:"script_generation"`
+	Pipeline         PipelineConfig   `toml:"pipeline"`
 }
 
 // ScriptGeneration holds all script-generation settings.
@@ -80,6 +81,11 @@ type HardsubRules struct {
 // when replacing jsonstore with a real database, DSN, timeouts, etc. will be added here.
 type Storage struct {
 	Path string `toml:"path"`
+}
+
+// PipelineConfig holds pipeline-level settings.
+type PipelineConfig struct {
+	DormancyPeriod int `toml:"dormancy_period"` // seconds; 0 = disabled (current polling behaviour)
 }
 
 // GeneratorPaths holds directory paths used by the generator process.
@@ -179,6 +185,9 @@ func defaultCFG() Config {
 				Encoding:        1,
 			},
 			FfmpegBinary: "ffmpeg",
+		},
+		Pipeline: PipelineConfig{
+			DormancyPeriod: 0,
 		},
 	}
 }

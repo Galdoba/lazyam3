@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
@@ -297,6 +298,91 @@ func TestRun_CtxCancelled(t *testing.T) {
 	}
 }
 
+func TestNewPipeline_PollIntervalDefault(t *testing.T) {
+	p := NewPipeline(Options{})
+	if p.pollInterval != defaultPollInterval {
+		t.Errorf("NewPipeline() pollInterval = %v, want %v", p.pollInterval, defaultPollInterval)
+	}
+	p2 := NewPipeline(Options{PollInterval: 5 * time.Second})
+	if p2.pollInterval != 5*time.Second {
+		t.Errorf("NewPipeline() pollInterval = %v, want %v", p2.pollInterval, 5*time.Second)
+	}
+}
+
+func TestRun_LoopsUntilContextCancelled(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	p := NewPipeline(Options{
+		Logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Ingest:       &fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		Metadata:     &fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		Renderer:     &fakeRenderer{},
+		Events:       events,
+		SourceDir:    root,
+		Destination:  t.TempDir(),
+		DryRun:       false,
+		PollInterval: 10 * time.Millisecond,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	var out RunOutput
+	var runErr error
+	go func() {
+		defer close(done)
+		out, runErr = p.Run(ctx)
+	}()
+
+	// First pass: unit processed, source files moved to the buffer directory.
+	firstScanDone := make(chan struct{})
+	go func() {
+		for e := range events {
+			if e.Type == EventScanDone {
+				close(firstScanDone)
+				return
+			}
+		}
+	}()
+	select {
+	case <-firstScanDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for first scan done")
+	}
+
+	// Second pass: source is empty now (files were moved), scan done again.
+	secondScanDone := make(chan struct{})
+	go func() {
+		for e := range events {
+			if e.Type == EventScanDone {
+				close(secondScanDone)
+				return
+			}
+		}
+	}()
+	select {
+	case <-secondScanDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("expected second scan pass after poll interval")
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not return after context cancellation")
+	}
+	if !errors.Is(runErr, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context.Canceled", runErr)
+	}
+	if out.Processed != 1 {
+		t.Errorf("Run() totals after two passes = %+v, want Processed=1", out)
+	}
+}
+
 func TestBuildScriptConfig(t *testing.T) {
 	unit := testUnit()
 	root := t.TempDir()
@@ -472,5 +558,279 @@ func TestBuildScriptConfig_FfmpegBinaryEmpty(t *testing.T) {
 	}
 	if !strings.Contains(script.Content, "ffmpeg") {
 		t.Error("BuildScript() with empty FfmpegBinary should fallback to 'ffmpeg'")
+	}
+}
+
+func TestNewPipeline_DormancyPeriodDefault(t *testing.T) {
+	p := NewPipeline(Options{})
+	if p.dormancyPeriod != 0 {
+		t.Errorf("NewPipeline() dormancyPeriod = %v, want 0 (disabled)", p.dormancyPeriod)
+	}
+	p2 := NewPipeline(Options{DormancyPeriod: 5 * time.Second})
+	if p2.dormancyPeriod != 5*time.Second {
+		t.Errorf("NewPipeline() dormancyPeriod = %v, want 5s", p2.dormancyPeriod)
+	}
+	// Zero value means disabled — pipeline should use polling, not dormancy.
+	if p2.dormancyPeriod <= 0 {
+		t.Error("non-zero DormancyPeriod should be > 0")
+	}
+}
+
+func TestRun_DormancyMode_SleepsBetweenPasses(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	dormancy := 100 * time.Millisecond
+	p := NewPipeline(Options{
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Ingest:         &fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		Metadata:       &fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		Renderer:       &fakeRenderer{},
+		Events:         events,
+		SourceDir:      root,
+		Destination:    t.TempDir(),
+		DryRun:         false,
+		DormancyPeriod: dormancy,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	var runErr error
+	go func() {
+		defer close(done)
+		_, runErr = p.Run(ctx)
+	}()
+
+	// Wait for first scan done.
+	firstScanDone := make(chan struct{})
+	go func() {
+		for e := range events {
+			if e.Type == EventScanDone {
+				close(firstScanDone)
+				return
+			}
+		}
+	}()
+	select {
+	case <-firstScanDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for first scan done")
+	}
+
+	// After dormancy, wait for second scan done.
+	secondScanDone := make(chan struct{})
+	go func() {
+		for e := range events {
+			if e.Type == EventScanDone {
+				close(secondScanDone)
+				return
+			}
+		}
+	}()
+	select {
+	case <-secondScanDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("expected second scan after dormancy period")
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not return after context cancellation")
+	}
+	if !errors.Is(runErr, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context.Canceled", runErr)
+	}
+}
+
+func TestRun_DormancyMode_ContextCancelledDuringSleep(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	dormancy := 10 * time.Second
+	p := NewPipeline(Options{
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Ingest:         &fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		Metadata:       &fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		Renderer:       &fakeRenderer{},
+		Events:         events,
+		SourceDir:      root,
+		Destination:    t.TempDir(),
+		DryRun:         false,
+		DormancyPeriod: dormancy,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	var runErr error
+	go func() {
+		defer close(done)
+		_, runErr = p.Run(ctx)
+	}()
+
+	// Wait for first scan done.
+	firstScanDone := make(chan struct{})
+	go func() {
+		for e := range events {
+			if e.Type == EventScanDone {
+				close(firstScanDone)
+				return
+			}
+		}
+	}()
+	select {
+	case <-firstScanDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for first scan done")
+	}
+
+	// Cancel during dormancy sleep.
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not return after context cancellation during dormancy")
+	}
+	if !errors.Is(runErr, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context.Canceled", runErr)
+	}
+}
+
+func TestRun_DormancyDisabled_Polling(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	p := NewPipeline(Options{
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Ingest:         &fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		Metadata:       &fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		Renderer:       &fakeRenderer{},
+		Events:         events,
+		SourceDir:      root,
+		Destination:    t.TempDir(),
+		DryRun:         false,
+		DormancyPeriod: 0,
+		PollInterval:   10 * time.Millisecond,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		p.Run(ctx)
+	}()
+
+	// Wait for two scan passes (polling, not dormancy).
+	firstScanDone := make(chan struct{})
+	go func() {
+		for e := range events {
+			if e.Type == EventScanDone {
+				close(firstScanDone)
+				return
+			}
+		}
+	}()
+	select {
+	case <-firstScanDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for first scan done")
+	}
+
+	secondScanDone := make(chan struct{})
+	go func() {
+		for e := range events {
+			if e.Type == EventScanDone {
+				close(secondScanDone)
+				return
+			}
+		}
+	}()
+	select {
+	case <-secondScanDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("expected second scan pass after poll interval")
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not return after context cancellation")
+	}
+}
+
+func TestRun_DormancyMode_ContinuesAfterScanFailure(t *testing.T) {
+	root := t.TempDir()
+	events := make(chan PipelineEvent, 100)
+	dormancy := 100 * time.Millisecond
+	p := NewPipeline(Options{
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Ingest:         &fakeOrganizer{},
+		Metadata:       &fakeRepo{},
+		Renderer:       &fakeRenderer{},
+		Events:         events,
+		SourceDir:      root,
+		Destination:    t.TempDir(),
+		DryRun:         false,
+		DormancyPeriod: dormancy,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	var runErr error
+	go func() {
+		defer close(done)
+		_, runErr = p.Run(ctx)
+	}()
+
+	// Wait for first scan done (scan will have found 0 units but still emit ScanDone).
+	firstScanDone := make(chan struct{})
+	go func() {
+		for e := range events {
+			if e.Type == EventScanDone {
+				close(firstScanDone)
+				return
+			}
+		}
+	}()
+	select {
+	case <-firstScanDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for first scan done")
+	}
+
+	// After dormancy, second scan should happen even after first had no units.
+	secondScanDone := make(chan struct{})
+	go func() {
+		for e := range events {
+			if e.Type == EventScanDone {
+				close(secondScanDone)
+				return
+			}
+		}
+	}()
+	select {
+	case <-secondScanDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("expected second scan after dormancy despite first pass having no units")
+	}
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not return after context cancellation")
+	}
+	if !errors.Is(runErr, context.Canceled) {
+		t.Fatalf("Run() error = %v, want context.Canceled", runErr)
 	}
 }

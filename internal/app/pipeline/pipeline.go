@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	debugTumeout = 1
+	// defaultPollInterval is used when Options.PollInterval is not set.
+	defaultPollInterval = 1 * time.Second
 )
 
 // Pipeline orchestrates the media processing workflow.
@@ -28,24 +29,32 @@ type Pipeline struct {
 	hardsubTag string
 	harsub     script.HarsubConfig
 
-	sourceDir    string
-	destination  string
-	execPaths    map[string]string
-	dryRun       bool
-	ffmpegBinary string
-	events       chan PipelineEvent
+	sourceDir      string
+	destination    string
+	execPaths      map[string]string
+	dryRun         bool
+	ffmpegBinary   string
+	pollInterval   time.Duration
+	dormancyPeriod time.Duration
+	events         chan PipelineEvent
 }
 
 // NewPipeline creates a new Pipeline instance.
 func NewPipeline(opts Options) *Pipeline {
+	pollInterval := opts.PollInterval
+	if pollInterval <= 0 {
+		pollInterval = defaultPollInterval
+	}
 	return &Pipeline{
-		logger:       opts.Logger,
-		in:           opts.Ingest,
-		md:           opts.Metadata,
-		rd:           opts.Renderer,
-		hardsubTag:   opts.HardsubTag,
-		harsub:       opts.Harsub,
-		ffmpegBinary: opts.FfmpegBinary,
+		logger:         opts.Logger,
+		in:             opts.Ingest,
+		md:             opts.Metadata,
+		rd:             opts.Renderer,
+		hardsubTag:     opts.HardsubTag,
+		harsub:         opts.Harsub,
+		ffmpegBinary:   opts.FfmpegBinary,
+		pollInterval:   pollInterval,
+		dormancyPeriod: opts.DormancyPeriod,
 
 		sourceDir:   opts.SourceDir,
 		destination: opts.Destination,
@@ -59,6 +68,8 @@ func NewPipeline(opts Options) *Pipeline {
 // Totals are aggregated across all scan passes.
 func (p *Pipeline) Run(ctx context.Context) (RunOutput, error) {
 	var total RunOutput
+	ticker := time.NewTicker(p.pollInterval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -79,10 +90,22 @@ func (p *Pipeline) Run(ctx context.Context) (RunOutput, error) {
 		total.Processed += out.Processed
 		total.Failed += out.Failed
 
-		select {
-		case <-ctx.Done():
-			return total, ctx.Err()
-		case <-p.afterPoll():
+		if p.dormancyPeriod > 0 {
+			timer := time.NewTimer(p.dormancyPeriod)
+			select {
+			case <-ctx.Done():
+				total.Processed += out.Processed
+				total.Failed += out.Failed
+				timer.Stop()
+				return total, ctx.Err()
+			case <-timer.C:
+			}
+		} else {
+			select {
+			case <-ctx.Done():
+				return total, ctx.Err()
+			case <-ticker.C:
+			}
 		}
 	}
 }
@@ -185,18 +208,6 @@ func (p *Pipeline) emit(t EventType, id int64, err error) {
 	if p.events != nil {
 		p.events <- PipelineEvent{Type: t, ID: id, Error: err}
 	}
-}
-
-// afterPoll returns a channel that fires after the poll interval.
-// Overrideable for testing.
-func (p *Pipeline) afterPoll() <-chan struct{} {
-	ch := make(chan struct{})
-	go func() {
-		defer close(ch)
-		// TODO: configurable poll interval from config
-		time.Sleep(debugTumeout * time.Second)
-	}()
-	return ch
 }
 
 // fallbackProduct creates a minimal Product from the source directory basename.
