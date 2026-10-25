@@ -44,13 +44,36 @@ type Config struct {
 
 // ScriptGeneration holds all script-generation settings.
 type ScriptGeneration struct {
-	Hardsub      Hardsub `toml:"hardsub"`
-	FfmpegBinary string  `toml:"ffmpeg_binary,omitempty"`
+	Hardsub      HardsubRules `toml:"hardsub"`
+	FfmpegBinary string       `toml:"ffmpeg_binary,omitempty"`
 }
 
-// Hardsub holds hardsub classification rules.
-type Hardsub struct {
+// Harsub holds hardsub classification rules and burn-in parameters.
+type HardsubRules struct {
 	Tag string `toml:"tag"` // filename tag marking a sidecar subtitle as hardsub (burn-in)
+
+	// Burn-in parameters for the ffmpeg subtitles filter.
+	OriginalSize    string  `toml:"original_size"`
+	FontName        string  `toml:"font_name"`
+	FontSize        float64 `toml:"font_size"`
+	PrimaryColour   string  `toml:"primary_colour"`
+	SecondaryColour string  `toml:"secondary_colour"`
+	OutlineColour   string  `toml:"outline_colour"`
+	BackColour      string  `toml:"back_colour"`
+	Underline       int     `toml:"underline"`
+	StrikeOut       int     `toml:"strike_out"`
+	ScaleX          float64 `toml:"scale_x"`
+	ScaleY          float64 `toml:"scale_y"`
+	Spacing         int     `toml:"spacing"`
+	Angle           int     `toml:"angle"`
+	BorderStyle     int     `toml:"border_style"`
+	Outline         float64 `toml:"outline"`
+	Shadow          int     `toml:"shadow"`
+	Alignment       int     `toml:"alignment"`
+	MarginL         int     `toml:"margin_l"`
+	MarginR         int     `toml:"margin_r"`
+	MarginV         int     `toml:"margin_v"`
+	Encoding        int     `toml:"encoding"`
 }
 
 // Storage holds store settings. Currently only the path to the JSON file;
@@ -131,7 +154,30 @@ func defaultCFG() Config {
 			Path: "/path/to/lazyam3/storage.json",
 		},
 		ScriptGeneration: ScriptGeneration{
-			Hardsub:      Hardsub{Tag: "Forsirovannye"},
+			Hardsub: HardsubRules{
+				Tag:             "Forsirovannye",
+				OriginalSize:    "1920x1080",
+				FontName:        "Segoe UI",
+				FontSize:        19.4,
+				PrimaryColour:   "&H00EBEBEB",
+				SecondaryColour: "&H000000FF",
+				OutlineColour:   "&H00000000",
+				BackColour:      "&H80000000",
+				Underline:       0,
+				StrikeOut:       0,
+				ScaleX:          1,
+				ScaleY:          1,
+				Spacing:         0,
+				Angle:           0,
+				BorderStyle:     1,
+				Outline:         0.5,
+				Shadow:          0,
+				Alignment:       2,
+				MarginL:         5,
+				MarginR:         5,
+				MarginV:         20,
+				Encoding:        1,
+			},
 			FfmpegBinary: "ffmpeg",
 		},
 	}

@@ -98,6 +98,7 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 			Destination:   destination,
 			DryRun:        false,
 			HardsubTag:    cfg.ScriptGeneration.Hardsub.Tag,
+			Harsub:        pipeline.HardsubRulesToDomain(cfg.ScriptGeneration.Hardsub),
 			FfmpegBinary:  nonEmpty(cfg.ScriptGeneration.FfmpegBinary, "ffmpeg"),
 			ExecutorPaths: cfg.Paths.Executor,
 			CFG:           cfg,

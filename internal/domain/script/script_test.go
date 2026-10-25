@@ -210,22 +210,84 @@ func TestBuildSRTCleanup(t *testing.T) {
 	}
 }
 
+// defaultHarsub mirrors the defaults in infra/config.defaultCFG().
+var defaultHarsub = HarsubConfig{
+	OriginalSize:    "1920x1080",
+	FontName:        "Segoe UI",
+	FontSize:        19.4,
+	PrimaryColour:   "&H00EBEBEB",
+	SecondaryColour: "&H000000FF",
+	OutlineColour:   "&H00000000",
+	BackColour:      "&H80000000",
+	ScaleX:          1,
+	ScaleY:          1,
+	BorderStyle:     1,
+	Outline:         0.5,
+	Alignment:       2,
+	MarginL:         5,
+	MarginR:         5,
+	MarginV:         20,
+	Encoding:        1,
+}
+
 // ---------------------------------------------------------------------------
 // buildHSUB
 // ---------------------------------------------------------------------------
 
 func TestBuildHSUB(t *testing.T) {
-	got := buildHSUB("", "/tmp/in_progress")
+	got := buildHSUB("", "/tmp/in_progress", defaultHarsub)
 	if got != "" {
 		t.Errorf("buildHSUB(\"\", ...) = %q, want empty", got)
 	}
 
-	got = buildHSUB("hsub.srt", "/tmp/in_progress")
+	got = buildHSUB("hsub.srt", "/tmp/in_progress", defaultHarsub)
 	if !strings.Contains(got, "subtitles=") {
 		t.Errorf("buildHSUB() does not contain 'subtitles=': %q", got)
 	}
 	if !strings.Contains(got, "/tmp/in_progress/hsub.srt") {
 		t.Errorf("buildHSUB() does not contain expected path: %q", got)
+	}
+}
+
+func TestHSUBConfigValueChangesOutput(t *testing.T) {
+	base := HarsubConfig{
+		OriginalSize: "1920x1080",
+		FontName:     "Arial",
+		FontSize:     14,
+		MarginV:      10,
+		BorderStyle:  1,
+		Outline:      1,
+		Alignment:    2,
+		MarginL:      5,
+		MarginR:      5,
+		Encoding:     1,
+	}
+
+	gotDefault := buildHSUB("sub.srt", "/tmp/ip", base)
+
+	changed := base
+	changed.MarginV = 99
+	gotChanged := buildHSUB("sub.srt", "/tmp/ip", changed)
+
+	if gotDefault == gotChanged {
+		t.Error("buildHSUB with different HarsubConfig produced identical output")
+	}
+	if !strings.Contains(gotDefault, "MarginV=10") {
+		t.Error("default output should contain 'MarginV=10'")
+	}
+	if !strings.Contains(gotChanged, "MarginV=99") {
+		t.Error("changed output should contain 'MarginV=99'")
+	}
+
+	// Changing a string field also changes output
+	changed2 := base
+	changed2.FontName = "Verdana"
+	gotFont := buildHSUB("sub.srt", "/tmp/ip", changed2)
+	if gotDefault == gotFont {
+		t.Error("buildHSUB with different FontName produced identical output")
+	}
+	if !strings.Contains(gotFont, "FontName=Verdana") {
+		t.Error("font-changed output should contain 'FontName=Verdana'")
 	}
 }
 
@@ -1210,13 +1272,13 @@ func TestBuildSRTMove_HSUB_Move(t *testing.T) {
 
 func TestBuildHSUB_PathResolution(t *testing.T) {
 	// With empty inProgress, should use hsubFile as-is
-	got := buildHSUB("hardsub.srt", "")
+	got := buildHSUB("hardsub.srt", "", defaultHarsub)
 	if !strings.Contains(got, "hardsub.srt") {
 		t.Error("buildHSUB with empty inProgress should contain filename")
 	}
 
 	// With non-empty inProgress, should join paths
-	got = buildHSUB("hardsub.srt", "/tmp/in_progress")
+	got = buildHSUB("hardsub.srt", "/tmp/in_progress", defaultHarsub)
 	expectedPath := filepath.ToSlash(filepath.Join("/tmp/in_progress", "hardsub.srt"))
 	if !strings.Contains(got, expectedPath) {
 		t.Errorf("buildHSUB with inProgress should contain %q, got: %q", expectedPath, got)

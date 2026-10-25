@@ -300,7 +300,7 @@ func TestRun_CtxCancelled(t *testing.T) {
 func TestBuildScriptConfig(t *testing.T) {
 	unit := testUnit()
 	root := t.TempDir()
-	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "", "")
+	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "", "", script.HarsubConfig{OriginalSize: "1920x1080", FontName: "Segoe UI", FontSize: 19.4})
 	if err != nil {
 		t.Fatalf("buildScriptConfig() error: %v", err)
 	}
@@ -350,7 +350,7 @@ func TestBuildScriptConfig(t *testing.T) {
 }
 
 func TestBuildScriptConfig_RequiresRoot(t *testing.T) {
-	if _, err := buildScriptConfig(testUnit(), *testProduct(), "", nil, "", ""); err == nil {
+	if _, err := buildScriptConfig(testUnit(), *testProduct(), "", nil, "", "", script.HarsubConfig{OriginalSize: "1920x1080", FontName: "Segoe UI", FontSize: 19.4}); err == nil {
 		t.Fatal("expected error for empty destination root, got nil")
 	}
 }
@@ -365,7 +365,7 @@ func TestBuildScriptConfig_ExecutorPaths(t *testing.T) {
 		"notifications": "/exec/notifications",
 		"target":        "/exec/target",
 	}
-	cfg, err := buildScriptConfig(unit, *testProduct(), root, execPaths, "", "")
+	cfg, err := buildScriptConfig(unit, *testProduct(), root, execPaths, "", "", script.HarsubConfig{})
 	if err != nil {
 		t.Fatalf("buildScriptConfig() error: %v", err)
 	}
@@ -432,7 +432,7 @@ func TestFindSRT(t *testing.T) {
 func TestBuildScriptConfig_FfmpegBinary(t *testing.T) {
 	unit := testUnit()
 	root := t.TempDir()
-	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "", "/opt/bin/ffmpeg")
+	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "", "/opt/bin/ffmpeg", script.HarsubConfig{})
 	if err != nil {
 		t.Fatalf("buildScriptConfig() error: %v", err)
 	}
@@ -444,7 +444,7 @@ func TestBuildScriptConfig_FfmpegBinary(t *testing.T) {
 func TestBuildScriptConfig_FfmpegBinaryFallback(t *testing.T) {
 	unit := testUnit()
 	root := t.TempDir()
-	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "", "")
+	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "", "", script.HarsubConfig{OriginalSize: "1920x1080", FontName: "Segoe UI", FontSize: 19.4})
 	if err != nil {
 		t.Fatalf("buildScriptConfig() error: %v", err)
 	}
@@ -458,7 +458,7 @@ func TestBuildScriptConfig_FfmpegBinaryEmpty(t *testing.T) {
 	// The fallback to "ffmpeg" happens in BuildScript, not here.
 	unit := testUnit()
 	root := t.TempDir()
-	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "", "")
+	cfg, err := buildScriptConfig(unit, *testProduct(), root, nil, "", "", script.HarsubConfig{OriginalSize: "1920x1080", FontName: "Segoe UI", FontSize: 19.4})
 	if err != nil {
 		t.Fatalf("buildScriptConfig() error: %v", err)
 	}

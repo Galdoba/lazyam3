@@ -6,11 +6,11 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 
 ## Current Feature
 
-> **Work on: `A5` — Custom slog text handler with format template** (`doc/feature_list.json`)
+> **Work on: `S4` — Configurable script generation command parameters** (`doc/feature_list.json`)
 >
-> Status: `proposed` · blocked_by: `[]` · effort: 2-3 hours · priority: 5
+> Status: `in_rewiew` 
 
-> **Just finished: `D1` — Default configuration refactoring** (`doc/feature_list.json`) — status: `done` · effort: 2-3 hours · priority: 5
+> **Just finished: `S3` — Configurable hardsub parameters** (`doc/feature_list.json`) — status: `done` · effort: 2-3 hours · priority: 4
 
 Selection rule: pick the highest-priority feature in `doc/feature_list.json` whose `blocked_by` list is empty and whose `status` is `proposed`. When a feature is done, set its `status` to `in_rewiew` in `doc/feature_list.json` before moving on.
 
@@ -92,10 +92,10 @@ platform (internal/platform/*)     ← Stateless services (no domain deps)
 - Infrastructure implements domain ports
 - Commands wire dependencies and call Pipeline
 - Infrastructure failures fail fast
-- Simples solutions SHOULD examined first
+- Simples solutions MUST examined first
 - Analyze the problem before solving it
 - Make only minimal code edits
 - No comments in code unless really needed
 - Do NOT fix the bugs which unrelated to current feature
-- Be hornest
+- Be honest
 - Be carefull on your judjements

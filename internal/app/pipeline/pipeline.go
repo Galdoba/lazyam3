@@ -26,6 +26,7 @@ type Pipeline struct {
 	md         metadata.ProductRepository
 	rd         script.Renderer
 	hardsubTag string
+	harsub     script.HarsubConfig
 
 	sourceDir    string
 	destination  string
@@ -43,6 +44,7 @@ func NewPipeline(opts Options) *Pipeline {
 		md:           opts.Metadata,
 		rd:           opts.Renderer,
 		hardsubTag:   opts.HardsubTag,
+		harsub:       opts.Harsub,
 		ffmpegBinary: opts.FfmpegBinary,
 
 		sourceDir:   opts.SourceDir,
@@ -140,7 +142,7 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 		p.emit(EventUnitDone, unit.ID, nil)
 		return nil
 	}
-	cfg, err := buildScriptConfig(unit, *prod, p.destination, p.execPaths, p.hardsubTag, p.ffmpegBinary)
+	cfg, err := buildScriptConfig(unit, *prod, p.destination, p.execPaths, p.hardsubTag, p.ffmpegBinary, p.harsub)
 	if err != nil {
 		p.emit(EventUnitFailed, unit.ID, err)
 		return err

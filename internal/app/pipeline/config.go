@@ -12,6 +12,7 @@ import (
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 	"github.com/Galdoba/lazyam3/internal/domain/script"
+	"github.com/Galdoba/lazyam3/internal/infra/config"
 )
 
 // defaultPriority is written into generated scripts until config (task 10)
@@ -23,7 +24,7 @@ const defaultPriority = 6
 // Predictions are computed against the executor's target path so that
 // ffmpeg output paths are accessible to the executor.
 // The script destination is named by OUTBASE extracted from predictions.
-func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string, executorPaths map[string]string, hardsubTag, ffmpegBinary string) (script.ScriptConfig, error) {
+func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string, executorPaths map[string]string, hardsubTag, ffmpegBinary string, harsub script.HarsubConfig) (script.ScriptConfig, error) {
 	if root == "" {
 		return script.ScriptConfig{}, fmt.Errorf("pipeline: destination root is required")
 	}
@@ -114,6 +115,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 		CallNames:    callNames,
 		PRTTimestamp: timestamp,
 		FfmpegBinary: ffmpegBinary,
+		Harsub:       harsub,
 		Env: script.Environment{
 			Buffer:        buffer,
 			InProgress:    inProgress,
@@ -187,4 +189,31 @@ func findSubtitle(filenames []string, hardsubTag string) (srt, hsub string) {
 func isSubtitle(name string) bool {
 	l := strings.ToLower(name)
 	return strings.HasSuffix(l, ".srt") || strings.HasSuffix(l, ".ass") || strings.HasSuffix(l, ".ssa")
+}
+
+// HardsubRulesToDomain converts infra config HardsubRules to domain HarsubConfig.
+func HardsubRulesToDomain(r config.HardsubRules) script.HarsubConfig {
+	return script.HarsubConfig{
+		OriginalSize:    r.OriginalSize,
+		FontName:        r.FontName,
+		FontSize:        r.FontSize,
+		PrimaryColour:   r.PrimaryColour,
+		SecondaryColour: r.SecondaryColour,
+		OutlineColour:   r.OutlineColour,
+		BackColour:      r.BackColour,
+		Underline:       r.Underline,
+		StrikeOut:       r.StrikeOut,
+		ScaleX:          r.ScaleX,
+		ScaleY:          r.ScaleY,
+		Spacing:         r.Spacing,
+		Angle:           r.Angle,
+		BorderStyle:     r.BorderStyle,
+		Outline:         r.Outline,
+		Shadow:          r.Shadow,
+		Alignment:       r.Alignment,
+		MarginL:         r.MarginL,
+		MarginR:         r.MarginR,
+		MarginV:         r.MarginV,
+		Encoding:        r.Encoding,
+	}
 }

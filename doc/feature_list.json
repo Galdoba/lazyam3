@@ -1,179 +1,16 @@
 {
-  "A2": {
-    "title": "Group() helper for named contexts",
-    "source": "doc/logging_suggestions.md#A2",
-    "status": "done",
-    "effort": "5 min",
-    "impact": "high",
-    "priority": 3,
-    "blocked_by": [],
-    "problem": "Commands must call Slog().WithGroup(\"name\") and lose the typed *Logger surface (Errorf unavailable on grouped loggers).",
-    "proposal": "Add Logger.Group(name string) *Logger that wraps inner.WithGroup(name).",
-    "implementation": {
-      "file": "internal/infra/logging/logger.go",
-      "signature": "func (l *Logger) Group(name string) *Logger",
-      "notes": [
-        "One-liner: return &Logger{inner: l.inner.WithGroup(name)}",
-        "Child logger owns no resources (closers empty), same contract as With()",
-        "Migrate call sites in internal/infra/commands/cmd_process.go:62 and :91 to drop the Slog() escape hatch"
-      ]
-    },
-    "benefits": [
-      "Preserves typed surface (*Logger not *slog.Logger)",
-      "Consistent with With() API",
-      "Removes boilerplate in commands"
-    ],
-    "trade_offs": [
-      "Another method to remember"
-    ],
-    "tests": [
-      "TestLogger_Group returns a different instance and logs grouped output",
-      "Errorf available on grouped child logger"
-    ],
-    "outcome": "Implemented with interface port: pipeline.Logger interface in internal/app/pipeline/dto.go (Debug/Info/Warn/Error; both *slog.Logger and *logging.Logger satisfy it). cmd_process.go fully migrated off Slog(); pipeline.Options.Logger is now the interface."
-  },
-  "A3": {
-    "title": "JSON vs text format toggle",
-    "source": "doc/logging_suggestions.md#A3",
-    "status": "done",
-    "effort": "15 min",
-    "impact": "medium",
-    "priority": 2,
-    "blocked_by": [],
-    "problem": "Terminal output is always JSON (machine-readable but unreadable for humans).",
-    "proposal": "Add optional format field to [logger] config: \"json\" (default) or \"text\".",
-    "implementation": {
-      "file": "internal/infra/config + internal/infra/logging/logger.go",
-      "config_field": "Format string `toml:\"format\"` on config.Logging",
-      "notes": [
-        "newTermHandler switches on strings.EqualFold(cfg.Format, \"text\"): text -> slog.NewTextHandler(os.Stderr, opts), default -> slog.NewJSONHandler",
-        "File handler stays JSON (machine-consumed)",
-        "Empty format defaults to \"json\" — no breaking change"
-      ]
-    },
-    "benefits": [
-      "Humans get readable terminal logs",
-      "No breaking changes (default json)"
-    ],
-    "trade_offs": [
-      "One extra config field",
-      "Text output less structured"
-    ],
-    "tests": [
-      "TestNewTermHandler_FormatText — text format writes non-JSON lines",
-      "TestNewTermHandler_FormatJSON — format \"json\" and \"\" keep JSON output",
-      "TestNewTermHandler_FormatCaseInsensitive — \"TEXT\" accepted",
-      "TestNewTermHandler_NoTerminal — nil handler when Terminal=false",
-      "TestNewLogger_TerminalTextFormat — end-to-end NewLogger with text format"
-    ],
-    "outcome": "Implemented. config.Logging gained Format field; newTermHandler switches Text/JSON (case-insensitive \"text\"); file handler unchanged. Terminal-only tests capture os.Stderr via pipe."
-  },
-  "A4": {
-    "title": "Color support for terminal logs",
-    "source": "doc/logging_suggestions.md#A4",
-    "status": "done",
-    "effort": "20 min",
-    "impact": "medium",
-    "priority": 2,
-    "blocked_by": ["A3"],
-    "problem": "Human-readable text logs are colorless; levels don't stand out.",
-    "proposal": "Add optional color field to [logger] config; colorize level values in terminal text output.",
-    "implementation": {
-      "file": "internal/infra/logging/logger.go",
-      "config_field": "Color bool `toml:\"color\"` on config.Logging",
-      "notes": [
-        "ReplaceAttr approach from the proposal does NOT work: TextHandler quotes values containing control characters via strconv.Quote, so ANSI escapes would be emitted as literal \\x1b text",
-        "Implemented colorLevelWriter — an io.Writer wrapper around os.Stderr that colorizes the level field of each line (TextHandler guarantees one Write per record)",
-        "Colors DEBUG=cyan INFO=green WARN=yellow ERROR=red with reset after level token",
-        "Only effective when format = \"text\"; JSON output ignored",
-        "No new dependency — raw ANSI escapes",
-        "Colors apply to terminal handler only — file output stays plain",
-        "No TTY detection: color=true is an explicit opt-in; keep the zero-value default false"
-      ]
-    },
-    "benefits": [
-      "Levels scannable at a glance in text mode"
-    ],
-    "trade_offs": [
-      "No TTY detection — color=true writes escapes even when stderr is redirected",
-      "Colors not copied to file",
-      "Writer-level colorizer depends on TextHandler line format (time=... level=...)"
-    ],
-    "tests": [
-      "TestNewTermHandler_ColorText — color=true text mode emits ANSI-escaped level (level=\\x1b[32mINFO\\x1b[0m)",
-      "TestNewTermHandler_ColorDisabled — color=false text mode emits no escapes",
-      "TestNewTermHandler_ColorJSONIgnored — color=true json mode emits no escapes"
-    ],
-    "outcome": "Implemented. config.Logging gained Color field; newTermHandler wraps os.Stderr in colorLevelWriter when format=text and color=true. ReplaceAttr was rejected: TextHandler escapes control chars via strconv.Quote, so ANSI codes cannot pass through the value pipeline. File and JSON output stay plain."
-  },
-  "C1": {
-    "title": "Config package refactoring",
-    "source": "agent analysis of defaultCFG() — internal/infra/config/config.go",
-    "status": "done",
-    "effort": "30 min",
-    "impact": "medium",
-    "priority": 3,
-    "blocked_by": ["A4"],
-    "problem": "defaultCFG() had weak defaults: logger.path was the placeholder \"/path/to/file\" (file handler tried to open this bogus path on every run) and the executor map was empty (all 6 runtime keys silently fell back to the generator output root, giving no hint they exist).",
-    "proposal": "Clean up the config package after A4 settles the Logging struct: fix placeholder defaults and make executor keys discoverable.",
-    "implementation": {
-      "file": "internal/infra/config/config.go",
-      "notes": [
-        "Logger.Path default \"/path/to/file\" -> \"\" (empty disables file logging, already supported by newFileHandler)",
-        "Seed defaultCFG executor map with the 6 runtime keys (target, buffer, in_progress, done, notifications, archive) using the same fallback values buildScriptConfig computes, so a generated config documents them",
-        "Add Validate() (configmanager.Validator hook) for logger.level whitelisting and non-empty generator paths",
-        "Re-check struct shape after A4 adds Color — do not start before A4 is done"
-      ]
-    },
-    "benefits": [
-      "Freshly generated config no longer attempts to write /path/to/file",
-      "Executor keys self-documenting in generated config",
-      "Load-time validation catches bad logger.level early instead of silently coercing to info"
-    ],
-    "trade_offs": [
-      "Seeded executor defaults duplicate fallback logic in buildScriptConfig",
-      "Validate() adds a failure mode for configs that previously loaded with warnings"
-    ],
-    "tests": [
-      "TestDefaultConfig_LoggerPath — default Logger.Path is \"/path/to/file.log\"",
-      "TestDefaultConfig_ExecutorMapSeeded — default map contains all 6 keys",
-      "TestDefaultConfig_PassesValidation — default passes Validate",
-      "TestConfig_ValidateBadLevel — invalid logger.level rejected",
-      "TestConfig_ValidateEmptyGeneratorPath — empty generator paths rejected",
-      "TestLoad_ValidateRejectsBadLevel — invalid logger.level fails Load (HOME-isolated)",
-      "TestLoad_ValidateRejectsEmptyGeneratorPath — empty generator path fails Load (HOME-isolated)",
-      "Existing TestDefaultConfig_LoggerPath replaced by TestDefaultConfig_LoggerPathEmpty",
-      "Existing TestDefaultConfig_ExecutorMap replaced by TestDefaultConfig_ExecutorMapSeeded"
-    ],
-    "outcome": "Logger.Path fixed to \"\" (no file handler on fresh config). Executor map seeded with 6 keys mirroring buildScriptConfig fallbacks (target→root/target, buffer/in_progress/done/notifications→root, archive→root/archive). Validate() added: logger.level whitelist (debug/info/warn/error), generator input/output/metadata non-empty. Note: DiscoverAndLoad swallows validation errors and falls through to ~/.config — an invalid explicit config silently loads the user's real config. This is a configmanager library behavior; not in scope to fix. Observation: Storage.Path still has \"/path/to/file.json\" placeholder (same class as Logger.Path, out of scope for C1)."
-  },
-  "BUG-1": {
-    "title": "Env.TargetRoot regression: scriptRoot instead of executor target",
-    "source": "regression introduced in b3e2988",
-    "status": "done",
-    "effort": "1 min",
-    "impact": "low (latent)",
-    "priority": 1,
-    "blocked_by": [],
-    "problem": "buildScriptConfig set Env.TargetRoot to scriptRoot (generator dir) instead of renderRoot (executorPaths[\"target\"]), breaking the invariant set in 8e09fec (\"paths must be valid on executor\"). No production impact: TargetRoot is only consumed by the test-only fallback in script.BuildScript when Predictions is empty.",
-    "fix": "internal/app/pipeline/config.go: TargetRoot: scriptRoot -> renderRoot",
-    "tests": [
-      "TestBuildScriptConfig_ExecutorPaths (pre-existing; acts as the regression test — red before fix, green after)"
-    ]
-  },
   "A5": {
-    "title": "Custom slog text handler with format template",
-    "source": "doc/custom_slog_handler_proposal.md",
-    "status": "proposed",
+    "benefits": [
+      "Full control over terminal text output format",
+      "Field order, separators, quoting customizable",
+      "No new dependencies"
+    ],
+    "blocked_by": [],
     "effort": "2-3 hours",
     "impact": "medium",
-    "priority": 2,
-    "blocked_by": [],
-    "problem": "slog.TextHandler has no format customization options — field order, separators, timestamp format, and structure are all fixed.",
-    "proposal": "Replace slog.TextHandler with a custom handler that renders a format string like '{time} [{level}] {msg} {attrs}'. Minimal template set: {time}, {level}, {msg}, {attrs}. colorLevelWriter post-processing continues to work on the writer.",
     "implementation": {
-      "file": "internal/infra/logging/logger.go",
       "config_field": "FormatText string `toml:\"format_text\"` on config.Logging",
+      "file": "internal/infra/logging/logger.go",
       "notes": [
         "Implement slog.Handler interface with template parsing",
         "WithAttrs accumulates attrs; WithGroup adds key prefix",
@@ -182,16 +19,11 @@
         "File handler stays JSON (unaffected)"
       ]
     },
-    "benefits": [
-      "Full control over terminal text output format",
-      "Field order, separators, quoting customizable",
-      "No new dependencies"
-    ],
-    "trade_offs": [
-      "Replaces slog.TextHandler entirely — lose upstream improvements",
-      "Template parsing per log record (minor overhead)",
-      "Basic template (no conditionals, no per-field formatting)"
-    ],
+    "priority": 2,
+    "problem": "slog.TextHandler has no format customization options — field order, separators, timestamp format, and structure are all fixed.",
+    "proposal": "Replace slog.TextHandler with a custom handler that renders a format string like '{time} [{level}] {msg} {attrs}'. Minimal template set: {time}, {level}, {msg}, {attrs}. colorLevelWriter post-processing continues to work on the writer.",
+    "source": "doc/custom_slog_handler_proposal.md",
+    "status": "proposed",
     "tests": [
       "TestCustomHandler_RenderBasic — template with {time} [{level}] {msg}",
       "TestCustomHandler_RenderAttrs — {attrs} renders key=value pairs",
@@ -199,21 +31,27 @@
       "TestCustomHandler_WithGroup — group prefix applied to attr keys",
       "TestCustomHandler_ColorIntegration — colorLevelWriter still works",
       "TestCustomHandler_TerminalTextFormat — end-to-end NewLogger with custom format"
+    ],
+    "title": "Custom slog text handler with format template",
+    "trade_offs": [
+      "Replaces slog.TextHandler entirely — lose upstream improvements",
+      "Template parsing per log record (minor overhead)",
+      "Basic template (no conditionals, no per-field formatting)"
     ]
   },
   "S1": {
-    "title": "Config struct refactor: ScriptGeneration block",
-    "source": "internal/infra/config/config.go — Hardsub is a standalone top-level struct, hard to extend",
-    "status": "done",
+    "benefits": [
+      "All script-generation settings grouped under one config block",
+      "Easy to add more settings (frame rate, preset, filter options) without touching top-level",
+      "Clearer config structure for users",
+      "Prepares for S2: ffmpeg binary configurability"
+    ],
+    "blocked_by": [],
     "effort": "1 hour",
     "impact": "medium",
-    "priority": 4,
-    "blocked_by": [],
-    "problem": "Hardsub is a standalone top-level struct in Config. Script-generation settings (hardsub tag, ffmpeg binary, future filter presets) are scattered across the config with no natural grouping. This makes the config hard to extend and harder for users to understand what settings belong together.",
-    "proposal": "Introduce a ScriptGeneration config block that groups all script-generation settings. Move Hardsub into it, add FfmpegBinary field. This is iterative: start with Hardsub + FfmpegBinary, add more fields as needed.",
     "implementation": {
-      "file": "internal/infra/config/config.go",
       "config_change": "New ScriptGeneration struct with Hardsub (moved from top-level) and FfmpegBinary string. Config struct gains ScriptGeneration field; Hardsub field removed from top-level.",
+      "file": "internal/infra/config/config.go",
       "migration": "TOML key [script_generation] with nested hardsub { tag } and ffmpeg_binary. Backwards compat: [hardsub] still reads into ScriptGeneration.Hardsub for existing configs.",
       "notes": [
         "New ScriptGeneration { Hardsub Hardsub; FfmpegBinary string } struct",
@@ -225,39 +63,38 @@
         "Update pipeline options to read from ScriptGeneration"
       ]
     },
-    "benefits": [
-      "All script-generation settings grouped under one config block",
-      "Easy to add more settings (frame rate, preset, filter options) without touching top-level",
-      "Clearer config structure for users",
-      "Prepares for S2: ffmpeg binary configurability"
-    ],
-    "trade_offs": [
-      "Breaking change for existing config files (need [hardsub] → [script_generation.hardsub] migration)",
-      "Backwards compat key adds slight complexity",
-      "All config accessors need updating (cfg.Hardsub → cfg.ScriptGeneration.Hardsub)"
-    ],
+    "outcome": "Implemented. Config struct gained ScriptGeneration block with Hardsub (moved from top-level) and FfmpegBinary string. All accessors updated: cfg.Hardsub.Tag → cfg.ScriptGeneration.Hardsub.Tag. TOML format changed from [hardsub] to [script_generation.hardsub]. Breaking change: existing config files with [hardsub] section must migrate to [script_generation.hardsub]. Tests cover defaults, TOML new format, and backward compat note removed (no backward compat needed).",
+    "priority": 4,
+    "problem": "Hardsub is a standalone top-level struct in Config. Script-generation settings (hardsub tag, ffmpeg binary, future filter presets) are scattered across the config with no natural grouping. This makes the config hard to extend and harder for users to understand what settings belong together.",
+    "proposal": "Introduce a ScriptGeneration config block that groups all script-generation settings. Move Hardsub into it, add FfmpegBinary field. This is iterative: start with Hardsub + FfmpegBinary, add more fields as needed.",
+    "source": "internal/infra/config/config.go — Hardsub is a standalone top-level struct, hard to extend",
+    "status": "done",
     "tests": [
       "TestScriptGeneration_HardsubTag — default tag preserved",
       "TestScriptGeneration_FfmpegBinary — default is \"ffmpeg\"",
       "TestScriptGeneration_TOMLNewFormat — [script_generation] section parsed correctly",
       "TestDefaultConfig_ScriptGeneration — defaultCFG has non-empty ScriptGeneration"
     ],
-    "outcome": "Implemented. Config struct gained ScriptGeneration block with Hardsub (moved from top-level) and FfmpegBinary string. All accessors updated: cfg.Hardsub.Tag → cfg.ScriptGeneration.Hardsub.Tag. TOML format changed from [hardsub] to [script_generation.hardsub]. Breaking change: existing config files with [hardsub] section must migrate to [script_generation.hardsub]. Tests cover defaults, TOML new format, and backward compat note removed (no backward compat needed)."
+    "title": "Config struct refactor: ScriptGeneration block",
+    "trade_offs": [
+      "Breaking change for existing config files (need [hardsub] → [script_generation.hardsub] migration)",
+      "Backwards compat key adds slight complexity",
+      "All config accessors need updating (cfg.Hardsub → cfg.ScriptGeneration.Hardsub)"
+    ]
   },
   "S2": {
-    "title": "Make ffmpeg binary configurable via app configuration",
-    "source": "internal/domain/script/template.go:43 — ffmpeg hardcoded as literal",
-    "status": "done",
+    "benefits": [
+      "Users can specify custom ffmpeg binary path (e.g., /opt/bin/ffmpeg, nvidia-enabled build)",
+      "Consistent with ffprobe configurability (both binaries now config-driven)",
+      "Generated scripts use the correct ffmpeg binary"
+    ],
+    "blocked_by": [],
     "effort": "2-3 hours",
     "impact": "medium",
-    "priority": 4,
-    "blocked_by": [],
-    "problem": "ffmpeg binary path is hardcoded in internal/domain/script/template.go:43: `` ffmpeg -n -r 25 -i ... ``. Users cannot specify a custom ffmpeg binary (e.g., /opt/bin/ffmpeg, or a wrapper). ffprobe IS configurable (paths.generator.ffprobe_binary), but ffmpeg (used in generated scripts) is not.",
-    "proposal": "Pass ffmpeg binary path from config through pipeline → ScriptConfig → template placeholder. Template uses |=ffmpeg_binary=| placeholder replaced by buildScriptConfig with the configured value (or fallback to \"ffmpeg\").",
     "implementation": {
-      "file": "internal/infra/config/config.go, internal/app/pipeline/dto.go, internal/domain/script/config.go, internal/domain/script/template.go, internal/app/pipeline/config.go",
       "config_field": "ScriptGeneration.FfmpegBinary string `toml:\"ffmpeg_binary\"`",
       "dataflow": "config → Pipeline.Options.FfmpegBinary → buildScriptConfig → ScriptConfig.FfmpegBinary → template placeholder |=ffmpeg_binary=| → replaced in generated .sh script",
+      "file": "internal/infra/config/config.go, internal/app/pipeline/dto.go, internal/domain/script/config.go, internal/domain/script/template.go, internal/app/pipeline/config.go",
       "notes": [
         "Add FfmpegBinary string to Pipeline.Options (dto.go)",
         "Add FfmpegBinary string to ScriptConfig (config.go)",
@@ -267,124 +104,200 @@
         "Fallback: \"ffmpeg\" if not configured (same as ffprobe default)"
       ]
     },
-    "benefits": [
-      "Users can specify custom ffmpeg binary path (e.g., /opt/bin/ffmpeg, nvidia-enabled build)",
-      "Consistent with ffprobe configurability (both binaries now config-driven)",
-      "Generated scripts use the correct ffmpeg binary"
-    ],
-    "trade_offs": [
-      "Touches domain layer (ScriptConfig) — adds one field",
-      "Template placeholder adds one line to the template",
-      "Pipeline dataflow change: ffmpeg binary must flow from config through pipeline to script builder"
-    ],
+    "outcome": "Implemented. ScriptConfig gained FfmpegBinary field; template replaced hardcoded ffmpeg with |=ffmpeg_binary=| placeholder; BuildScript falls back to 'ffmpeg' when empty; Pipeline.Options gained FfmpegBinary; buildScriptConfig passes it through; cmd_process.go wires cfg.ScriptGeneration.FfmpegBinary with nonEmpty fallback. Tests added: TestBuildScript_FfmpegBinary, TestBuildScript_FfmpegBinaryFallback, TestBuildScriptConfig_FfmpegBinary, TestBuildScriptConfig_FfmpegBinaryFallback, TestBuildScriptConfig_FfmpegBinaryEmpty.",
+    "priority": 4,
+    "problem": "ffmpeg binary path is hardcoded in internal/domain/script/template.go:43: `` ffmpeg -n -r 25 -i ... ``. Users cannot specify a custom ffmpeg binary (e.g., /opt/bin/ffmpeg, or a wrapper). ffprobe IS configurable (paths.generator.ffprobe_binary), but ffmpeg (used in generated scripts) is not.",
+    "proposal": "Pass ffmpeg binary path from config through pipeline → ScriptConfig → template placeholder. Template uses |=ffmpeg_binary=| placeholder replaced by buildScriptConfig with the configured value (or fallback to \"ffmpeg\").",
+    "source": "internal/domain/script/template.go:43 — ffmpeg hardcoded as literal",
+    "status": "done",
     "tests": [
       "TestBuildScriptConfig_FfmpegBinary — custom ffmpeg path appears in generated script",
       "TestBuildScriptConfig_FfmpegBinaryFallback — default \"ffmpeg\" used when not configured",
       "TestBuildScriptConfig_FfmpegBinaryEmpty — empty string falls back to \"ffmpeg\"",
       "TestTemplate_FfmpegPlaceholder — |=ffmpeg_binary=| replaced in rendered template"
     ],
-    "outcome": "Implemented. ScriptConfig gained FfmpegBinary field; template replaced hardcoded ffmpeg with |=ffmpeg_binary=| placeholder; BuildScript falls back to 'ffmpeg' when empty; Pipeline.Options gained FfmpegBinary; buildScriptConfig passes it through; cmd_process.go wires cfg.ScriptGeneration.FfmpegBinary with nonEmpty fallback. Tests added: TestBuildScript_FfmpegBinary, TestBuildScript_FfmpegBinaryFallback, TestBuildScriptConfig_FfmpegBinary, TestBuildScriptConfig_FfmpegBinaryFallback, TestBuildScriptConfig_FfmpegBinaryEmpty."
-  },
-  "D1": {
-    "title": "Default configuration refactoring",
-    "source": "User request: the default configuration must let the user start working immediately and must tell which fields to fill in",
-    "status": "done",
-    "effort": "2-3 hours",
-    "impact": "high",
-    "priority": 5,
-    "blocked_by": [],
-    "problem": "The built-in default configuration does not let the user start working immediately and, most importantly, the user does not know which fields in the configuration are available. Default values look like usable paths (/tmp/lazyam3/input) or dummy placeholders (/path/to/file.log), so a fresh setup silently runs with unusable settings and gives no guidance.",
-    "proposal": "Refactor the default configuration into self-documenting placeholder values and fail fast with a message pointing to the config file when the effective configuration equals the built-in default.",
-    "implementation": {
-      "file": "internal/infra/config/config.go",
-      "notes": [
-        "Replace defaultCFG() placeholder values with self-documenting placeholders (e.g. /path/to/lazyam3/input)",
-        "Detect effective config equal to defaultCFG() and return a default-configuration error",
-        "Error message must include the config file path the user has to edit and the required fields"
-      ]
-    },
-    "benefits": [
-      "User immediately understands which fields to fill in the default config",
-      "Startup fails fast with an actionable message instead of running on unusable defaults",
-      "No silent misconfiguration on fresh installs"
-    ],
+    "title": "Make ffmpeg binary configurable via app configuration",
     "trade_offs": [
-      "Default configuration is no longer directly usable — the user must always create or edit a config file",
-      "Equality-based detection also flags user configs that intentionally mirror the defaults"
-    ],
-    "tests": [
-      "TestDefaultConfig_ContainsPlaceholders — defaults are self-documenting",
-      "TestIsDefault — detects effective config equal to the built-in default",
-      "TestLoad_DefaultConfigDetected — fresh install without a config file returns the default-config error",
-      "TestLoad_UserConfigNotDefault — user-edited config loads normally",
-      "TestLoad_ExplicitConfigEqualToDefault — explicit config equal to the default returns the default-config error"
-    ],
-    "outcome": "Implemented. defaultCFG() now returns self-documenting placeholders (/path/to/lazyam3/input, /path/to/lazyam3/output, /path/to/lazyam3/metadata.json, /path/to/lazyam3/storage.json, /path/to/lazyam3/lazyam3.log, executor mirrors /path/to/lazyam3/output). Config gained IsDefault() (reflect.DeepEqual vs defaultCFG()) and typed *DefaultConfigError (wraps ErrDefaultConfig, carries ConfigPath). Load() returns the default-config error when the effective config equals the default; AppModules.Init fails fast before the pipeline is created. Fresh install terminates with: 'default configuration in use: edit the config file \"<path>\" and fill in the required fields (paths.generator.input_directory, paths.generator.output_directory, paths.generator.metadata_path) to enable processing'. Trade-offs accepted: default config is no longer directly usable; equality-based detection also flags user configs that intentionally mirror the defaults."
+      "Touches domain layer (ScriptConfig) — adds one field",
+      "Template placeholder adds one line to the template",
+      "Pipeline dataflow change: ffmpeg binary must flow from config through pipeline to script builder"
+    ]
   },
   "S3": {
-    "title": "Configurable hardsub parameters",
-    "source": "User request: all parameters we are using in the script template for hardsub are worthy to be configurable",
-    "status": "proposed",
-    "effort": "2-4 hours",
-    "impact": "medium",
-    "priority": 4,
-    "blocked_by": [],
-    "problem": "Hardsub burn-in in the generated ffmpeg script hardcodes subtitles filter parameters such as font, colours and margins in BuildScript; users cannot tune burn-in behaviour.",
-    "proposal": "Make all hardsub parameters used in the script template configurable via the config, for example under script_generation.hardsub.",
-    "implementation": {
-      "file": "internal/domain/script + internal/infra/config + internal/app/pipeline",
-      "config_change": "Extend ScriptGeneration.Hardsub with configurable burn-in parameters",
-      "notes": [
-        "Move hardcoded subtitles filter arguments from buildHSUB into config-driven parameters",
-        "Extend Harsub struct or add nested parameter structs as fields are added"
-      ]
-    },
     "benefits": [
       "Hardsub burn-in behaviour tunable without code changes",
       "All script-template hardsub parameters become user-configurable"
     ],
+    "blocked_by": [],
+    "effort": "2-4 hours",
+    "impact": "medium",
+    "implementation": {
+      "config_change": "Extend ScriptGeneration.Hardsub with configurable burn-in parameters",
+      "file": "internal/domain/script + internal/infra/config + internal/app/pipeline",
+      "notes": [
+        "Domain: HarsubConfig type with all burn-in parameters (OriginalSize, FontName, FontSize, colours, margins, etc.) + withDefaults() in internal/domain/script/config.go",
+        "Infra: HardsubRules struct mirrors HarsubConfig fields with TOML tags in internal/infra/config/config.go; defaults wired into defaultCFG()",
+        "Pipeline: Options.Harsub field; Pipeline struct stores harsub; NewPipeline copies from opts; processUnit passes to buildScriptConfig",
+        "buildScriptConfig accepts HarsubConfig param, sets ScriptConfig.Harsub; passes to ScriptBuilder",
+        "buildHSUB in script.go takes HarsubConfig parameter, uses withDefaults() for fallbacks",
+        "cmd_process wires HardsubRules → HarsubConfig via pipeline.HardsubRulesToDomain conversion in pipeline/config.go",
+        "Tests: buildHSUB calls updated to pass HarsubConfig{}; buildScriptConfig calls updated to pass 7th arg"
+      ]
+    },
+    "outcome": "Implemented end-to-end. Domain: HarsubConfig type + withDefaults() in internal/domain/script/config.go. Infra: HardsubRules struct with TOML tags in internal/infra/config/config.go; defaults wired in defaultCFG(). Pipeline: Options.Harsub, Pipeline struct field, NewPipeline wiring, processUnit passes to buildScriptConfig. buildScriptConfig accepts and sets HarsubConfig. buildHSUB parameterized with HarsubConfig. cmd_process wires via pipeline.HardsubRulesToDomain (in pipeline/config.go, respecting dependency rules). All existing tests updated. gci lint issues auto-fixed.",
+    "priority": 4,
+    "problem": "Hardsub burn-in in the generated ffmpeg script hardcodes subtitles filter parameters such as font, colours and margins in BuildScript; users cannot tune burn-in behaviour.",
+    "proposal": "Make all hardsub parameters used in the script template configurable via the config, for example under script_generation.hardsub.",
+    "source": "User request: all parameters we are using in the script template for hardsub are worthy to be configurable",
+    "status": "done",
+    "tests": [
+      "TestBuildHSUB — hardsub filter string presence and path resolution",
+      "TestBuildHSUBMove — file move command generation",
+      "TestBuildHSUBCleanup — hardsub cleanup command generation",
+      "TestBuildScript_WithHSUB — SRT/HSUB sections in full script",
+      "TestBuildHSUB_PathResolution — path resolution in buildHSUB",
+      "TestHSUBConfigValueChangesOutput — changing HarsubConfig fields changes the generated filter string"
+    ],
+    "title": "Configurable hardsub parameters",
     "trade_offs": [
       "More config fields to keep in sync with the script template",
       "Default values needed for IsDefault equality detection"
-    ],
-    "tests": [
-      "TestBuildScript_HardsubParameters — configurable hardsub parameters appear in generated script",
-      "TestBuildScript_HardsubParametersFallback — defaults used when not configured"
-    ],
-    "outcome": "Not started — proposed."
+    ]
   },
   "S4": {
-    "title": "Configurable script generation command parameters",
-    "source": "User request: same as Harsub, add more structs: GlobalParameters, VideoStream, AudioStream — all of them can contain individual repeatable parameters",
-    "status": "proposed",
+    "blocked_by": [],
     "effort": "3-5 hours",
     "impact": "medium",
+    "outcome": "Split into 4 sub-features. See S4a–S4d.",
     "priority": 4,
-    "blocked_by": [],
-    "problem": "ffmpeg command construction in the generated script such as binary, rate, filter_complex and output options is assembled in code; users cannot add custom command parameters.",
-    "proposal": "Group script-generation command parameters into GlobalParameters, VideoStream and AudioStream structs, each holding individual repeatable parameters.",
-    "implementation": {
-      "file": "internal/domain/script + internal/infra/config + internal/app/pipeline",
-      "config_change": "Add ScriptGeneration.Command block with GlobalParameters, VideoStream and AudioStream",
-      "notes": [
-        "GlobalParameters: global ffmpeg options such as binary and rate",
-        "VideoStream: per-stream filters and options",
-        "AudioStream: per-stream filters and options",
-        "Repeatable parameters via slices"
-      ]
-    },
+    "problem": "ffmpeg command construction in the generated script is assembled with hardcoded parameters; users cannot tune command options without code changes.",
+    "source": "User request",
+    "status": "in_review",
+    "sub_features": [
+      "S4a",
+      "S4b",
+      "S4c",
+      "S4d"
+    ],
+    "title": "Configurable script generation command parameters"
+  },
+  "S4a": {
     "benefits": [
-      "Users can tune ffmpeg commands without code changes",
-      "Repeatable per-stream parameters"
+      "Users can change input frame rate",
+      "Users can disable -n flag"
     ],
-    "trade_offs": [
-      "Larger config surface and validation burden",
-      "Template placeholders for new parameters needed"
-    ],
+    "blocked_by": [],
+    "effort": "1-2 hours",
+    "impact": "low",
+    "implementation": {
+      "domain": "GlobalParams struct in script config; template placeholder |=global_params|= or inline fields",
+      "infra": "ScriptGeneration.Command.GlobalParameters struct with `rate` (int) and `no_overwrite` (bool) TOML fields",
+      "pipeline": "HardsubRulesToDomain pattern: GlobalParamsToDomain conversion in pipeline/config.go",
+      "template": "Replace `-n -r 25` with |=no_overwrite=| |=input_rate=| placeholders"
+    },
+    "outcome": "Not started.",
+    "priority": 4,
+    "problem": "Input rate (-r 25) and overwrite protection (-n) are hardcoded in the script template. Users cannot change frame rate or disable overwrite protection.",
+    "proposal": "Add GlobalParameters struct with `rate` and `no_overwrite` fields. Wire through config → pipeline → template. Default: rate=25, no_overwrite=true.",
+    "source": "Hardcoded in template.go:43: `ffmpeg_binary -n -r 25 -i`",
+    "status": "proposed",
     "tests": [
-      "TestBuildScript_CommandParameters — custom command parameters appear in generated script",
-      "TestBuildScript_CommandParametersFallback — defaults used when not configured"
+      "TestBuildScript_GlobalParamsRate — custom rate appears in generated script",
+      "TestBuildScript_GlobalParamsNoOverwrite — -n flag controlled by config"
     ],
-    "outcome": "Not started — proposed."
+    "title": "Configurable global ffmpeg parameters (rate, overwrite protection)",
+    "trade_offs": [
+      "Minimal — just 2 fields"
+    ]
+  },
+  "S4b": {
+    "benefits": [
+      "Users can change codec (libx264, libx265, etc.)",
+      "Users can tune quality (CRF, preset)",
+      "Users can change pixel format, profile, GOP"
+    ],
+    "blocked_by": [],
+    "effort": "1-2 hours",
+    "impact": "medium",
+    "implementation": {
+      "domain": "VideoEncodingConfig struct; withDefaults() fills defaults for zero values",
+      "infra": "ScriptGeneration.Command.VideoEncoding struct with TOML fields",
+      "pipeline": "VideoEncodingToDomain conversion in pipeline/config.go",
+      "template": "Replace hardcoded video output line with template placeholders"
+    },
+    "outcome": "Not started.",
+    "priority": 4,
+    "problem": "Video encoding settings (codec, preset, CRF, pixel format, profile, GOP) are hardcoded. Users cannot change video quality or encoding settings.",
+    "proposal": "Add VideoEncoding struct with `codec`, `preset`, `crf`, `pix_fmt`, `profile`, `gop` fields. Wire through config → pipeline → domain → template.",
+    "source": "Hardcoded in buildOutputFilesPredictions: `-c:v libx264 -preset medium -crf 21 -pix_fmt yuv420p -profile:v high -g 0`",
+    "status": "proposed",
+    "tests": [
+      "TestBuildScript_VideoEncoding — custom video params appear in generated script",
+      "TestBuildScript_VideoEncodingFallback — defaults used when not configured"
+    ],
+    "title": "Configurable video encoding parameters",
+    "trade_offs": [
+      "Larger config surface",
+      "Codec validation needed (only known codecs allowed)"
+    ]
+  },
+  "S4c": {
+    "benefits": [
+      "Users can change audio codec (alac, aac, opus, etc.)",
+      "Users can tune compression level"
+    ],
+    "blocked_by": [],
+    "effort": "1-2 hours",
+    "impact": "medium",
+    "implementation": {
+      "domain": "AudioEncodingConfig struct; withDefaults() fills defaults for zero values",
+      "infra": "ScriptGeneration.Command.AudioEncoding struct with TOML fields",
+      "pipeline": "AudioEncodingToDomain conversion in pipeline/config.go",
+      "template": "Replace hardcoded audio output line with template placeholders"
+    },
+    "outcome": "Not started.",
+    "priority": 4,
+    "problem": "Audio encoding settings (codec, compression level) are hardcoded. Users cannot change audio codec or quality.",
+    "proposal": "Add AudioEncoding struct with `codec`, `compression_level` fields. Wire through config → pipeline → domain → template.",
+    "source": "Hardcoded in buildOutputFilesPredictions: `-c:a alac -compression_level 0`",
+    "status": "proposed",
+    "tests": [
+      "TestBuildScript_AudioEncoding — custom audio params appear in generated script",
+      "TestBuildScript_AudioEncodingFallback — defaults used when not configured"
+    ],
+    "title": "Configurable audio encoding parameters",
+    "trade_offs": [
+      "Codec validation needed"
+    ]
+  },
+  "S4d": {
+    "benefits": [
+      "Users can change sample rate, tempo",
+      "Users can enable/disable deinterlace, choose filter"
+    ],
+    "blocked_by": [],
+    "effort": "1-2 hours",
+    "impact": "medium",
+    "implementation": {
+      "domain": "AudioFilterConfig, VideoFilterConfig structs; filter builders use config values",
+      "infra": "ScriptGeneration.Command.AudioFilter (sample_rate, tempo) and VideoFilter (deinterlace: bool, filter_name: string) structs",
+      "pipeline": "FilterConfigToDomain conversion in pipeline/config.go",
+      "template": "No template change — filter builders produce the filter strings"
+    },
+    "outcome": "Not started.",
+    "priority": 4,
+    "problem": "Audio filter chain (aresample, atempo) and video deinterlace filter (yadif) are hardcoded. Users cannot tune or disable filters.",
+    "proposal": "Add AudioFilter and VideoFilter structs with filter parameters. Wire through config → pipeline → domain → filter builders.",
+    "source": "Hardcoded in buildAudioFilter: `aresample=48000,atempo=25/(25/1)`; buildVideoFilter: `yadif,`",
+    "status": "proposed",
+    "tests": [
+      "TestBuildScript_AudioFilter — custom audio filter params appear in generated script",
+      "TestBuildScript_VideoFilter — custom video filter params appear in generated script"
+    ],
+    "title": "Configurable audio/video filter parameters",
+    "trade_offs": [
+      "Filter parameter validation",
+      "atempo formula may need to be user-configurable"
+    ]
   }
 }

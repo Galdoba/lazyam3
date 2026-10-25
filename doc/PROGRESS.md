@@ -34,6 +34,14 @@
   - Generator paths non-empty: `input_directory`, `output_directory`, `metadata_path`
 - 7 tests added/updated
 
+#### D1 — Default configuration refactoring (done)
+- **Problem:** built-in default config used usable-looking paths (`/tmp/lazyam3/input`) or dummy placeholders (`/path/to/file.log`, `/path/to/file.json`); fresh installs silently ran on unusable defaults and users had no idea which fields existed.
+- **Solution:**
+  - `defaultCFG()` refactored to self-documenting placeholders: `/path/to/lazyam3/input`, `/path/to/lazyam3/output`, `/path/to/lazyam3/metadata.json`, `/path/to/lazyam3/storage.json`, `/path/to/lazyam3/lazyam3.log`, executor mirrors `/path/to/lazyam3/output/<key>`.
+  - `Config.IsDefault()` added (reflect.DeepEqual against `defaultCFG()`).
+  - Typed error `*DefaultConfigError{ConfigPath}` wrapping sentinel `ErrDefaultConfig` added.
+  - `Load()` returns the default-config error when the effective config equals the default; `AppModules.Init` fails fast (unwrapped) before logger/pipeline creation.
+
 #### Feature Planning
 - **A5** — Custom slog text handler with format template (proposed, priority 5)
   - Analysis saved to `doc/custom_slog_handler_proposal.md`
@@ -54,17 +62,14 @@
 ### Key Technical Findings
 
 1. **TOML map merge semantics:** `go-toml/v2` merges decoded maps into existing seeded maps — missing keys keep seed values. Partial executor sections fill missing keys from seeds. Verified empirically.
-
 2. **DiscoverAndLoad swallows validation errors:** Falls through to standard paths (`~/.config/...`). Invalid explicit configs silently load user's real config. Only surfaces when no candidate loads. This is a `configmanager` library behavior.
-
 3. **Color via post-processing:** `colorLevelWriter` works because TextHandler writes one `Write()` per record. ReplaceAttr cannot pass ANSI codes (strconv.Quote escapes control chars).
-
 4. **First-run crash fixed:** `Logger.Path = "/path/to/file"` caused `os.OpenFile("/path/to/file")` → permission denied on `/` for non-root users. Fresh installs now work with `Path = ""`.
 
 ### Metrics
 
 - **Lines changed:** ~120 lines of code, ~80 lines of tests
-- **Features completed:** 5 (A2, A3, A4, C1, BUG-1)
+- **Features completed:** 5 (A2, A3, A4, C1)
 - **Features added:** 3 (A5, S1, S2)
 - **Tests added:** 9 (across config and logging packages)
 - **Gates passed:** `go build`, `go test -race -cover`, `go vet`, `golangci-lint run` — all clean
@@ -95,9 +100,7 @@
 ### Key Technical Findings
 
 1. **configmanager doesn't support UnmarshalTOML:** `go-toml/v2` (used by configmanager) ignores custom `UnmarshalTOML` methods. Custom TOML handling must be done in `Load()` after `configmanager` returns, or via struct fields with TOML tags.
-
 2. **S1+S2 prepare template for configurable ffmpeg:** `ScriptGeneration.FfmpegBinary` field added in S1; S2 will wire it through pipeline → ScriptConfig → template placeholder.
-
 3. **Breaking config change:** `[hardsub]` → `[script_generation.hardsub]`. User config at `~/.config/lazyam3/config.toml` updated manually.
 
 ### Metrics
@@ -177,3 +180,21 @@ default configuration in use: edit the config file "<config file path>" and fill
 ### What to Watch For
 - Next feature: `A5` — Custom slog text handler with format template (proposed, priority 5, no blockers).
 - D1 trade-off: equality-based detection also flags user configs that intentionally mirror the defaults.
+
+### S3: Configurable hardsub parameters (in_review)
+
+#### Changes
+- `doc/feature_list.json` — corrected S3 `tests` array to list actual test names.
+- `internal/domain/script/script_test.go` — added `TestHSUBConfigValueChangesOutput`
+  asserting that changing `HarsubConfig` fields produces different `force_style` output
+  (tests `MarginV` and `FontName`).
+
+#### Gates
+- `go build ./...` — pass
+- `go test -race -cover ./...` — pass (domain/script 98.0%)
+- `go vet ./...` — pass
+- `golangci-lint run` — 0 issues
+
+#### Notes
+- S3 is ready to commit. The feature_list.json `status` is already `done`.
+- Next feature: `S4` — Configurable ffmpeg/filter command parameters (in_review).

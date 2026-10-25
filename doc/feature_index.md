@@ -2,14 +2,10 @@
 
 | Code | Status | Priority | Title | Blocked by |
 |---|---|---|---|---|
-| `BUG-1` | done | 1 | Env.TargetRoot regression: scriptRoot instead of executor target | — |
-| `A3` | done | 2 | JSON vs text format toggle | — |
-| `A4` | done | 2 | Color support for terminal logs | A3 |
-| `A2` | done | 3 | Group() helper for named contexts | — |
-| `C1` | done | 3 | Config package refactoring | A4 |
-| `S1` | done | 4 | Config struct refactor: ScriptGeneration block | — |
-| `S2` | done | 4 | Make ffmpeg binary configurable via app configuration | — |
-| `A5` | proposed | 5 | Custom slog text handler with format template | — |
-| `D1` | done | 5 | Default configuration refactoring | — |
-| `S3` | proposed | 4 | Configurable hardsub parameters | — |
-| `S4` | proposed | 4 | Configurable script generation command parameters | — |
+| `A5` | proposed | 2 | Custom slog text handler with format template | — |
+| `S3` | done | 4 | Configurable hardsub parameters | — |
+| `S4` | in_review | 4 | Configurable script generation command parameters | — |
+| `S4a` | proposed | 4 | Configurable global ffmpeg parameters (rate, overwrite protection) | — |
+| `S4b` | proposed | 4 | Configurable video encoding parameters | — |
+| `S4c` | proposed | 4 | Configurable audio encoding parameters | — |
+| `S4d` | proposed | 4 | Configurable audio/video filter parameters | — |

@@ -44,7 +44,7 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 	// Build video section
 	interlaced := getInterlaced(cfg.Streams)
 	yadif := buildVideoFilter(interlaced)
-	hsub := buildHSUB(cfg.HSUBFile, cfg.Env.InProgress)
+	hsub := buildHSUB(cfg.HSUBFile, cfg.Env.InProgress, cfg.Harsub)
 
 	// Build audio section — still needs stream indices for filter_complex
 	audioTracks := selectAudioTracksFromPredictions(cfg)
@@ -250,7 +250,9 @@ func buildSRTCleanup(srt string) string {
 // buildHSUB generates the hardsub filter string if HSUBFile is set.
 // The path is resolved against inProgress so the filter references the
 // absolute location inside IN_PROGRESS where the script moves the file.
-func buildHSUB(hsubFile, inProgress string) string {
+// Burn-in parameters come from the configured HarsubConfig; unset values
+// fall back to the built-in defaults.
+func buildHSUB(hsubFile, inProgress string, hsub HarsubConfig) string {
 	if hsubFile == "" {
 		return ""
 	}
@@ -258,7 +260,8 @@ func buildHSUB(hsubFile, inProgress string) string {
 	if inProgress != "" {
 		path = filepath.ToSlash(filepath.Join(inProgress, hsubFile))
 	}
-	return fmt.Sprintf(`subtitles=filename=%s:original_size=1920x1080:force_style='FontName=Segoe UI,Fontsize=19.4,PrimaryColour='&H00EBEBEB',SecondaryColour='&H000000FF',OutlineColour='&H00000000',BackColour='&H80000000',Underline=0,StrikeOut=0,ScaleX=1,ScaleY=1,Spacing=0,Angle=0,BorderStyle=1,Outline=0.5,Shadow=0,Alignment=2,MarginL=5,MarginR=5,MarginV=20,Encoding=1',`, path)
+	p := hsub
+	return fmt.Sprintf(`subtitles=filename=%s:original_size=%s:force_style='FontName=%s,Fontsize=%v,PrimaryColour='%s',SecondaryColour='%s',OutlineColour='%s',BackColour='%s',Underline=%d,StrikeOut=%d,ScaleX=%v,ScaleY=%v,Spacing=%d,Angle=%d,BorderStyle=%d,Outline=%v,Shadow=%d,Alignment=%d,MarginL=%d,MarginR=%d,MarginV=%d,Encoding=%d',`, path, p.OriginalSize, p.FontName, p.FontSize, p.PrimaryColour, p.SecondaryColour, p.OutlineColour, p.BackColour, p.Underline, p.StrikeOut, p.ScaleX, p.ScaleY, p.Spacing, p.Angle, p.BorderStyle, p.Outline, p.Shadow, p.Alignment, p.MarginL, p.MarginR, p.MarginV, p.Encoding)
 }
 
 // buildHSUBMove generates the shell line to move the hardsub file from

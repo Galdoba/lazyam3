@@ -31,9 +31,10 @@ type Options struct {
 	SourceDir     string
 	Destination   string
 	DryRun        bool
-	HardsubTag    string            // filename tag marking sidecar subtitles as hardsub (burn-in)
-	FfmpegBinary  string            // path to ffmpeg binary for generated scripts
-	ExecutorPaths map[string]string // executor filesystem paths from config
+	HardsubTag    string              // filename tag marking sidecar subtitles as hardsub (burn-in)
+	Harsub        script.HarsubConfig // hardsub burn-in parameters for the subtitles filter
+	FfmpegBinary  string              // path to ffmpeg binary for generated scripts
+	ExecutorPaths map[string]string   // executor filesystem paths from config
 	CFG           config.Config
 }
 
