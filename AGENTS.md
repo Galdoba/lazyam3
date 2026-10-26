@@ -6,13 +6,15 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 
 ## Current Feature
 
-> **Work on**: dormancy period for cyclic mode
+> **Work on**: custom text logger handler (format template)
 >
 > Status: `in_review` 
 
-> **Just finished: `D1` — Dormancy period for cyclic mode** (`doc/cycling_mode.md`) — status: `in_review` · effort: 1-2 hours · priority: 4
+> **Just finished: `A5` — Custom slog text handler with format template** (`doc/text_logger_format_refactoring.md`) — status: `in_review` · effort: 2-3 hours · priority: 2
 
 Selection rule: pick the highest-priority feature in `doc/feature_list.json` whose `blocked_by` list is empty and whose `status` is `proposed`. When a feature is done, set its `status` to `in_rewiew` in `doc/feature_list.json` before moving on.
+
+Note: `D1` (dormancy period for cyclic mode) remains `in_review`.
 
 ## Live Test
 
@@ -34,6 +36,7 @@ Run before/after any pipeline change to verify end-to-end behavior.
 | `doc/metadata.md` | Metadata domain: Product/Kind, ProductRepository, tree lookup, catalog test data |
 | `doc/script.md` | Script domain: BuildScript, naming derivation, audio filters, SRT/HSUB handling, template |
 | `doc/callname.md` | CallName bounded context: input/output filename construction, transliteration, naming patterns |
+| `doc/text_logger_format_refactoring.md` | Text logger format spec: template placeholders, config defaults, colorization, test plan |
 | `doc/feature_list.json` | Feature backlog: status, priority, blocked_by, implementation notes, tests per feature |
 | `doc/feature_index.md` | Synced feature table from feature_list.json |
 | `doc/logging_suggestions.md` | Logging improvement catalog (A1–A4 quick wins, B1–B5 larger items) with trade-offs |

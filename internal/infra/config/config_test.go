@@ -349,3 +349,35 @@ func TestScriptGeneration_DefaultConfig(t *testing.T) {
 		t.Error("ScriptGeneration.FfmpegBinary should be non-empty")
 	}
 }
+
+func TestDefaultConfig_LoggerFormatText(t *testing.T) {
+	cfg := defaultCFG()
+	if cfg.Logger.FormatText != "{time} [{level}] {module}: {message} {attrs}" {
+		t.Errorf("Logger.FormatText = %q, want the default template", cfg.Logger.FormatText)
+	}
+	if cfg.Logger.TimestampFormat != "06-01-02 15:04:05.000" {
+		t.Errorf("Logger.TimestampFormat = %q, want %q", cfg.Logger.TimestampFormat, "06-01-02 15:04:05.000")
+	}
+}
+
+func TestLoad_FormatTextInheritedWhenMissing(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("LAZYAM3_CONFIG", "")
+	t.Setenv("LAZYAM3_CONFIG_PATH", "")
+	toml := `[paths.generator]
+input_directory = '/in'
+output_directory = '/out'
+metadata_path = '/meta.json'
+`
+	path := writeConfig(t, toml)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+	if cfg.Logger.FormatText != defaultCFG().Logger.FormatText {
+		t.Errorf("missing format_text must inherit the default: got %q", cfg.Logger.FormatText)
+	}
+	if cfg.Logger.TimestampFormat != defaultCFG().Logger.TimestampFormat {
+		t.Errorf("missing timestamp_format must inherit the default: got %q", cfg.Logger.TimestampFormat)
+	}
+}

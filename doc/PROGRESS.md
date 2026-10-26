@@ -260,3 +260,34 @@ default configuration in use: edit the config file "<config file path>" and fill
 ### What to Watch For
 - Next feature: `S4` — Configurable ffmpeg/filter command parameters (in_review).
 - `--dormancy` flag overrides config value; flag takes precedence.
+
+## Session 2026-10-26 — A5: Custom slog text handler with format template
+
+**Feature:** `A5` (`doc/text_logger_format_refactoring.md`) — status moved `proposed` → `in_review`.
+
+**Evaluation findings (before implementation):**
+- Proposal contradicted itself on `{level}` rendering (§5 `[INFO]` vs §11 `[{level}]`), on test #4 vs #5 (group prefix kept vs stripped), and on whether the desired format was a default or opt-in (§1 vs §3.6/§8).
+- §6 regex draft had no capture groups while `colorizeLevel()` indexes `loc[4]:loc[5]` → would have panicked; also couldn't anchor `[INFO]` behind a space-containing timestamp.
+- Gaps: empty-placeholder separator behavior, `format_text`×`format="json"` gating, handler concurrency (struct-level buffer = data race).
+
+**Decisions confirmed with user:**
+1. Ship the desired format as the new default (configmanager merges TOML over `defaultCFG()` — verified in appcontext source; missing keys inherit defaults).
+2. `{level}` = bare level name, brackets literal in template.
+3. Empty placeholders swallow adjacent space/colon-only literals.
+
+**Implemented:**
+- `config.Logging` += `FormatText`, `TimestampFormat` (+ defaults: `"{time} [{level}] {module}: {message} {attrs}"`, `"06-01-02 15:04:05.000"`).
+- `customTextHandler` in `internal/infra/logging/logger.go`: template parsed once, immutable handler state, local buffer in `Handle`, group stack → `{module}`, attrs unprefixed + quoted strings, nested `slog.Group` flattening, `Resolve()`d values, in-handler level colorization (fallback path keeps `colorLevelWriter` untouched).
+- Spec doc rewritten with decisions/deviations; `feature_list.json` A5 synced (source now points at the real doc, 18 tests listed); `feature_index.md`, `AGENTS.md`, `HANDOFF.md` updated.
+
+**Tests added (18):** 14 in `logging` (`TestCustomHandler_*` ×13, `TestNewTermHandler_*` ×3 — exact-line render, attrs quoting, module/nesting, prefix stripping, color, layouts, swallowing, reordering, unknown placeholder, nested group, concurrency, e2e, JSON gating, fallback), 2 in `config` (`TestDefaultConfig_LoggerFormatText`, `TestLoad_FormatTextInheritedWhenMissing`).
+
+**Metrics:**
+- Gates: `go build` ✓ · `go test -race -cover ./...` ✓ (logging 93.2%, config 84.8%) · `go vet` ✓ · `golangci-lint` → 106 issues = pre-existing baseline (`//log=` comment noise in untouched files); **0 new issues** (stash-diff verified).
+- Live test: passed — 6/6 units, terminal `26-10-26 12:10:18.812 [INFO] pipeline: processing dir="..."`, file log unchanged JSON.
+- Lines changed: ~230 lines of code, ~380 lines of tests.
+
+**What to watch for:**
+- Non-string attrs with spaces render unquoted (`error=product 63580 not found`) — per spec, but ambiguous for parsers.
+- Lint gate is red repo-wide even on clean checkout (gci/gocritic on `//log=` placeholders) — pre-existing, out of A5 scope.
+- Priority numbering in `feature_list.json` is ambiguous (2 "higher" than 4?) — next-feature selection needs clarification.

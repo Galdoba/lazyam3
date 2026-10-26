@@ -120,11 +120,13 @@ func (p Paths) GeneratorFFprobe() string { return p.Generator.FfprobeBinary }
 func (p Paths) ExecutorPath(key string) string { return p.Executor[key] }
 
 type Logging struct {
-	Level    string `toml:"level"`
-	Path     string `toml:"path"`
-	Terminal bool   `toml:"terminal"`
-	Format   string `toml:"format"` // "json" (default) or "text" — terminal output only
-	Color    bool   `toml:"color"`  // colorize level in terminal text output
+	Level           string `toml:"level"`
+	Path            string `toml:"path"`
+	Terminal        bool   `toml:"terminal"`
+	Format          string `toml:"format"`           // "json" (default) or "text" — terminal output only
+	Color           bool   `toml:"color"`            // colorize level in terminal text output
+	FormatText      string `toml:"format_text"`      // text output template; empty falls back to slog.TextHandler
+	TimestampFormat string `toml:"timestamp_format"` // Go time layout for {time}; empty uses the default layout
 }
 
 func defaultCFG() Config {
@@ -150,11 +152,13 @@ func defaultCFG() Config {
 			},
 		},
 		Logger: Logging{
-			Level:    "info",
-			Path:     "/path/to/lazyam3/lazyam3.log",
-			Terminal: true,
-			Format:   "text",
-			Color:    true,
+			Level:           "info",
+			Path:            "/path/to/lazyam3/lazyam3.log",
+			Terminal:        true,
+			Format:          "text",
+			Color:           true,
+			FormatText:      "{time} [{level}] {module}: {message} {attrs}",
+			TimestampFormat: "06-01-02 15:04:05.000",
 		},
 		Storage: Storage{
 			Path: "/path/to/lazyam3/storage.json",

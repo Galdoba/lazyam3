@@ -9,34 +9,54 @@
     "effort": "2-3 hours",
     "impact": "medium",
     "implementation": {
-      "config_field": "FormatText string `toml:\"format_text\"` on config.Logging",
+      "config_field": "FormatText string `toml:\"format_text\"` and TimestampFormat string `toml:\"timestamp_format\"` on config.Logging",
+      "defaults": [
+        "FormatText = \"{time} [{level}] {module}: {message} {attrs}\"",
+        "TimestampFormat = \"06-01-02 15:04:05.000\"",
+        "empty format_text opts out (falls back to slog.TextHandler)"
+      ],
       "file": "internal/infra/logging/logger.go",
       "notes": [
-        "Implement slog.Handler interface with template parsing",
-        "WithAttrs accumulates attrs; WithGroup adds key prefix",
-        "Enabled compares level; Handle renders template against Record",
-        "colorLevelWriter wraps os.Stderr as before — post-processing on raw bytes",
+        "customTextHandler implements slog.Handler; template parsed once at creation",
+        "WithAttrs/WithGroup return copies — immutable after construction, Handle uses a local buffer (race-free, no mutex)",
+        "{module} renders the group stack; attrs are rendered unprefixed (never pipeline.dir)",
+        "Empty placeholder swallows adjacent literal if it is only spaces/colons — no dangling ': ' or trailing space",
+        "Level colorized inside the handler when color=true; colorLevelWriter + levelFieldRe untouched (fallback path only)",
+        "format_text honored only when format = \"text\"",
         "File handler stays JSON (unaffected)"
       ]
     },
     "priority": 2,
     "problem": "slog.TextHandler has no format customization options — field order, separators, timestamp format, and structure are all fixed.",
-    "proposal": "Replace slog.TextHandler with a custom handler that renders a format string like '{time} [{level}] {msg} {attrs}'. Minimal template set: {time}, {level}, {msg}, {attrs}. colorLevelWriter post-processing continues to work on the writer.",
-    "source": "doc/custom_slog_handler_proposal.md",
-    "status": "proposed",
+    "proposal": "Replace slog.TextHandler with a custom handler rendering a format template. Placeholders: {time}, {level}, {module}, {message}, {attrs}. {level} renders the bare level name (brackets are literal template text). Shipped as the new default via defaultCFG(); empty format_text falls back to slog.TextHandler.",
+    "source": "doc/text_logger_format_refactoring.md",
+    "status": "in_review",
     "tests": [
-      "TestCustomHandler_RenderBasic — template with {time} [{level}] {msg}",
-      "TestCustomHandler_RenderAttrs — {attrs} renders key=value pairs",
-      "TestCustomHandler_WithAttrs — accumulated attrs appear in output",
-      "TestCustomHandler_WithGroup — group prefix applied to attr keys",
-      "TestCustomHandler_ColorIntegration — colorLevelWriter still works",
-      "TestCustomHandler_TerminalTextFormat — end-to-end NewLogger with custom format"
+      "TestCustomHandler_RenderBasic — exact desired output line",
+      "TestCustomHandler_RenderAttrs — quoted strings, unquoted non-strings",
+      "TestCustomHandler_AccumulatedAttrs — WithAttrs appear in output",
+      "TestCustomHandler_Module — empty/one/nested group stack",
+      "TestCustomHandler_GroupPrefixStripping — group only via {module}, never pipeline.dir",
+      "TestCustomHandler_Color — ANSI around level when color=true",
+      "TestCustomHandler_TimestampFormat — custom and default layouts",
+      "TestCustomHandler_Message — message as plain text",
+      "TestCustomHandler_EmptyMessageAndAttrsSwallowSeparators — no dangling/trailing separators",
+      "TestCustomHandler_TemplateReordering — placeholder order arbitrary",
+      "TestCustomHandler_UnknownPlaceholder — {foo} passes through literally",
+      "TestCustomHandler_NestedGroupAttr — slog.Group flattens to inner.k=v",
+      "TestCustomHandler_ConcurrentHandle — 50 goroutines, race-clean",
+      "TestNewTermHandler_CustomFormatText — end-to-end newTermHandler output",
+      "TestNewTermHandler_FallbackToTextHandler — empty format_text keeps old format",
+      "TestNewTermHandler_FormatTextIgnoredForJSON — format=json ignores format_text",
+      "TestDefaultConfig_LoggerFormatText — default template and layout",
+      "TestLoad_FormatTextInheritedWhenMissing — missing TOML keys inherit defaults"
     ],
     "title": "Custom slog text handler with format template",
     "trade_offs": [
-      "Replaces slog.TextHandler entirely — lose upstream improvements",
-      "Template parsing per log record (minor overhead)",
-      "Basic template (no conditionals, no per-field formatting)"
+      "Custom path loses upstream slog.TextHandler improvements (fallback retained via format_text = \"\")",
+      "Terminal output format changes for configs that omit format_text (intended; opt-out available)",
+      "No conditional segments — only separator swallowing for empty placeholders",
+      "Non-string attrs with spaces render unquoted (error=product 63580 not found)"
     ]
   },
   "S1": {

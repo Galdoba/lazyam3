@@ -7,6 +7,9 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -440,5 +443,299 @@ func TestNewLogger_TerminalTextFormat(t *testing.T) {
 	}
 	if !bytes.Contains(data, []byte("pipeline start")) {
 		t.Errorf("expected text line in terminal output, got:\n%s", data)
+	}
+}
+
+const testTemplate = "{time} [{level}] {module}: {message} {attrs}"
+
+func testRecordTime() time.Time {
+	return time.Date(2026, time.October, 25, 22, 9, 52, 794000000, time.UTC)
+}
+
+type renderOpts struct {
+	template        string
+	timestampFormat string
+	color           bool
+	groups          []string
+	preAttrs        []slog.Attr
+	msg             string
+	attrs           []slog.Attr
+}
+
+func renderCustom(t *testing.T, o renderOpts) string {
+	t.Helper()
+	var buf bytes.Buffer
+	h := newCustomTextHandler(textHandlerOptions{
+		level:           slog.LevelDebug,
+		timestampFormat: o.timestampFormat,
+		template:        o.template,
+		color:           o.color,
+	}, &buf)
+	handler := h
+	for _, g := range o.groups {
+		handler = handler.WithGroup(g)
+	}
+	if len(o.preAttrs) > 0 {
+		handler = handler.WithAttrs(o.preAttrs)
+	}
+	rec := slog.NewRecord(testRecordTime(), slog.LevelInfo, o.msg, 0)
+	rec.AddAttrs(o.attrs...)
+	if err := handler.Handle(context.Background(), rec); err != nil {
+		t.Fatalf("Handle: %v", err)
+	}
+	return buf.String()
+}
+
+func TestCustomHandler_RenderBasic(t *testing.T) {
+	got := renderCustom(t, renderOpts{
+		template:        testTemplate,
+		timestampFormat: "06-01-02 15:04:05.000",
+		groups:          []string{"pipeline"},
+		msg:             "processing",
+		attrs:           []slog.Attr{slog.String("dir", "/path")},
+	})
+	want := "26-10-25 22:09:52.794 [INFO] pipeline: processing dir=\"/path\"\n"
+	if got != want {
+		t.Errorf("render:\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestCustomHandler_RenderAttrs(t *testing.T) {
+	got := renderCustom(t, renderOpts{
+		template: "{attrs}",
+		msg:      "unused",
+		attrs: []slog.Attr{
+			slog.String("name", "x"),
+			slog.Int("id", 42),
+			slog.Bool("flag", true),
+			slog.Float64("ratio", 1.5),
+		},
+	})
+	want := "name=\"x\" id=42 flag=true ratio=1.5\n"
+	if got != want {
+		t.Errorf("render:\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestCustomHandler_AccumulatedAttrs(t *testing.T) {
+	got := renderCustom(t, renderOpts{
+		template: "{message} {attrs}",
+		preAttrs: []slog.Attr{slog.String("app", "cli")},
+		msg:      "start",
+		attrs:    []slog.Attr{slog.Int("id", 7)},
+	})
+	want := "start app=\"cli\" id=7\n"
+	if got != want {
+		t.Errorf("render:\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestCustomHandler_Module(t *testing.T) {
+	tests := []struct {
+		name   string
+		groups []string
+		want   string
+	}{
+		{"no group", nil, "processing\n"},
+		{"one group", []string{"pipeline"}, "pipeline: processing\n"},
+		{"nested groups", []string{"pipeline", "command"}, "pipeline.command: processing\n"},
+	}
+	for _, tc := range tests {
+		got := renderCustom(t, renderOpts{
+			template: "{module}: {message}",
+			groups:   tc.groups,
+			msg:      "processing",
+		})
+		if got != tc.want {
+			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestCustomHandler_GroupPrefixStripping(t *testing.T) {
+	got := renderCustom(t, renderOpts{
+		template: testTemplate,
+		groups:   []string{"pipeline"},
+		msg:      "processing",
+		attrs:    []slog.Attr{slog.String("dir", "/path")},
+	})
+	if strings.Contains(got, "pipeline.dir") {
+		t.Errorf("attr key must not repeat the group prefix: %q", got)
+	}
+	if !strings.Contains(got, "pipeline: processing dir=\"/path\"") {
+		t.Errorf("expected module + unprefixed attr, got %q", got)
+	}
+}
+
+func TestCustomHandler_Color(t *testing.T) {
+	colored := renderCustom(t, renderOpts{template: "{level}", color: true, msg: "m"})
+	if !strings.Contains(colored, "\x1b[32mINFO\x1b[0m") {
+		t.Errorf("color=true: expected colorized level, got %q", colored)
+	}
+	plain := renderCustom(t, renderOpts{template: "{level}", color: false, msg: "m"})
+	if plain != "INFO\n" {
+		t.Errorf("color=false: got %q, want %q", plain, "INFO\n")
+	}
+}
+
+func TestCustomHandler_TimestampFormat(t *testing.T) {
+	short := renderCustom(t, renderOpts{
+		template:        "{time} {level}",
+		timestampFormat: "15:04:05",
+		msg:             "m",
+	})
+	if short != "22:09:52 INFO\n" {
+		t.Errorf("custom layout: got %q", short)
+	}
+	def := renderCustom(t, renderOpts{template: "{time} {level}", msg: "m"})
+	if def != "2026/10/25 22:09:52.794 INFO\n" {
+		t.Errorf("default layout: got %q", def)
+	}
+}
+
+func TestCustomHandler_Message(t *testing.T) {
+	got := renderCustom(t, renderOpts{
+		template: testTemplate,
+		groups:   []string{"pipeline"},
+		msg:      "scan failed, using fallback",
+	})
+	// message is plain text; with the default timestamp layout the time differs —
+	// check structure instead of the exact timestamp.
+	if !strings.HasSuffix(got, "[INFO] pipeline: scan failed, using fallback\n") {
+		t.Errorf("message with separators: got %q", got)
+	}
+}
+
+func TestCustomHandler_EmptyMessageAndAttrsSwallowSeparators(t *testing.T) {
+	got := renderCustom(t, renderOpts{
+		template:        testTemplate,
+		timestampFormat: "15:04:05",
+		groups:          []string{"pipeline"},
+		msg:             "",
+	})
+	want := "22:09:52 [INFO] pipeline\n"
+	if got != want {
+		t.Errorf("empty message+attrs: got %q, want %q", got, want)
+	}
+
+	noGroup := renderCustom(t, renderOpts{
+		template:        testTemplate,
+		timestampFormat: "15:04:05",
+		msg:             "processing",
+	})
+	want = "22:09:52 [INFO] processing\n"
+	if noGroup != want {
+		t.Errorf("empty module+attrs: got %q, want %q", noGroup, want)
+	}
+
+	trailing := renderCustom(t, renderOpts{
+		template: "{message} {attrs}",
+		msg:      "processing",
+	})
+	if trailing != "processing\n" {
+		t.Errorf("empty attrs must not leave a trailing space: %q", trailing)
+	}
+}
+
+func TestCustomHandler_TemplateReordering(t *testing.T) {
+	got := renderCustom(t, renderOpts{
+		template:        "{message} {level} {time}",
+		timestampFormat: "15:04:05",
+		msg:             "processing",
+	})
+	want := "processing INFO 22:09:52\n"
+	if got != want {
+		t.Errorf("reordered template: got %q, want %q", got, want)
+	}
+}
+
+func TestCustomHandler_UnknownPlaceholder(t *testing.T) {
+	got := renderCustom(t, renderOpts{
+		template:        "{time} {foo} {level}",
+		timestampFormat: "15:04:05",
+		msg:             "m",
+	})
+	want := "22:09:52 {foo} INFO\n"
+	if got != want {
+		t.Errorf("unknown placeholder: got %q, want %q", got, want)
+	}
+}
+
+func TestCustomHandler_NestedGroupAttr(t *testing.T) {
+	got := renderCustom(t, renderOpts{
+		template: "{attrs}",
+		msg:      "m",
+		attrs:    []slog.Attr{slog.Group("inner", slog.String("k", "v"))},
+	})
+	want := "inner.k=\"v\"\n"
+	if got != want {
+		t.Errorf("nested group attr: got %q, want %q", got, want)
+	}
+}
+
+type syncWriter struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (w *syncWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.b.Write(p)
+}
+
+func TestCustomHandler_ConcurrentHandle(t *testing.T) {
+	w := &syncWriter{}
+	h := newCustomTextHandler(textHandlerOptions{
+		level:    slog.LevelDebug,
+		template: testTemplate,
+	}, w)
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			rec := slog.NewRecord(testRecordTime(), slog.LevelInfo, "concurrent", 0)
+			rec.AddAttrs(slog.Int("id", i))
+			_ = h.Handle(context.Background(), rec)
+		}()
+	}
+	wg.Wait()
+	if got := strings.Count(w.b.String(), "concurrent"); got != 50 {
+		t.Errorf("expected 50 rendered lines, got %d", got)
+	}
+}
+
+func TestNewTermHandler_CustomFormatText(t *testing.T) {
+	data := captureTermOutput(t, config.Logging{
+		Terminal:        true,
+		Format:          "text",
+		Color:           false,
+		FormatText:      "{time} {level} {message} {attrs}",
+		TimestampFormat: "15:04:05",
+	})
+	if !regexp.MustCompile(`^\d{2}:\d{2}:\d{2} INFO format test message key="value"\n$`).Match(data) {
+		t.Errorf("custom format output: %q", data)
+	}
+}
+
+func TestNewTermHandler_FallbackToTextHandler(t *testing.T) {
+	data := captureTermOutput(t, config.Logging{Terminal: true, Format: "text", Color: false})
+	if !bytes.Contains(data, []byte("level=INFO")) {
+		t.Errorf("empty format_text must fall back to slog.TextHandler, got: %q", data)
+	}
+}
+
+func TestNewTermHandler_FormatTextIgnoredForJSON(t *testing.T) {
+	data := captureTermOutput(t, config.Logging{
+		Terminal:   true,
+		Format:     "json",
+		FormatText: "{time} {level} {message}",
+	})
+	if !bytes.Contains(data, []byte(`"msg":"format test message"`)) {
+		t.Errorf("format_text must be ignored for JSON output, got: %q", data)
+	}
+	if bytes.Contains(data, []byte("INFO format test message")) {
+		t.Errorf("format_text must not switch JSON output to text, got: %q", data)
 	}
 }
