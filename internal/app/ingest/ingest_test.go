@@ -15,7 +15,7 @@ func TestIngest_RealFiles(t *testing.T) {
 		t.Skip("testdata not available")
 	}
 
-	ing := New("/usr/bin/ffprobe")
+	ing := New("/usr/bin/ffprobe", nil)
 	mu, err := ing.Ingest(testDataDir)
 	if err != nil {
 		t.Fatalf("Ingest() error: %v", err)
@@ -57,7 +57,7 @@ func TestIngest_Synthetic(t *testing.T) {
 		t.Fatalf("ReadDir error: %v", err)
 	}
 
-	ing := New("/usr/bin/ffprobe")
+	ing := New("/usr/bin/ffprobe", nil)
 
 	for _, dir := range entries {
 		if !dir.IsDir() {

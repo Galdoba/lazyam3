@@ -14,12 +14,10 @@ import (
 )
 
 func main() {
-	//log=info msg="starting lazyam3"
 	os.Exit(run())
 }
 
 func run() int {
-	//log=info msg="initializing modules"
 	// Empty container. Config and Logger will be populated in Root.Before
 	// after flag parsing. Other modules are lazy accessors.
 	modules := app.New()
@@ -34,8 +32,7 @@ func run() int {
 			},
 		},
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-		//log=info msg="config loaded from %s", configPath
-		// Root flags are already parsed here, --config is available.
+			// Root flags are already parsed here, --config is available.
 			// Create exactly what is needed for logging startup errors:
 			// config and logger. Everything else — on demand from commands.
 			if err := modules.Init(cmd.String("config")); err != nil {
@@ -44,8 +41,7 @@ func run() int {
 			return ctx, nil
 		},
 		After: func(ctx context.Context, cmd *cli.Command) error {
-		//log=info msg="shutting down modules"
-		// Closes everything that was actually created by lazy accessors.
+			// Closes everything that was actually created by lazy accessors.
 			return modules.Shutdown()
 		},
 		Commands: []*cli.Command{
@@ -59,7 +55,6 @@ func run() int {
 	defer stop()
 
 	if err := root.Run(ctx, os.Args); err != nil {
-		//log=error msg="execution failed: %v", err
 		// Before may have failed before Logger appeared.
 		if modules.Logger != nil {
 			modules.Logger.Error("execution failed", "error", err)

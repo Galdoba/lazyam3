@@ -51,7 +51,7 @@ func TestRepository_FindByID(t *testing.T) {
 		t.Fatalf("failed to write test metadata: %v", err)
 	}
 
-	repo, err := New(metaFile)
+	repo, err := New(nil, metaFile)
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
@@ -128,14 +128,14 @@ func TestRepository_New_Empty(t *testing.T) {
 		t.Fatalf("failed to write test metadata: %v", err)
 	}
 
-	_, err := New(metaFile)
+	_, err := New(nil, metaFile)
 	if err == nil {
 		t.Error("expected error for empty metadata, got nil")
 	}
 }
 
 func TestRepository_New_NotFound(t *testing.T) {
-	_, err := New("/nonexistent/path/metadata.json")
+	_, err := New(nil, "/nonexistent/path/metadata.json")
 	if err == nil {
 		t.Error("expected error for missing file, got nil")
 	}
@@ -147,7 +147,7 @@ func TestRepository_FindByID_RealFile(t *testing.T) {
 		t.Skip("testdata/metadata.json not available")
 	}
 
-	repo, err := New(path)
+	repo, err := New(nil, path)
 	if err != nil {
 		t.Fatalf("New(%q) error: %v", path, err)
 	}

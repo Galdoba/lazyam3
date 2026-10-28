@@ -39,15 +39,19 @@ Language of rendering script generation. Types: `Script`, `ScriptConfig`, `Strea
 │   └── lazyam3/
 │       └── main.go                 # entry point: AppModules → config/logger → commands
 │
-├── configs/                        # placeholder YAML configs (TOML planned — task 10)
-│
 ├── doc/
 │   ├── architecture.md             # architecture overview and development guidelines
-│   ├── ingest.md                   # ingest domain details
+│   ├── domain_callname.md          # callname domain details
+│   ├── domain_ingest.md            # ingest domain details
+│   ├── domain_metadata.md          # metadata domain details
+│   ├── domain_script.md            # script domain details
+│   ├── feature_index.md            # human-readable feature summary
+│   ├── feature_list.json           # machine-readable feature backlog
+│   ├── HANDOFF.md
+│   ├── INDEX.md
 │   ├── lazyam3.md                  # this file
-│   ├── metadata.md                 # metadata domain details
-│   ├── script.md                   # script domain details
-│   ├── tasks.json                  # implementation tasks and status
+│   ├── NOTES.md
+│   ├── PROGRESS.md
 │   └── BACKLOG.md
 │
 ├── internal/
@@ -57,9 +61,10 @@ Language of rendering script generation. Types: `Script`, `ScriptConfig`, `Strea
 │   │   └── script/                 # script Build use case
 │   │
 │   ├── domain/                     # DOMAIN LAYER: models and rules. Pure Go. No os/net.
-│   │   ├── ingest/                 # physical files and streams (see doc/ingest.md)
-│   │   ├── metadata/               # product catalog (see doc/metadata.md)
-│   │   └── script/                 # rendering script generation
+│   │   ├── callname/               # output filename derivation (see doc/domain_callname.md)
+│   │   ├── ingest/                 # physical files and streams (see doc/domain_ingest.md)
+│   │   ├── metadata/               # product catalog (see doc/domain_metadata.md)
+│   │   └── script/                 # rendering script generation (see doc/domain_script.md)
 │   │
 │   ├── infra/                      # PORT IMPLEMENTATIONS. Knows about the outside world. Depends on domain.
 │   │   ├── cache/                  # in-memory cache
@@ -76,12 +81,12 @@ Language of rendering script generation. Types: `Script`, `ScriptConfig`, `Strea
 │   │   └── retry/                  # backoff, jitter
 │   │
 │   └── presentation/
-│       ├── cli/                    # empty — CLI commands currently live in infra/commands
 │       └── tui/                    # bubbletea TUI model (not wired into cmd yet)
 │
-├── scrips/                         # standalone helper tools (native name is misspelled)
+├── scripts/                        # helper scripts and standalone tools
 │   ├── asses/                      # JSON querying tool (gjson)
-│   └── find/
+│   ├── find/
+│   └── live_test.sh
 │
 ├── testdata/
 │   ├── metadata.json               # product catalog snapshot

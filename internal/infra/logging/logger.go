@@ -23,10 +23,8 @@ type Logger struct {
 }
 
 func NewLogger(cfg config.Logging) (*Logger, error) {
-	//log=info msg="logger created with level=%s, format=%s", cfg.Level, cfg.Format
 	handlers, closers, err := createHandlers(cfg)
 	if err != nil {
-		//log=error msg="failed to create logger: %v", err
 		return nil, fmt.Errorf("failed to collect handlers: %w", err)
 	}
 	return &Logger{
@@ -73,7 +71,6 @@ func (l *Logger) Group(name string) *Logger {
 func (l *Logger) Slog() *slog.Logger { return l.inner }
 
 // Close closes resources. Idempotent.
-//log=info msg="logger closed"
 func (l *Logger) Close() error {
 	if l == nil {
 		return nil
@@ -112,7 +109,6 @@ func createHandlers(cfg config.Logging) ([]slog.Handler, []io.Closer, error) {
 	}
 
 	if len(handlers) == 0 {
-		//log=error msg="no logging handlers created"
 		return nil, nil, fmt.Errorf("created nil-handlers only")
 	}
 

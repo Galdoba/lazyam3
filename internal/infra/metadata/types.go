@@ -104,20 +104,16 @@ type Found struct {
 // ---------------------------------------------------------------------------
 
 // LoadRoot reads and parses a metadata JSON file.
-//log=info msg="loaded metadata: %d series, %d movies", len(root.Series), len(root.Movies)
 func LoadRoot(path string) (*Root, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		//log=error msg="failed to read metadata file: %v", err
 		return nil, fmt.Errorf("read metadata file: %w", err)
 	}
 	var root Root
 	if err := json.Unmarshal(data, &root); err != nil {
-		//log=error msg="failed to parse metadata JSON: %v", err
 		return nil, fmt.Errorf("parse metadata JSON: %w", err)
 	}
 	if len(root.Series) == 0 && len(root.Movies) == 0 {
-		//log=error msg="metadata file is empty: no series or movies found"
 		return nil, fmt.Errorf("empty metadata: no series or movies found")
 	}
 	return &root, nil

@@ -40,7 +40,7 @@ func TestBuildAndExecute_RealInputs(t *testing.T) {
 		}
 	}
 
-	if err := Build(context.Background(), cfg, scriptinfra.New()); err != nil {
+	if err := Build(nil, context.Background(), cfg, scriptinfra.New()); err != nil {
 		t.Fatalf("Build() error: %v", err)
 	}
 

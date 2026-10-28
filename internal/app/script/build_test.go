@@ -38,7 +38,7 @@ func realConfig(t *testing.T) (dscript.ScriptConfig, string, string) {
 	}
 
 	// Real ingest (ffprobe on the fixture directory).
-	unit, err := appingest.New(ffprobe).Ingest(srcDir)
+	unit, err := appingest.New(ffprobe, nil).Ingest(srcDir)
 	if err != nil {
 		t.Fatalf("Ingest() error: %v", err)
 	}
@@ -55,7 +55,7 @@ func realConfig(t *testing.T) (dscript.ScriptConfig, string, string) {
 	}
 
 	// Real metadata lookup.
-	repo, err := mdinfra.New(metaPath)
+	repo, err := mdinfra.New(nil, metaPath)
 	if err != nil {
 		t.Fatalf("metadata.New() error: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestBuild_RealInputs(t *testing.T) {
 	cfg, srcDir, _ := realConfig(t)
 
 	// Build via the real renderer (use case under test).
-	if err := Build(context.Background(), cfg, scriptinfra.New()); err != nil {
+	if err := Build(nil, context.Background(), cfg, scriptinfra.New()); err != nil {
 		t.Fatalf("Build() error: %v", err)
 	}
 

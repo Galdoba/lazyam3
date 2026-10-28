@@ -295,7 +295,6 @@ type Config struct {
 - Loaded via `github.com/Galdoba/appcontext/configmanager` with `WithFormat(configmanager.TOML)`
 - Defaults are hardcoded (`defaultCFG()`); app name constant is `lazyam3`
 - Defaults are self-documenting placeholders (e.g. `/path/to/lazyam3/input`) — the built-in default now fails fast with `config.ErrDefaultConfig` before the pipeline is created
-- `configs/config.yaml` and `configs/config.local.yaml` are empty placeholders
 
 ## Workflow
 
@@ -322,4 +321,4 @@ When adding new functionality:
 5. **Wire in application** — Add to `Pipeline` as interface dependency
 6. **Use in command** — Command creates implementation and passes to Pipeline
 7. **Never leak infrastructure** — Domains must not know about files, APIs, or databases
-8. **Update docs and tasks** — Keep `doc/lazyam3.md`, `doc/architecture.md`, and `doc/tasks.json` in sync with the code
+8. **Update docs** — Keep `doc/lazyam3.md`, `doc/architecture.md`, and `doc/INDEX.md` in sync with the code

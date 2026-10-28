@@ -87,7 +87,6 @@ func (si ScriptInput) validate() error {
 }
 
 // BuildInputName constructs a call name for a single file.
-//log=debug msg="building call name for %q", originalFilename
 func BuildInputName(product metadata.Product, originalFilename, timestamp string) (ScriptInput, error) {
 	stem, _ := splitExtension(originalFilename)
 
@@ -100,7 +99,6 @@ func BuildInputName(product metadata.Product, originalFilename, timestamp string
 		}
 	}
 	if idStr == "" {
-		//log=error msg="filename %q does not start with a digit", originalFilename
 		return ScriptInput{}, fmt.Errorf("filename %q does not start with a digit", originalFilename)
 	}
 
@@ -117,8 +115,6 @@ func BuildInputName(product metadata.Product, originalFilename, timestamp string
 	}
 	return si, si.validate()
 }
-
-//log=info msg="building call names for %d files", len(filenames)
 
 // ExtractID parses the product ID from an original filename (leading digits
 // of the stem). Handles the bare-ID format only; ingest's ExtractID gets the
@@ -158,12 +154,10 @@ func ExtractID(filename string) (int64, error) {
 // BuildCallNames builds call names for all files in a MediaUnit.
 // Keys are original filenames; fails fast if any file fails.
 func BuildInputNames(product metadata.Product, filenames []string, timestamp string) (map[string]string, error) {
-	//log=info msg="building call names for %d files", len(filenames)
 	names := make(map[string]string, len(filenames))
 	for _, filename := range filenames {
 		call, err := BuildInputName(product, filename, timestamp)
 		if err != nil {
-			//log=error msg="call name for %q failed: %v", filename, err
 			return nil, fmt.Errorf("call name for %q: %w", filename, err)
 		}
 		names[filename] = call.String()
@@ -173,7 +167,6 @@ func BuildInputNames(product metadata.Product, filenames []string, timestamp str
 
 // deriveOutBase returns the transliterated SeriesTitle with first character
 // uppercase, or "" when the product has no SeriesTitle.
-//log=debug msg="derived output base from product: %s", p.SeriesTitle
 func deriveOutBase(p metadata.Product) string {
 	if p.SeriesTitle == "" {
 		return ""

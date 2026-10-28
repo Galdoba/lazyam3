@@ -5,21 +5,27 @@ import (
 	"fmt"
 
 	"github.com/Galdoba/lazyam3/internal/domain/script"
+	"github.com/Galdoba/lazyam3/internal/infra/logging"
 )
 
 // Build is the use case that builds a rendering script from the config and
 // materializes it as a usable artifact via the Renderer.
-//log=info msg="building rendering script"
-func Build(ctx context.Context, config script.ScriptConfig, renderer script.Renderer) error {
+func Build(logger *logging.Logger, ctx context.Context, config script.ScriptConfig, renderer script.Renderer) error {
+	if logger != nil {
+		logger.Info("building rendering script")
+	}
 	if err := ctx.Err(); err != nil {
-		//log=warn msg="context cancelled during script build: %v", err
+		if logger != nil {
+			logger.Warn("context cancelled during script build", "error", err)
+		}
 		return err
 	}
 	sc, err := script.BuildScript(config)
 	if err != nil {
-		//log=error msg="build script failed: %v", err
 		return fmt.Errorf("build script: %w", err)
 	}
-	//log=info msg="writing rendered script to %s", config.Destination
+	if logger != nil {
+		logger.Info("writing rendered script to destination", "path", config.Destination)
+	}
 	return renderer.Render(sc)
 }

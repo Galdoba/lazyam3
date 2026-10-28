@@ -6,15 +6,10 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 
 ## Current Feature
 
-> **Work on**: custom text logger handler (format template)
+> **Work on**: documentation maintainance (format template)
 >
-> Status: `in_review` 
+> Status: `discovering` 
 
-> **Just finished: `A5` — Custom slog text handler with format template** (`doc/text_logger_format_refactoring.md`) — status: `in_review` · effort: 2-3 hours · priority: 2
-
-Selection rule: pick the highest-priority feature in `doc/feature_list.json` whose `blocked_by` list is empty and whose `status` is `proposed`. When a feature is done, set its `status` to `in_rewiew` in `doc/feature_list.json` before moving on.
-
-Note: `D1` (dormancy period for cyclic mode) remains `in_review`.
 
 ## Live Test
 
@@ -26,24 +21,9 @@ Note: `D1` (dormancy period for cyclic mode) remains `in_review`.
 
 Run before/after any pipeline change to verify end-to-end behavior.
 
-## Documentation Index
+## Documentation
 
-| File | Purpose |
-|---|---|
-| `doc/architecture.md` | Full architecture: layers, domains, ports, dependency rules, development guidelines |
-| `doc/lazyam3.md` | Brief overview: workflow, domain modules, repository tree |
-| `doc/ingest.md` | Ingest domain: types, pure functions, validation rules, test data |
-| `doc/metadata.md` | Metadata domain: Product/Kind, ProductRepository, tree lookup, catalog test data |
-| `doc/script.md` | Script domain: BuildScript, naming derivation, audio filters, SRT/HSUB handling, template |
-| `doc/callname.md` | CallName bounded context: input/output filename construction, transliteration, naming patterns |
-| `doc/text_logger_format_refactoring.md` | Text logger format spec: template placeholders, config defaults, colorization, test plan |
-| `doc/feature_list.json` | Feature backlog: status, priority, blocked_by, implementation notes, tests per feature |
-| `doc/feature_index.md` | Synced feature table from feature_list.json |
-| `doc/logging_suggestions.md` | Logging improvement catalog (A1–A4 quick wins, B1–B5 larger items) with trade-offs |
-| `doc/HANDOFF.md` | Session handoff: decisions, known issues, what to watch for |
-| `doc/PROGRESS.md` | Session progress log: work completed, findings, metrics |
-| `doc/BACKLOG.md` | Known issues/footguns and deferred items |
-| `AGENTS.md` | This file: current feature, commands, rules, quick reference |
+Full catalog: `doc/INDEX.md`. 
 
 ## Commands
 

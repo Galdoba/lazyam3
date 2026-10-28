@@ -126,7 +126,7 @@
     },
     "outcome": "Implemented. ScriptConfig gained FfmpegBinary field; template replaced hardcoded ffmpeg with |=ffmpeg_binary=| placeholder; BuildScript falls back to 'ffmpeg' when empty; Pipeline.Options gained FfmpegBinary; buildScriptConfig passes it through; cmd_process.go wires cfg.ScriptGeneration.FfmpegBinary with nonEmpty fallback. Tests added: TestBuildScript_FfmpegBinary, TestBuildScript_FfmpegBinaryFallback, TestBuildScriptConfig_FfmpegBinary, TestBuildScriptConfig_FfmpegBinaryFallback, TestBuildScriptConfig_FfmpegBinaryEmpty.",
     "priority": 4,
-    "problem": "ffmpeg binary path is hardcoded in internal/domain/script/template.go:43: `` ffmpeg -n -r 25 -i ... ``. Users cannot specify a custom ffmpeg binary (e.g., /opt/bin/ffmpeg, or a wrapper). ffprobe IS configurable (paths.generator.ffprobe_binary), but ffmpeg (used in generated scripts) is not.",
+    "problem": "ffmpeg binary path is hardcoded in internal/domain/script/template.go:43: ` ffmpeg -n -r 25 -i ... `. Users cannot specify a custom ffmpeg binary (e.g., /opt/bin/ffmpeg, or a wrapper). ffprobe IS configurable (paths.generator.ffprobe_binary), but ffmpeg (used in generated scripts) is not.",
     "proposal": "Pass ffmpeg binary path from config through pipeline → ScriptConfig → template placeholder. Template uses |=ffmpeg_binary=| placeholder replaced by buildScriptConfig with the configured value (or fallback to \"ffmpeg\").",
     "source": "internal/domain/script/template.go:43 — ffmpeg hardcoded as literal",
     "status": "done",
@@ -185,6 +185,7 @@
     ]
   },
   "S4": {
+    "benefits": [],
     "blocked_by": [],
     "effort": "3-5 hours",
     "impact": "medium",
@@ -198,166 +199,24 @@
       "S4b",
       "S4c",
       "S4d"
-    ],
-    "title": "Configurable script generation command parameters"
-  },
-  "S4a": {
-    "benefits": [
-      "Users can change input frame rate",
-      "Users can disable -n flag"
-    ],
-    "blocked_by": [],
-    "effort": "1-2 hours",
-    "impact": "low",
-    "implementation": {
-      "domain": "GlobalParams struct in script config; template placeholder |=global_params|= or inline fields",
-      "infra": "ScriptGeneration.Command.GlobalParameters struct with `rate` (int) and `no_overwrite` (bool) TOML fields",
-      "pipeline": "HardsubRulesToDomain pattern: GlobalParamsToDomain conversion in pipeline/config.go",
-      "template": "Replace `-n -r 25` with |=no_overwrite=| |=input_rate=| placeholders"
-    },
-    "outcome": "Not started.",
-    "priority": 4,
-    "problem": "Input rate (-r 25) and overwrite protection (-n) are hardcoded in the script template. Users cannot change frame rate or disable overwrite protection.",
-    "proposal": "Add GlobalParameters struct with `rate` and `no_overwrite` fields. Wire through config → pipeline → template. Default: rate=25, no_overwrite=true.",
-    "source": "Hardcoded in template.go:43: `ffmpeg_binary -n -r 25 -i`",
-    "status": "proposed",
-    "tests": [
-      "TestBuildScript_GlobalParamsRate — custom rate appears in generated script",
-      "TestBuildScript_GlobalParamsNoOverwrite — -n flag controlled by config"
-    ],
-    "title": "Configurable global ffmpeg parameters (rate, overwrite protection)",
-    "trade_offs": [
-      "Minimal — just 2 fields"
     ]
   },
-  "S4b": {
-    "benefits": [
-      "Users can change codec (libx264, libx265, etc.)",
-      "Users can tune quality (CRF, preset)",
-      "Users can change pixel format, profile, GOP"
-    ],
+  "E1": {
+    "benefits": [],
     "blocked_by": [],
-    "effort": "1-2 hours",
+    "effort": "2-3 hours",
     "impact": "medium",
-    "implementation": {
-      "domain": "VideoEncodingConfig struct; withDefaults() fills defaults for zero values",
-      "infra": "ScriptGeneration.Command.VideoEncoding struct with TOML fields",
-      "pipeline": "VideoEncodingToDomain conversion in pipeline/config.go",
-      "template": "Replace hardcoded video output line with template placeholders"
-    },
-    "outcome": "Not started.",
-    "priority": 4,
-    "problem": "Video encoding settings (codec, preset, CRF, pixel format, profile, GOP) are hardcoded. Users cannot change video quality or encoding settings.",
-    "proposal": "Add VideoEncoding struct with `codec`, `preset`, `crf`, `pix_fmt`, `profile`, `gop` fields. Wire through config → pipeline → domain → template.",
-    "source": "Hardcoded in buildOutputFilesPredictions: `-c:v libx264 -preset medium -crf 21 -pix_fmt yuv420p -profile:v high -g 0`",
+    "outcome": "Not yet implemented",
+    "priority": 3,
+    "problem": "When scripts render, files are moved out of the input directory. Next scan cycle detects the now-empty directory and emits a ScanError. Logs are getting messy.",
+    "proposal": "Defer deletion until script succeeds. Use a marker artifact in Output/ directory as a success signal.",
+    "source": "doc/BACKLOG.md — Empty input directories",
     "status": "proposed",
     "tests": [
-      "TestBuildScript_VideoEncoding — custom video params appear in generated script",
-      "TestBuildScript_VideoEncodingFallback — defaults used when not configured"
-    ],
-    "title": "Configurable video encoding parameters",
-    "trade_offs": [
-      "Larger config surface",
-      "Codec validation needed (only known codecs allowed)"
-    ]
-  },
-  "S4c": {
-    "benefits": [
-      "Users can change audio codec (alac, aac, opus, etc.)",
-      "Users can tune compression level"
-    ],
-    "blocked_by": [],
-    "effort": "1-2 hours",
-    "impact": "medium",
-    "implementation": {
-      "domain": "AudioEncodingConfig struct; withDefaults() fills defaults for zero values",
-      "infra": "ScriptGeneration.Command.AudioEncoding struct with TOML fields",
-      "pipeline": "AudioEncodingToDomain conversion in pipeline/config.go",
-      "template": "Replace hardcoded audio output line with template placeholders"
-    },
-    "outcome": "Not started.",
-    "priority": 4,
-    "problem": "Audio encoding settings (codec, compression level) are hardcoded. Users cannot change audio codec or quality.",
-    "proposal": "Add AudioEncoding struct with `codec`, `compression_level` fields. Wire through config → pipeline → domain → template.",
-    "source": "Hardcoded in buildOutputFilesPredictions: `-c:a alac -compression_level 0`",
-    "status": "proposed",
-    "tests": [
-      "TestBuildScript_AudioEncoding — custom audio params appear in generated script",
-      "TestBuildScript_AudioEncodingFallback — defaults used when not configured"
-    ],
-    "title": "Configurable audio encoding parameters",
-    "trade_offs": [
-      "Codec validation needed"
-    ]
-  },
-  "S4d": {
-    "benefits": [
-      "Users can change sample rate, tempo",
-      "Users can enable/disable deinterlace, choose filter"
-    ],
-    "blocked_by": [],
-    "effort": "1-2 hours",
-    "impact": "medium",
-    "implementation": {
-      "domain": "AudioFilterConfig, VideoFilterConfig structs; filter builders use config values",
-      "infra": "ScriptGeneration.Command.AudioFilter (sample_rate, tempo) and VideoFilter (deinterlace: bool, filter_name: string) structs",
-      "pipeline": "FilterConfigToDomain conversion in pipeline/config.go",
-      "template": "No template change — filter builders produce the filter strings"
-    },
-    "outcome": "Not started.",
-    "priority": 4,
-    "problem": "Audio filter chain (aresample, atempo) and video deinterlace filter (yadif) are hardcoded. Users cannot tune or disable filters.",
-    "proposal": "Add AudioFilter and VideoFilter structs with filter parameters. Wire through config → pipeline → domain → filter builders.",
-    "source": "Hardcoded in buildAudioFilter: `aresample=48000,atempo=25/(25/1)`; buildVideoFilter: `yadif,`",
-    "status": "proposed",
-    "tests": [
-      "TestBuildScript_AudioFilter — custom audio filter params appear in generated script",
-      "TestBuildScript_VideoFilter — custom video filter params appear in generated script"
-    ],
-    "title": "Configurable audio/video filter parameters",
-    "trade_offs": [
-      "Filter parameter validation",
-      "atempo formula may need to be user-configurable"
-    ]
-  },
-  "D1": {
-    "benefits": [
-      "Wastes less CPU when pipeline is idle",
-      "Predictable cadence: work → rest → work",
-      "Configurable via TOML or CLI flag",
-      "Backward compatible: zero value preserves polling behaviour"
-    ],
-    "blocked_by": [],
-    "effort": "1-2 hours",
-    "impact": "low",
-    "implementation": {
-      "config_field": "PipelineConfig struct with DormancyPeriod time.Duration `toml:\"dormancy_period\"` in internal/infra/config/config.go; Config struct gains Pipeline field",
-      "file": "internal/infra/config/config.go, internal/app/pipeline/dto.go, internal/app/pipeline/pipeline.go, internal/infra/commands/cmd_process.go",
-      "notes": [
-        "Add PipelineConfig { DormancyPeriod time.Duration } to Config; default 0",
-        "Add DormancyPeriod to pipeline.Options; Pipeline struct stores it",
-        "Run() sleeps dormancyPeriod after each pass when > 0; else uses polling ticker",
-        "cmd_process.go: --dormancy flag with fallback to cfg.Pipeline.DormancyPeriod",
-        "Tests: dormancy sleeps between passes, context cancelled during sleep, zero = polling, continues after scan failure"
-      ]
-    },
-    "outcome": "Implemented end-to-end. Config: PipelineConfig struct with DormancyPeriod field added; Config gains Pipeline field; defaultCFG includes PipelineConfig{DormancyPeriod: 0}. DTO: DormancyPeriod added to Options. Pipeline: struct field added, NewPipeline copies from opts, Run() sleeps dormancyPeriod after each pass when > 0 (cancellable via ctx), falls back to polling ticker when == 0. cmd_process.go: --dormancy flag with fallback to cfg.Pipeline.DormancyPeriod. Tests: TestNewPipeline_DormancyPeriodDefault, TestRun_DormancyMode_SleepsBetweenPasses, TestRun_DormancyMode_ContextCancelledDuringSleep, TestRun_DormancyDisabled_Polling, TestRun_DormancyMode_ContinuesAfterScanFailure.",
-    "priority": 4,
-    "problem": "The cyclic mode polls every 1 second even when the pipeline is idle. There's no concept of 'process once, then rest for N minutes before checking again.'",
-    "proposal": "Add a configurable dormancy period to cyclic mode: after each scan pass completes (success or failure), sleep for the configured duration before the next pass. Zero value preserves current polling behaviour.",
-    "source": "doc/cycling_mode.md",
-    "status": "in_review",
-    "tests": [
-      "TestNewPipeline_DormancyPeriodDefault — zero value means disabled",
-      "TestRun_DormancyMode_SleepsBetweenPasses — verify sleep between passes with fast duration",
-      "TestRun_DormancyMode_ContextCancelledDuringSleep — context cancellation during dormancy exits loop",
-      "TestRun_DormancyDisabled_Polling — zero dormancy uses polling ticker",
-      "TestRun_DormancyMode_ContinuesAfterScanFailure — sleep happens even after failed passes"
-    ],
-    "title": "Dormancy period for cyclic mode",
-    "trade_offs": [
-      "Replaces 1-second polling with configurable sleep (backward compatible via zero value)",
-      "Minimal config surface: one duration field"
+      "TestEmptyDir_MarkerCreatedOnSuccess",
+      "TestEmptyDir_MarkerNotCreatedOnFailure",
+      "TestEmptyDir_SecondScan_SkipsCompletedUnit",
+      "TestEmptyDir_DryRun_NoMarkerCreated"
     ]
   }
 }

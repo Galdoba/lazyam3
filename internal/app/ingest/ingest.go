@@ -8,29 +8,31 @@ import (
 
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/infra/fso"
+	"github.com/Galdoba/lazyam3/internal/infra/logging"
 )
 
 // Ingest implements ingest.Organizer by scanning a directory, probing each
 // regular file with ffprobe, and returning a MediaUnit.
 type Ingest struct {
 	ffprobeBinary string
+	logger        *logging.Logger
 }
 
 // New creates an Ingest that uses the given ffprobe binary path.
-//log=debug msg="ingest created with ffprobe=%s", ffprobeBinaryPath
-func New(ffprobeBinaryPath string) *Ingest {
-	return &Ingest{ffprobeBinary: ffprobeBinaryPath}
+func New(ffprobeBinaryPath string, logger *logging.Logger) *Ingest {
+	return &Ingest{ffprobeBinary: ffprobeBinaryPath, logger: logger}
 }
 
 // Ingest scans dir for regular files, probes each with ffprobe, and returns
 // a MediaUnit. Non-regular entries (directories, symlinks, etc.) are skipped.
 // Subtitle sidecar files (.srt, .ass, .ssa) that ffprobe cannot probe are
 // recorded in Filenames so the pipeline can later classify them as SRT or HSUB.
-//log=info msg="ingesting directory: %s", dir
 func (ing *Ingest) Ingest(dir string) (ingest.MediaUnit, error) {
+	if ing.logger != nil {
+		ing.logger.Info("ingesting directory", "dir", dir)
+	}
 	fls, err := os.ReadDir(dir)
 	if err != nil {
-		//log=error msg="failed to read directory %s: %v", dir, err
 		return ingest.MediaUnit{}, err
 	}
 	dirData := make(map[string][]byte)
@@ -48,13 +50,11 @@ func (ing *Ingest) Ingest(dir string) (ingest.MediaUnit, error) {
 				continue
 			}
 			return ingest.MediaUnit{}, fmt.Errorf("failed to probe file %q: %w", path, err)
-		//log=error msg="failed to probe file %q: %v", path, err
 		}
 		dirData[f.Name()] = data
 	}
 	mu, err := ingest.NewMediaUnit(dirData)
 	if err != nil {
-		//log=error msg="failed to parse data for unit: %v", err
 		return ingest.MediaUnit{}, err
 	}
 	mu.Filenames = append(mu.Filenames, sidecars...)
