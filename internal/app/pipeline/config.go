@@ -3,6 +3,7 @@ package pipeline
 import (
 	"fmt"
 	"os"
+	path "path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -86,7 +87,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	// Derive script name (basename without .sh) for execution-signal markers.
 	scriptName := filepath.Base(destination)
 	scriptName = strings.TrimSuffix(scriptName, filepath.Ext(destination))
-	metadataDir := filepath.Join(toSlash(root), "metadata")
+	metadataDir := path.Join(toSlash(root), "metadata")
 
 	// Normalize all executor paths for Windows
 	buffer := toSlash(executorPaths["buffer"])
