@@ -67,4 +67,14 @@ echo "RESULT: GO/NO-GO - YES (all gates passed, start solution-search)"
 echo ""
 echo "=== Problem Statement ==="
 cat "$PS_FILE"
+
+# ── Output Repository Map ─────────────────────────────────────────
+# Generate repo map for agent orientation.
+SCANNER="$REPO_ROOT/.agents/skills/solution-search/scripts/repo-scanner.sh"
+if [[ -f "$SCANNER" ]]; then
+  echo ""
+  echo "=== Repository Map ==="
+  bash "$SCANNER" --format markdown 2>/dev/null
+fi
+
 exit 0
