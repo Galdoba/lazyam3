@@ -1,0 +1,54 @@
+{
+  "skill_name": "solution-search",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Найди лучшее решение для STORAGE-002: persist .done processing history to jsonstore before deletion",
+      "expected_output": "Solution Verdict document with APPROVED verdict, 2+ approaches, rationale",
+      "files": [],
+      "assertions": [
+        {
+          "name": "Landing gate passes",
+          "text": "landing-gate.sh returns 0 for the output document",
+          "evidence": "run landing-gate.sh"
+        },
+        {
+          "name": "Has verdict section",
+          "text": "Document has ## verdict section with APPROVED/REJECTED/DEFERRED",
+          "evidence": "grep ## verdict"
+        },
+        {
+          "name": "Has rationale",
+          "text": "Document has **Rationale:** explaining the verdict",
+          "evidence": "grep Rationale"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I have a bug report: metadata resolution fails when subtitle filename has non-ASCII characters. Help me find the best fix approach.",
+      "expected_output": "Solution document with verdict, 2+ approaches, rationale",
+      "files": [],
+      "assertions": [
+        {
+          "name": "Landing gate passes",
+          "text": "landing-gate.sh returns 0",
+          "evidence": "run landing-gate.sh"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Как лучше реализовать feature: добавить поддержку HLS streams в ingest pipeline?",
+      "expected_output": "Solution Verdict document with verdict, approaches, rationale",
+      "files": [],
+      "assertions": [
+        {
+          "name": "Landing gate passes",
+          "text": "landing-gate.sh returns 0",
+          "evidence": "run landing-gate.sh"
+        }
+      ]
+    }
+  ]
+}

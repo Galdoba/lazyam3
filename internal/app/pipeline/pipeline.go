@@ -182,7 +182,11 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 		if len(snap.FilesIn(d.Path)) == 0 {
 			continue
 		}
-		if err := p.processUnit(ctx, d.Path); err != nil {
+		initialFiles := make([]string, 0, len(snap.FilesIn(d.Path)))
+		for _, f := range snap.FilesIn(d.Path) {
+			initialFiles = append(initialFiles, f.Path)
+		}
+		if err := p.processUnit(ctx, d.Path, initialFiles); err != nil {
 			out.Failed++
 			continue
 		}
@@ -194,7 +198,7 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 }
 
 // processUnit runs the full chain for one media unit directory.
-func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
+func (p *Pipeline) processUnit(ctx context.Context, dir string, initialFiles []string) error {
 	p.logger.Info("processing", "dir", dir)
 	unit, err := p.in.Ingest(dir)
 	if err != nil {
@@ -241,10 +245,27 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 	metaDir := p.pathBuilder.Canonical("metadata")
 	if err := os.MkdirAll(metaDir, 0o755); err == nil {
 		processingPath := p.pathBuilder.Canonical("metadata", scriptName+".processing")
+		productName := filepath.Base(dir)
+		if prod.Title != "" {
+			productName = prod.Title
+		} else if prod.SeriesTitle != "" {
+			productName = prod.SeriesTitle
+		}
+		now := time.Now().UTC()
+		rfc := now.Format(time.RFC3339)
+		createdAt := rfc[:len(rfc)-1] + fmt.Sprintf(".%03dZ", now.Nanosecond()/1000000)
+		createdFiles := make([]string, 0, len(cfg.Predictions))
+		for _, pred := range cfg.Predictions {
+			createdFiles = append(createdFiles, pred.Path)
+		}
 		payload := map[string]any{
-			"source_dir":  dir,
-			"unit_id":     unit.ID,
-			"script_name": scriptName,
+			"source_dir":    dir,
+			"unit_id":       unit.ID,
+			"script_name":   scriptName,
+			"product_name":  productName,
+			"created_at":    createdAt,
+			"initial_files": initialFiles,
+			"created_files": createdFiles,
 		}
 		payloadBytes, err := json.Marshal(payload)
 		if err != nil {

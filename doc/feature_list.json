@@ -317,5 +317,61 @@
       "Unit tests pass: pipeline, config, script"
     ],
     "title": "Fix: script marker metadata path uses executor buffer path"
+  },
+  "STORAGE-001": {
+    "benefits": [
+      "Traceable processing: users can determine which source files generated specific outputs",
+      "Auditability: product name, timestamps, and file lists recorded per processing run",
+      "Debugging: full context of what was processed when investigating failures",
+      "Minimal implementation: extend existing .processing JSON artifact, no new infrastructure"
+    ],
+    "blocked_by": [],
+    "effort": "3-4 hours",
+    "impact": "low",
+    "implementation": {
+      "domain_changes": "Product.Title already available; no domain changes needed",
+      "pipeline_changes": "Extend artifact payload in processUnit: add product_name (from Product.Title), created_at (time.Now().UTC().Format(time.RFC3339Nano)), initial_files (file list before prepareFiles), created_files (file list after rendering)",
+      "file": "internal/app/pipeline/pipeline.go",
+      "notes": [
+        "Capture initial_files before prepareFiles call (pipeline.go:225)",
+        "Capture product_name from prod.Title at pipeline.go:204-213",
+        "created_files requires scanning output after render; may need post-render file enumeration",
+        "Artifact JSON schema backward compatible: new fields are additive",
+        "findDoneFile (pipeline.go:306-314) must tolerate missing new fields in legacy .done files"
+      ]
+    },
+    "outcome": "Storage metadata capture implemented. .processing JSON artifact enriched with product_name (Product.Title → SeriesTitle → dir basename), created_at (RFC3339 UTC with ms), initial_files (absolute paths from scan snapshot before prepareFiles), and created_files (absolute paths from ScriptConfig.Predictions). Backward compatible: findDoneFile reads artifacts as map[string]any. Unit tests added and passing.",
+    "priority": 3,
+    "problem": "The .processing artifact stores only source_dir, unit_id, and script_name. Users cannot determine which source files generated specific outputs, track which products were processed, or know when processing occurred. This gap hinders debugging, auditing, and workflow verification.",
+    "proposal": "Extend the .processing JSON artifact with product_name, created_at, initial_files, and created_files fields. initial_files captured from scan snapshot before prepareFiles, product_name from metadata lookup, created_at at write time, created_files from ScriptConfig.Predictions.",
+    "source": "doc/storage_intake.md",
+    "status": "done",
+    "tests": [
+      "TestProcessUnitArtifactProduct — product_name non-empty from Product.Title/SeriesTitle",
+      "TestProcessUnitArtifactCreatedAt — created_at in RFC3339 UTC format with milliseconds",
+      "TestProcessUnitArtifactInitialFiles — initial_files contains absolute paths of source files",
+      "TestProcessUnitArtifactCreatedFiles — created_files contains absolute paths from Predictions",
+      "TestProcessUnitArtifactBackwardCompat — source_dir and unit_id present in artifact"
+    ],
+    "title": "Persistent processing metadata storage (initial/created files tracking)"
+  },
+  "STORAGE-002": {
+    "benefits": [
+      "Permanent processing history: query what subtitles, files, and parameters were used for any past episode",
+      "No data loss: .done payload preserved in jsonstore before file deletion",
+      "Transactional safety: store write + .done deletion as one operation, fail-safe",
+      "Leverages existing jsonstore infrastructure (unused since creation)"
+    ],
+    "blocked_by": [],
+    "effort": "3-4 hours",
+    "impact": "medium",
+    "status": "discovery",
+    "priority": 4,
+    "problem": "After .done file deletion, processing history is lost. The generated .sh script remains in archive but there's no way to query what subtitles, source files, or parameters were used for a specific episode. The jsonstore infrastructure exists but is unused.",
+    "proposal": "Persist .done JSON payload to jsonstore with key script_{script_name} before deletion. Store write + .done deletion as transactional operation. Store.Save() called at end of each RunOnce cycle.",
+    "source": "doc/STORAGE-002_problem_statement.md",
+    "outcome": "",
+    "tests": [],
+    "title": "Persist .done processing history to jsonstore before deletion"
   }
 }

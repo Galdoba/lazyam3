@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -1098,5 +1099,181 @@ func TestSanitize_DoneFileConsumedAfterDeletion(t *testing.T) {
 	}
 	if pathExists(filepath.Join(metaDir, "test2.done")) {
 		t.Errorf("consumed .done file should be deleted")
+	}
+}
+
+func readProcessingArtifact(t *testing.T, metaDir, scriptName string) map[string]any {
+	marker := filepath.Join(metaDir, scriptName+".processing")
+	data, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatalf("read processing artifact %q: %v", marker, err)
+	}
+	payload := map[string]any{}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatalf("parse processing artifact %q: %v", marker, err)
+	}
+	return payload
+}
+
+func TestProcessUnitArtifactProduct(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{}
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		&fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		rd, events, false)
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	scriptName := filepath.Base(rd.scripts[0].Destination)
+	scriptName = strings.TrimSuffix(scriptName, filepath.Ext(rd.scripts[0].Destination))
+	metaDir := filepath.Join(p.destination, "metadata")
+	payload := readProcessingArtifact(t, metaDir, scriptName)
+	productName, ok := payload["product_name"].(string)
+	if !ok || productName == "" {
+		t.Errorf("product_name missing or empty: %v", payload["product_name"])
+	}
+}
+
+func TestProcessUnitArtifactCreatedAt(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{}
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		&fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		rd, events, false)
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	scriptName := filepath.Base(rd.scripts[0].Destination)
+	scriptName = strings.TrimSuffix(scriptName, filepath.Ext(rd.scripts[0].Destination))
+	metaDir := filepath.Join(p.destination, "metadata")
+	payload := readProcessingArtifact(t, metaDir, scriptName)
+	createdAt, ok := payload["created_at"].(string)
+	if !ok {
+		t.Fatalf("created_at missing or not a string: %v", payload["created_at"])
+	}
+	// Verify RFC3339 format with milliseconds and UTC timezone.
+	if !strings.Contains(createdAt, "T") || !strings.HasSuffix(createdAt, "Z") {
+		t.Errorf("created_at %q not in RFC3339 UTC format", createdAt)
+	}
+	if _, err := time.Parse(time.RFC3339, createdAt); err != nil {
+		t.Errorf("created_at %q failed to parse as RFC3339: %v", createdAt, err)
+	}
+}
+
+func TestProcessUnitArtifactInitialFiles(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	files := []string{"12094.mp4", "12094-rus.srt"}
+	for _, name := range files {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{}
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		&fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		rd, events, false)
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	scriptName := filepath.Base(rd.scripts[0].Destination)
+	scriptName = strings.TrimSuffix(scriptName, filepath.Ext(rd.scripts[0].Destination))
+	metaDir := filepath.Join(p.destination, "metadata")
+	payload := readProcessingArtifact(t, metaDir, scriptName)
+	initialFiles, ok := payload["initial_files"].([]any)
+	if !ok {
+		t.Fatalf("initial_files missing or not a list: %v", payload["initial_files"])
+	}
+	if len(initialFiles) != 2 {
+		t.Errorf("initial_files has %d entries, want 2", len(initialFiles))
+	}
+	for _, f := range initialFiles {
+		pathStr, ok := f.(string)
+		if !ok || !filepath.IsAbs(pathStr) {
+			t.Errorf("initial_files entry %v not an absolute path string", f)
+		}
+	}
+}
+
+func TestProcessUnitArtifactCreatedFiles(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{}
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		&fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		rd, events, false)
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	scriptName := filepath.Base(rd.scripts[0].Destination)
+	scriptName = strings.TrimSuffix(scriptName, filepath.Ext(rd.scripts[0].Destination))
+	metaDir := filepath.Join(p.destination, "metadata")
+	payload := readProcessingArtifact(t, metaDir, scriptName)
+	createdFiles, ok := payload["created_files"].([]any)
+	if !ok {
+		t.Fatalf("created_files missing or not a list: %v", payload["created_files"])
+	}
+	if len(createdFiles) == 0 {
+		t.Errorf("created_files is empty, want predictions")
+	}
+	for _, f := range createdFiles {
+		pathStr, ok := f.(string)
+		if !ok || !filepath.IsAbs(pathStr) {
+			t.Errorf("created_files entry %v not an absolute path string", f)
+		}
+	}
+}
+
+func TestProcessUnitArtifactBackwardCompat(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{}
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		&fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		rd, events, false)
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	scriptName := filepath.Base(rd.scripts[0].Destination)
+	scriptName = strings.TrimSuffix(scriptName, filepath.Ext(rd.scripts[0].Destination))
+	metaDir := filepath.Join(p.destination, "metadata")
+	payload := readProcessingArtifact(t, metaDir, scriptName)
+	if payload["source_dir"] != unitDir {
+		t.Errorf("source_dir = %v, want %q", payload["source_dir"], unitDir)
+	}
+	if payload["unit_id"] != float64(12094) {
+		t.Errorf("unit_id = %v, want 12094", payload["unit_id"])
 	}
 }

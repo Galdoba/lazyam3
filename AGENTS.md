@@ -6,9 +6,10 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 
 ## Current Feature
 
-> **Mode**: Maintenance. No active feature work.
+> **STORAGE-002** — persist .done processing history to jsonstore before deletion
 >
-> Sanitation (E2) is complete: `.processing` artifact carries JSON, renames to `.done` on OK, scan-start deletes empty source dirs. Edge cases verified (hidden sidecars prevent deletion, partial execution leaves `.processing` dirs intact). Marker metadata path bug fixed: script marker lines now reference the executor's buffer path (`path.Join(buffer, "metadata")`) instead of the generator's destination root. See `doc/HANDOFF.md` and `doc/feature_list.json`.
+> **Status**: Discovery complete, solution-search skill created. Ready for solution search.
+> Problem Statement: `doc/STORAGE-002_problem_statement.md` (landing gate: PASS).
 
 
 ## Live Test
@@ -75,7 +76,7 @@ platform (internal/platform/*)     ← Stateless services (no domain deps)
 - Infrastructure implements domain ports
 - Commands wire dependencies and call Pipeline
 - Infrastructure failures fail fast
-- Simples solutions MUST examined first
+- Simple solutions MUST examined first
 - Analyze the problem before solving it
 - Make only minimal code edits
 - No comments in code unless really needed
