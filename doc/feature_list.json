@@ -252,5 +252,38 @@
       "TestSanitize_InvalidJSONDoneFile_Skipped",
       "TestSanitize_DoneFileConsumedAfterDeletion"
     ]
+  },
+  "naming-001": {
+    "benefits": [
+      "Cross-platform path resolution: Windows generator and Linux executor share identical path format",
+      "Config-driven paths via TOML, platform-agnostic PathBuilder service",
+      "Canonical forward-slash metadata markers; path existence validation before file operations",
+      "Removes Windows-specific syntax and IP-based host references"
+    ],
+    "blocked_by": [],
+    "effort": "5-8 hours",
+    "impact": "medium",
+    "implementation": {
+      "config_change": "Paths.Executor map (buffer, in_progress, done, notifications, archive, target) validated from TOML; PathBuilder service introduced",
+      "file": "internal/infra/config/config.go, internal/platform/pathbuilder.go, internal/app/pipeline/config.go, internal/app/pipeline/dto.go",
+      "notes": [
+        "PathBuilder.native() uses filepath; PathBuilder.canonical() returns forward-slash strings",
+        "Generator writes metadata markers using canonical form; executor reads from config",
+        "Path existence validation added before move/detect operations; fail fast on missing source dir"
+      ]
+    },
+    "outcome": "Planned. See doc/naming_implementation_plan.md (OPT-3: config-driven paths with platform abstraction). Tasks T1-T7 defined with verification commands and rollback plan.",
+    "priority": 5,
+    "problem": "When generator runs on Windows and script executor runs on Linux, not all paths are properly resolved, causing path mismatches between source file names and output file names. Mixed forward/backslash notation breaks cross-platform compatibility.",
+    "proposal": "Config-driven paths with platform abstraction: extend TOML paths section, introduce PathBuilder service exposing canonical forward-slash strings, update domain layers, add path validation.",
+    "source": "doc/naming_problem_statement.md",
+    "status": "proposed",
+    "tests": [
+      "PathBuilder unit tests: native vs canonical output per OS",
+      "Config schema test: paths section loads and normalizes correctly",
+      "Integration: generate script on Linux, assert forward-slash paths and .processing → .done transition",
+      "Manual: explicit path-validation failures (missing source dir fails fast)"
+    ],
+    "title": "Cross-platform path resolution: config-driven paths with platform abstraction (OPT-3)"
   }
 }

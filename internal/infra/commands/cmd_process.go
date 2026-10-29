@@ -114,7 +114,7 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 			FfmpegBinary:   nonEmpty(cfg.ScriptGeneration.FfmpegBinary, "ffmpeg"),
 			ExecutorPaths:  cfg.Paths.Executor,
 			DormancyPeriod: dormancy,
-			PathBuilder: platform.NewPathBuilder(destination),
+			PathBuilder:    platform.NewPathBuilder(destination),
 			CFG:            cfg,
 		})
 

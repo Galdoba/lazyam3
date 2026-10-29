@@ -20,6 +20,11 @@ All docs live in `doc/`. Every file in `doc/` MUST have an entry here.
 | `NOTES.md` | Notes | Unexpected discoveries |
 | `sanitation_problem_statement.md` | Problem Statement | Sanitation problem — artifact-based solution proposal for deleting empty incoming dirs |
 | `sanitation_problem.md` | Verification Results | Sanitation problem — verification results and implementation plan for artifact-based solution |
+| `naming_problem_statement.md` | Problem Statement | Naming problem — cross-platform path resolution between Windows generator and Linux executor |
+| `naming_context.md` | Context | Naming problem — generator/executor path examples |
+| `naming_decidion_record.md` | Decision Record | Naming problem — selected OPT-3 config-driven paths with platform abstraction |
+| `naming_soluution_options.md` | Solution Options | Naming problem — OPT-1/2/3 options analysis |
+| `naming_implementation_plan.md` | Implementation Plan | Naming problem — executable plan for OPT-3 cross-platform path resolution |
 | `text_logger_format_refactoring.md` | Spec | Logger format template specification |
 | `pipeline_chart.html` | Visualization | Mermaid graph visualizing pipeline operations, data flow, and module coverage |
 
