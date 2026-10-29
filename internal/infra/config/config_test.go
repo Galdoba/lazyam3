@@ -173,6 +173,17 @@ func TestConfig_ValidateEmptyGeneratorPath(t *testing.T) {
 	}
 }
 
+func TestConfig_ValidateMissingExecutorPath(t *testing.T) {
+	cfg := defaultCFG()
+	for _, key := range requiredExecutorPaths {
+		cfg.Paths.Executor[key] = ""
+		if err := cfg.Validate(); err == nil {
+			t.Errorf("Validate() with empty executor path %q: want error, got nil", key)
+		}
+		cfg.Paths.Executor[key] = defaultCFG().Paths.Executor[key]
+	}
+}
+
 func TestDefaultConfig_ExecutorMapSeeded(t *testing.T) {
 	cfg := defaultCFG()
 	if cfg.Paths.Executor == nil {

@@ -23,6 +23,9 @@ var requiredConfigFields = []string{
 	"paths.generator.metadata_path",
 }
 
+// requiredExecutorPaths lists the executor path keys that must be present and non-empty.
+var requiredExecutorPaths = []string{"buffer", "in_progress", "done", "notifications", "archive", "target"}
+
 // DefaultConfigError reports that the effective configuration equals the built-in default and
 // the user must edit the pointed config file to fill in the required fields.
 type DefaultConfigError struct {
@@ -215,6 +218,11 @@ func (c Config) Validate() error {
 	}
 	if c.Paths.Generator.MetadataPath == "" {
 		return fmt.Errorf("paths.generator.metadata_path is required")
+	}
+	for _, key := range requiredExecutorPaths {
+		if c.Paths.Executor[key] == "" {
+			return fmt.Errorf("paths.executor.%s is required", key)
+		}
 	}
 	return nil
 }
