@@ -57,6 +57,10 @@ func NewPipeline(opts Options) *Pipeline {
 	if opts.CFG.Storage.Path != "" {
 		statusPath = opts.CFG.Storage.Path
 	}
+	pb := opts.PathBuilder
+	if pb.IsEmpty() {
+		pb = platform.NewPathBuilder(opts.Destination)
+	}
 	return &Pipeline{
 		logger:         opts.Logger,
 		in:             opts.Ingest,
@@ -73,7 +77,7 @@ func NewPipeline(opts Options) *Pipeline {
 		execPaths:   opts.ExecutorPaths,
 		dryRun:      opts.DryRun,
 		events:      opts.Events,
-		pathBuilder: opts.PathBuilder,
+		pathBuilder: pb,
 		statusPath:  statusPath,
 	}
 }

@@ -12,6 +12,11 @@ type PathBuilder struct {
 	root string
 }
 
+// IsEmpty returns true when the PathBuilder has no root set.
+func (b PathBuilder) IsEmpty() bool {
+	return b.root == ""
+}
+
 // NewPathBuilder returns a PathBuilder rooted at root.
 func NewPathBuilder(root string) PathBuilder {
 	return PathBuilder{root: root}
