@@ -7,6 +7,7 @@ import (
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 	"github.com/Galdoba/lazyam3/internal/domain/script"
 	"github.com/Galdoba/lazyam3/internal/infra/config"
+	"github.com/Galdoba/lazyam3/internal/platform"
 )
 
 // Logger is the structured logging port used by the pipeline.
@@ -28,6 +29,9 @@ type Options struct {
 	Ingest   ingest.Organizer
 	Metadata metadata.ProductRepository
 	Renderer script.Renderer
+
+	// PathBuilder for platform-agnostic path construction.
+	PathBuilder platform.PathBuilder
 
 	// Config
 	SourceDir      string

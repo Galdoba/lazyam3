@@ -13,6 +13,7 @@ import (
 	"github.com/Galdoba/lazyam3/internal/app/pipeline"
 	"github.com/Galdoba/lazyam3/internal/infra/metadata"
 	scriptinfra "github.com/Galdoba/lazyam3/internal/infra/script"
+	"github.com/Galdoba/lazyam3/internal/platform"
 )
 
 const (
@@ -113,6 +114,7 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 			FfmpegBinary:   nonEmpty(cfg.ScriptGeneration.FfmpegBinary, "ffmpeg"),
 			ExecutorPaths:  cfg.Paths.Executor,
 			DormancyPeriod: dormancy,
+			PathBuilder: platform.NewPathBuilder(destination),
 			CFG:            cfg,
 		})
 

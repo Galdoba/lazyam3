@@ -12,8 +12,8 @@ type PathBuilder struct {
 	root string
 }
 
-// newPathBuilder returns a PathBuilder rooted at root.
-func newPathBuilder(root string) PathBuilder {
+// NewPathBuilder returns a PathBuilder rooted at root.
+func NewPathBuilder(root string) PathBuilder {
 	return PathBuilder{root: root}
 }
 

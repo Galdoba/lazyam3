@@ -16,6 +16,7 @@ import (
 	"github.com/Galdoba/lazyam3/internal/domain/script"
 	"github.com/Galdoba/lazyam3/internal/infra/fso"
 	"github.com/Galdoba/lazyam3/internal/infra/logging"
+	"github.com/Galdoba/lazyam3/internal/platform"
 )
 
 const (
@@ -40,6 +41,8 @@ type Pipeline struct {
 	pollInterval   time.Duration
 	dormancyPeriod time.Duration
 	events         chan PipelineEvent
+
+	pathBuilder platform.PathBuilder
 
 	statusPath string
 }
@@ -70,6 +73,7 @@ func NewPipeline(opts Options) *Pipeline {
 		execPaths:   opts.ExecutorPaths,
 		dryRun:      opts.DryRun,
 		events:      opts.Events,
+		pathBuilder: opts.PathBuilder,
 		statusPath:  statusPath,
 	}
 }
