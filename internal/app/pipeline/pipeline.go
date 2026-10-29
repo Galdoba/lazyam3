@@ -146,7 +146,7 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 	dirs := snap.TopDirsAllFilesWritable()
 	p.logger.Info("dirs found", "count", len(dirs))
 
-	metaDir := filepath.Join(p.destination, "metadata")
+	metaDir := p.pathBuilder.Canonical("metadata")
 	matches := make([]doneMatch, 0)
 	for _, d := range dirs {
 		if len(snap.FilesIn(d.Path)) > 0 {
@@ -234,9 +234,9 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 	// Write processing artifact after successful script build, before execution.
 	scriptName := filepath.Base(cfg.Destination)
 	scriptName = strings.TrimSuffix(scriptName, filepath.Ext(cfg.Destination))
-	metaDir := filepath.Join(p.destination, "metadata")
+	metaDir := p.pathBuilder.Canonical("metadata")
 	if err := os.MkdirAll(metaDir, 0o755); err == nil {
-		processingPath := filepath.Join(metaDir, scriptName+".processing")
+		processingPath := p.pathBuilder.Canonical("metadata", scriptName+".processing")
 		payload := map[string]any{
 			"source_dir":  dir,
 			"unit_id":     unit.ID,
@@ -294,7 +294,7 @@ func (p *Pipeline) findDoneFile(metaDir, sourceDir string) (string, bool) {
 		if filepath.Ext(e.Name()) != ".done" {
 			continue
 		}
-		donePath := filepath.Join(metaDir, e.Name())
+		donePath := p.pathBuilder.Canonical("metadata", e.Name())
 		data, err := os.ReadFile(donePath)
 		if err != nil {
 			continue

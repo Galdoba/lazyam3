@@ -15,6 +15,7 @@ import (
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 	"github.com/Galdoba/lazyam3/internal/domain/script"
+	"github.com/Galdoba/lazyam3/internal/platform"
 )
 
 type fakeOrganizer struct {
@@ -97,6 +98,7 @@ func sourceRoot(t *testing.T) (string, string) {
 
 func newTestPipeline(t *testing.T, root string, in *fakeOrganizer, repo *fakeRepo, rd *fakeRenderer, events chan PipelineEvent, dryRun bool) *Pipeline {
 	t.Helper()
+	dest := t.TempDir()
 	return NewPipeline(Options{
 		Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Ingest:        in,
@@ -104,10 +106,11 @@ func newTestPipeline(t *testing.T, root string, in *fakeOrganizer, repo *fakeRep
 		Renderer:      rd,
 		Events:        events,
 		SourceDir:     root,
-		Destination:   t.TempDir(),
+		Destination:   dest,
 		DryRun:        dryRun,
 		HardsubTag:    "",
 		ExecutorPaths: nil,
+		PathBuilder:   platform.NewPathBuilder(dest),
 	})
 }
 
@@ -1002,6 +1005,7 @@ func TestSanitize_EmptyDirWithDoneFile_Deleted(t *testing.T) {
 		&fakeRepo{products: map[int64]*metadata.Product{}},
 		&fakeRenderer{}, events, false)
 	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
 
 	out, err := p.RunOnce(context.Background())
 	if err != nil {
@@ -1031,6 +1035,7 @@ func TestSanitize_EmptyDirWithoutDoneFile_Kept(t *testing.T) {
 		&fakeRepo{products: map[int64]*metadata.Product{}},
 		&fakeRenderer{}, events, false)
 	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
 
 	_, err := p.RunOnce(context.Background())
 	if err != nil {
@@ -1058,6 +1063,7 @@ func TestSanitize_InvalidJSONDoneFile_Skipped(t *testing.T) {
 		&fakeRepo{products: map[int64]*metadata.Product{}},
 		&fakeRenderer{}, events, false)
 	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
 
 	if _, err := p.RunOnce(context.Background()); err != nil {
 		t.Fatalf("RunOnce() error: %v", err)
@@ -1085,6 +1091,7 @@ func TestSanitize_DoneFileConsumedAfterDeletion(t *testing.T) {
 		&fakeRepo{products: map[int64]*metadata.Product{}},
 		&fakeRenderer{}, events, false)
 	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
 
 	if _, err := p.RunOnce(context.Background()); err != nil {
 		t.Fatalf("RunOnce() error: %v", err)

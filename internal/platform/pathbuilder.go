@@ -22,7 +22,7 @@ func (b PathBuilder) native(components ...string) string {
 	return filepath.Join(b.root, filepath.Join(components...))
 }
 
-// canonical joins path components using forward slashes, regardless of OS.
-func (b PathBuilder) canonical(components ...string) string {
+// Canonical joins path components using forward slashes, regardless of OS.
+func (b PathBuilder) Canonical(components ...string) string {
 	return path.Join(b.root, path.Join(components...))
 }
