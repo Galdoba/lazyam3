@@ -287,5 +287,35 @@
       "Ingest tests: source paths canonical"
     ],
     "title": "Cross-platform path resolution: config-driven paths with platform abstraction (OPT-3)"
+  },
+  "marker-path-fix": {
+    "benefits": [
+      "Generated script marker lines reference the executor's metadata location, not the generator's",
+      "Fixes '.processing not renaming to .done' when generator and executor paths differ"
+    ],
+    "blocked_by": [
+      "naming-001"
+    ],
+    "effort": "1 hour",
+    "impact": "high",
+    "implementation": {
+      "config_change": "buildScriptConfig metadataDir computed from executor buffer path instead of generator destination root",
+      "file": "internal/app/pipeline/config.go",
+      "notes": [
+        "metadataDir := path.Join(buffer, \"metadata\") uses executor buffer path",
+        "Ensures marker lines embed executor metadata location (e.g. /home/pemaltynov/IN/metadata)"
+      ]
+    },
+    "outcome": "Implemented. buildScriptConfig metadataDir now uses executor buffer path (path.Join(buffer, \"metadata\")) instead of generator destination root. Marker lines in generated scripts reference the executor's metadata location. Live test passes (6 processed, 0 failed); build, vet, lint, and unit tests pass.",
+    "priority": 6,
+    "problem": "Generated script marker line embeds generator's destination path (/192.168.31.4/buffer/IN/metadata/...processing) but executor runs at its own buffer path (/home/pemaltynov/IN), so the .processing file does not exist at the embedded path and mv fails.",
+    "proposal": "Derive metadataDir in buildScriptConfig from the executor's buffer path (executorPaths.buffer) so marker lines reference the executor's metadata location.",
+    "source": "User report: mv marker fails because generator path embedded in script does not exist on executor",
+    "status": "done",
+    "tests": [
+      "Live test: 6 processed, 0 failed",
+      "Unit tests pass: pipeline, config, script"
+    ],
+    "title": "Fix: script marker metadata path uses executor buffer path"
   }
 }

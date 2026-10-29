@@ -2,13 +2,13 @@
 
 Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata resolution → script generation → rendering).
 
-**Current State**: Tasks 1-10 complete. Pipeline fully wired end-to-end with HSUB auto-detection, movie naming fix, TOML config, config-driven paths, empty-dir sanitation, and cross-platform path resolution (PathBuilder, canonical metadata markers). Entering maintenance phase.
+**Current State**: Tasks 1-10 complete. Pipeline fully wired end-to-end with HSUB auto-detection, movie naming fix, TOML config, config-driven paths, empty-dir sanitation, and cross-platform path resolution (PathBuilder, canonical metadata markers). Marker metadata path bug fixed. Entering maintenance phase.
 
 ## Current Feature
 
 > **Mode**: Maintenance. No active feature work.
 >
-> Cross-platform path resolution (naming-001) is complete: PathBuilder service (native/canonical), TOML paths validated, metadata markers use canonical forward-slash form, script paths emit forward slashes, source paths canonical. Build, vet, lint, and live test pass. See `doc/HANDOFF.md` and `doc/feature_list.json`.
+> Sanitation (E2) is complete: `.processing` artifact carries JSON, renames to `.done` on OK, scan-start deletes empty source dirs. Edge cases verified (hidden sidecars prevent deletion, partial execution leaves `.processing` dirs intact). Marker metadata path bug fixed: script marker lines now reference the executor's buffer path (`path.Join(buffer, "metadata")`) instead of the generator's destination root. See `doc/HANDOFF.md` and `doc/feature_list.json`.
 
 
 ## Live Test

@@ -87,7 +87,6 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	// Derive script name (basename without .sh) for execution-signal markers.
 	scriptName := filepath.Base(destination)
 	scriptName = strings.TrimSuffix(scriptName, filepath.Ext(destination))
-	metadataDir := path.Join(toSlash(root), "metadata")
 
 	// Normalize all executor paths for Windows
 	buffer := toSlash(executorPaths["buffer"])
@@ -110,6 +109,10 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	if archive == "" {
 		archive = toSlash(filepath.Join(root, "archive"))
 	}
+
+	// Metadata dir uses the executor's buffer path so marker lines reference
+	// the executor's metadata location (e.g. /home/pemaltynov/IN/metadata).
+	metadataDir := path.Join(buffer, "metadata")
 
 	return script.ScriptConfig{
 		Filenames:    unit.Filenames,
