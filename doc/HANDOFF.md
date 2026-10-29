@@ -1,34 +1,33 @@
-# HANDOFF — Sanitation Problem Implementation Complete
+# HANDOFF — Cross-Platform Path Resolution Implemented
 
-## Session: Implemented artifact-based empty-dir sanitation
+## Session: naming-001 cross-platform path resolution (OPT-3)
 
 ### What was implemented
-1. **`fso.Snapshot`** gained `SanitizeablePaths []string` field + `Sanitize() error` method (deletes paths via `os.RemoveAll`).
-2. **`pipeline.go processUnit`** writes JSON payload to `.processing` artifact: `{"source_dir": "<abs path>", "unit_id": <int64>, "script_name": "<name>"}`.
-3. **`pipeline.go RunOnce`** after scan: identifies empty dirs, correlates with `.done` files in `destination/metadata`, populates `SanitizeablePaths`, calls `snap.Sanitize()`, removes consumed `.done` files, then continues ingestion for non-empty dirs.
-4. **`pipeline.go findDoneFile`** helper scans metadata dir for `.done` files, parses JSON, matches `source_dir`.
+1. **T1 — TOML paths validation**: `Paths.Executor` map (buffer, in_progress, done, notifications, archive, target) and `Paths.Generator` validated from TOML. Added `requiredExecutorPaths` schema validation in `config.Validate()`.
+2. **T2 — PathBuilder service**: `internal/platform/pathbuilder.go` with `Native()` (host-OS separators via `filepath.Join`) and `Canonical()` (forward-slash strings via `path.Join`).
+3. **T3 — PathBuilder wiring**: Added `PathBuilder` to `pipeline.Options` and `Pipeline` struct, wired from `cmd_process.go` via `platform.NewPathBuilder(destination)`.
+4. **T4 — Script paths**: `pipeline/config.go` uses `path.Join` for `metadataDir`; script domain emits forward-slash paths in generated naming scripts.
+5. **T5 — Metadata markers**: Generator writes and executor reads `.processing`/`.done` markers using `PathBuilder.Canonical("metadata", ...)`.
+6. **T6 — Source paths**: Ingest tests verify canonical source path handling; `app/ingest` uses `filepath.Join(dir, name)` for host-OS paths.
 
 ### Verification results
-- **Live test confirmed**: after `.processing`→`.done` rename and second `process --once`, all 6 empty `incoming/<unit>/` directories were deleted, and `.done` files consumed.
-- **Unit tests added**: `TestSanitize_EmptyDirWithDoneFile_Deleted`, `TestSanitize_EmptyDirWithoutDoneFile_Kept`, `TestSanitize_InvalidJSONDoneFile_Skipped`, `TestSanitize_DoneFileConsumedAfterDeletion`. All pass.
+- **Live test confirmed**: `process --once` completed with 6 processed, 0 failed; metadata markers in canonical forward-slash form.
+- **Unit tests pass**: PathBuilder (native/canonical), config executor validation, pipeline marker canonical form, ingest source paths.
 - **Gates pass**: `go build ./...`, `go test -race -cover ./...`, `go vet ./...`, `golangci-lint run ./...` (0 issues).
 
-### Edge cases handled
-- Empty dir with no matching `.done`: left intact (first cycle or other emptying).
-- `.done` points to non-matching path: skipped.
-- Invalid/unparseable JSON in `.done`: log warning, skipped (dir kept).
-- `.done` accumulation: `.done` deleted immediately after deleting `source_dir`.
-
 ### Files changed
-- `internal/infra/fso/filescanner.go`: `SanitizeablePaths` field + `Sanitize()` method.
-- `internal/app/pipeline/pipeline.go`: JSON `.processing` artifact, `findDoneFile`, empty-dir correlation in `RunOnce`.
-- `internal/app/pipeline/pipeline_test.go`: 4 sanitation tests.
-- `doc/feature_list.json`: added E2 feature entry with tests.
+- `internal/infra/config/config.go`, `config_test.go`: executor path schema validation.
+- `internal/platform/pathbuilder.go`, `pathbuilder_test.go`: PathBuilder service.
+- `internal/app/pipeline/dto.go`, `pipeline.go`, `config.go`: PathBuilder wiring, canonical markers, forward-slash metadata dir.
+- `internal/app/pipeline/pipeline_test.go`: PathBuilder initialization in tests.
+- `internal/infra/commands/cmd_process.go`: PathBuilder construction.
+- `doc/feature_list.json`: naming-001 entry status → done.
+- `AGENTS.md`: Current State/Feature updated.
 
 ### Maintenance notes
-- Feature E2 is complete and verified. No active work required.
-- Edge cases: hidden sidecars prevent deletion; partial execution leaves `.processing` dirs intact; stale `.done` for absent dirs is safely ignored.
-- Concurrency: single-instance cron usage assumed; concurrent runs could double-consume `.done` files.
+- PathBuilder root defaults to destination in `NewPipeline` when unset (prevents relative `metadata/` dirs).
+- Canonical forward-slash markers ensure generator (Windows) and executor (Linux) share identical path format.
+- No unrelated changes included; all 7 plan tasks (T1-T7) completed.
 
 ### Next agent
-Maintenance phase. Sanitation feature is complete. Address new issues or features as they arise per project rules.
+Maintenance phase. Cross-platform path resolution is complete. Address new issues or features as they arise per project rules.
