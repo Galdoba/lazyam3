@@ -42,6 +42,9 @@ type ScriptConfig struct {
 	// Empty values fall back to the built-in defaults.
 	Harsub HarsubConfig
 
+	// ScriptName is the base name of the script (e.g. "Show_s01e06_PRT261023120000") used for execution-signal markers.
+	ScriptName string
+
 	// Output path for the .sh file
 	Destination string
 }
@@ -81,4 +84,5 @@ type Environment struct {
 	Archive       string // script self-archive location (from TOML)
 	TargetRoot    string // e.g. "/mnt/ROOT/EDIT"
 	Priority      int
+	MetadataDir   string // metadata directory for execution-signal markers (.processing/.done)
 }

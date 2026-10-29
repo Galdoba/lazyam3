@@ -383,6 +383,129 @@ func TestRun_LoopsUntilContextCancelled(t *testing.T) {
 	}
 }
 
+func TestEmptyDir_MarkerCreatedOnSuccess(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{}
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		&fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		rd, events, false)
+
+	_, err := p.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if len(rd.scripts) != 1 {
+		t.Fatalf("expected 1 script, got %d", len(rd.scripts))
+	}
+	scriptName := filepath.Base(rd.scripts[0].Destination)
+	scriptName = strings.TrimSuffix(scriptName, filepath.Ext(rd.scripts[0].Destination))
+	metaDir := filepath.Join(p.destination, "metadata")
+	marker := filepath.Join(metaDir, scriptName+".processing")
+	if !fileExists(marker) {
+		t.Errorf("marker %q should exist after successful build", marker)
+	}
+}
+
+func TestEmptyDir_MarkerNotCreatedOnFailure(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{err: errors.New("render failed")}
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		&fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		rd, events, false)
+
+	out, err := p.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if out.Failed != 1 {
+		t.Errorf("RunOnce() Failed = %d, want 1", out.Failed)
+	}
+	metaDir := filepath.Join(p.destination, "metadata")
+	if fileExists(metaDir) {
+		t.Errorf("metadata dir %q should not exist after failure", metaDir)
+	}
+}
+
+func TestEmptyDir_SecondScan_SkipsCompletedUnit(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{}
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		&fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		rd, events, false)
+
+	out1, err := p.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("first RunOnce() error: %v", err)
+	}
+	if out1.Processed != 1 || out1.Failed != 0 {
+		t.Errorf("first RunOnce() = %+v, want Processed=1 Failed=0", out1)
+	}
+
+	// Second scan: files were moved to buffer, dir is now empty.
+	out2, err := p.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("second RunOnce() error: %v", err)
+	}
+	if out2.Processed != 0 {
+		t.Errorf("second RunOnce() Processed = %d, want 0 (empty dir skipped)", out2.Processed)
+	}
+	if len(rd.scripts) != 1 {
+		t.Errorf("expected 1 script total, got %d", len(rd.scripts))
+	}
+}
+
+func TestEmptyDir_DryRun_NoMarkerCreated(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{}
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		&fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		rd, events, true)
+
+	_, err := p.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	metaDir := filepath.Join(p.destination, "metadata")
+	if fileExists(metaDir) {
+		t.Errorf("metadata dir %q should not exist on dry run", metaDir)
+	}
+}
+
+func fileExists(path string) bool {
+	if _, err := os.Stat(path); err == nil {
+		return true
+	}
+	return false
+}
+
 func TestBuildScriptConfig(t *testing.T) {
 	unit := testUnit()
 	root := t.TempDir()
@@ -832,5 +955,141 @@ func TestRun_DormancyMode_ContinuesAfterScanFailure(t *testing.T) {
 	}
 	if !errors.Is(runErr, context.Canceled) {
 		t.Fatalf("Run() error = %v, want context.Canceled", runErr)
+	}
+}
+
+// pathExists returns true if path exists (file or dir).
+func pathExists(path string) bool {
+	e, err := os.Lstat(path)
+	return err == nil && e != nil
+}
+
+func emptyDirFixture(t *testing.T) (string, string) {
+	t.Helper()
+	root := t.TempDir()
+	emptyDir := filepath.Join(root, "empty-unit")
+	if err := os.MkdirAll(emptyDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return root, emptyDir
+}
+
+func writeDoneFile(t *testing.T, metaDir, scriptName, sourceDir string) string {
+	t.Helper()
+	donePath := filepath.Join(metaDir, scriptName+".done")
+	payload := fmt.Sprintf(`{"source_dir": "%s", "unit_id": 1, "script_name": "test"}`, sourceDir)
+	if err := os.WriteFile(donePath, []byte(payload), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return donePath
+}
+
+func TestSanitize_EmptyDirWithDoneFile_Deleted(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	absEmptyDir, err := filepath.Abs(emptyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	donePath := writeDoneFile(t, metaDir, "test.done", absEmptyDir)
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+
+	out, err := p.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if out.Processed != 0 || out.Failed != 0 {
+		t.Errorf("RunOnce() = %+v, want Processed=0 Failed=0", out)
+	}
+	if pathExists(emptyDir) {
+		t.Errorf("empty dir %q should be deleted", emptyDir)
+	}
+	if pathExists(donePath) {
+		t.Errorf("done file %q should be consumed", donePath)
+	}
+}
+
+func TestSanitize_EmptyDirWithoutDoneFile_Kept(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+
+	_, err := p.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if !pathExists(emptyDir) {
+		t.Errorf("empty dir %q should be kept (no .done file)", emptyDir)
+	}
+}
+
+func TestSanitize_InvalidJSONDoneFile_Skipped(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	donePath := filepath.Join(metaDir, "bad.done")
+	if err := os.WriteFile(donePath, []byte("not-json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if !pathExists(emptyDir) {
+		t.Errorf("empty dir %q should be kept (invalid .done JSON)", emptyDir)
+	}
+}
+
+func TestSanitize_DoneFileConsumedAfterDeletion(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	absEmptyDir, err := filepath.Abs(emptyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeDoneFile(t, metaDir, "test2.done", absEmptyDir)
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if pathExists(filepath.Join(metaDir, "test2.done")) {
+		t.Errorf("consumed .done file should be deleted")
 	}
 }

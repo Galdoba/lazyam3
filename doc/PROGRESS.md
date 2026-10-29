@@ -291,3 +291,51 @@ default configuration in use: edit the config file "<config file path>" and fill
 - Non-string attrs with spaces render unquoted (`error=product 63580 not found`) — per spec, but ambiguous for parsers.
 - Lint gate is red repo-wide even on clean checkout (gci/gocritic on `//log=` placeholders) — pre-existing, out of A5 scope.
 - Priority numbering in `feature_list.json` is ambiguous (2 "higher" than 4?) — next-feature selection needs clarification.
+
+## Session: Sanitation Problem Verification
+
+### Work Completed
+
+#### Verification of artifact-based empty-dir sanitation (VERIFIED — ACCEPT)
+
+- **Problem:** After `process`, source files move from `incoming/<unit>/` to `buffer/`; next scan silently skips empty dirs but never deletes them, so they accumulate.
+- **Verification:** Confirmed artifact-based solution is viable:
+  - JSON payload `{"source_dir", "unit_id", "script_name"}` is parseable; `MediaUnit.ID` is `int64`.
+  - `fso.Scan` normalizes paths via `filepath.Abs()` → scanned dirs are absolute, matching stored `source_dir`.
+  - `buildDoneMarker` renames `.processing`→`.done` after successful ffmpeg execution; `mv` preserves JSON content.
+  - Artifacts live in `filepath.Join(p.destination, "metadata")`, persisting across cycles.
+- **Architecture decision:** `fso.Snapshot` gains `SanitizeablePaths []string` field + `Sanitize() error` method. `pipeline.go processUnit` writes JSON `.processing` artifact. `pipeline.go RunOnce` (pipeline's responsibility) correlates empty dirs with `.done` files, populates `SanitizeablePaths`, calls `snap.Sanitize()` if non-empty, removes consumed `.done` files, then continues ingestion for non-empty dirs.
+- **Deliverables:**
+  - `doc/sanitation_problem.md` — verification results, verdict (ACCEPT), implementation plan, cost, benefits, edge cases.
+  - `doc/pipeline_chart.html` — mermaid graph visualizing pipeline operations, data flow, module coverage.
+  - Updated `doc/INDEX.md` with both new entries.
+  - Rewritten `doc/HANDOFF.md` with verification findings and next-agent instructions.
+
+### Key Technical Findings
+
+1. **Architecture separation:** Scanner (`fso.Scan`) scans only; `fso.Snapshot.Sanitize()` handles file-system deletion; pipeline orchestrates and decides when to sanitize.
+2. **Path consistency:** absolute paths from `fso.Scan` match stored `source_dir` exactly.
+3. **Edge cases:** empty dir with no matching `.done` → leave; `.done` points to non-matching path → skip; invalid JSON → log warning, skip; `.done` accumulation → delete after processing; "empty" means zero entries via `os.ReadDir` (hidden files included).
+
+### Metrics
+
+- **Docs created:** `sanitation_problem.md`, `pipeline_chart.html`.
+- **Docs updated:** `INDEX.md`, `HANDOFF.md`.
+- **Verdict:** ACCEPT — artifact-based sanitation is implementable.
+
+
+### Implementation of empty-dir sanitation (DONE)
+
+- **Implemented:** `fso.Snapshot.SanitizeablePaths []string` + `Sanitize() error` method; `pipeline.go processUnit` writes JSON `.processing` artifact; `pipeline.go RunOnce` correlates empty dirs with `.done` files, sanitizes, removes consumed `.done` files.
+- **Verification:** Live test confirmed all 6 empty `incoming/<unit>/` directories deleted after `.processing`→`.done` rename and second `process --once`.
+- **Tests added:** `TestSanitize_EmptyDirWithDoneFile_Deleted`, `TestSanitize_EmptyDirWithoutDoneFile_Kept`, `TestSanitize_InvalidJSONDoneFile_Skipped`, `TestSanitize_DoneFileConsumedAfterDeletion`. All pass.
+- **Gates:** `go build ./...`, `go test -race -cover ./...`, `go vet ./...`, `golangci-lint run ./...` — all pass (0 issues).
+- **Feature list:** E2 entry added to `doc/feature_list.json` with tests listed.
+- **Deliverables:** AGENTS.md updated, doc/HANDOFF.md rewritten with implementation findings.
+
+### Maintenance phase entered
+
+- Sanitation feature (E2) verified complete: live tests confirmed full deletion after execution, partial execution leaves `.processing` dirs intact, hidden sidecars prevent deletion.
+- Documentation cleanup: removed redundant `Empty_input_directories_problem_analysis.md`; INDEX.md updated; NOTES.md updated with edge-case discoveries.
+- AGENTS.md, HANDOFF.md, PROGRESS.md, feature_list.json all reflect maintenance state.
+- No active feature work; ready for new issues/features per project rules.

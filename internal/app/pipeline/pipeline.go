@@ -2,10 +2,12 @@ package pipeline
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	appscript "github.com/Galdoba/lazyam3/internal/app/script"
@@ -38,6 +40,8 @@ type Pipeline struct {
 	pollInterval   time.Duration
 	dormancyPeriod time.Duration
 	events         chan PipelineEvent
+
+	statusPath string
 }
 
 // NewPipeline creates a new Pipeline instance.
@@ -45,6 +49,10 @@ func NewPipeline(opts Options) *Pipeline {
 	pollInterval := opts.PollInterval
 	if pollInterval <= 0 {
 		pollInterval = defaultPollInterval
+	}
+	statusPath := ""
+	if opts.CFG.Storage.Path != "" {
+		statusPath = opts.CFG.Storage.Path
 	}
 	return &Pipeline{
 		logger:         opts.Logger,
@@ -62,6 +70,7 @@ func NewPipeline(opts Options) *Pipeline {
 		execPaths:   opts.ExecutorPaths,
 		dryRun:      opts.DryRun,
 		events:      opts.Events,
+		statusPath:  statusPath,
 	}
 }
 
@@ -92,6 +101,9 @@ func (p *Pipeline) Run(ctx context.Context) (RunOutput, error) {
 		}
 		total.Processed += out.Processed
 		total.Failed += out.Failed
+		if p.statusPath != "" {
+			p.writeStatus(total)
+		}
 
 		if p.dormancyPeriod > 0 {
 			timer := time.NewTimer(p.dormancyPeriod)
@@ -130,9 +142,37 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 	dirs := snap.TopDirsAllFilesWritable()
 	p.logger.Info("dirs found", "count", len(dirs))
 
+	metaDir := filepath.Join(p.destination, "metadata")
+	matches := make([]doneMatch, 0)
+	for _, d := range dirs {
+		if len(snap.FilesIn(d.Path)) > 0 {
+			continue
+		}
+		donePath, ok := p.findDoneFile(metaDir, d.Path)
+		if ok {
+			snap.SanitizeablePaths = append(snap.SanitizeablePaths, d.Path)
+			matches = append(matches, doneMatch{sourceDir: d.Path, donePath: donePath})
+		}
+	}
+	if len(snap.SanitizeablePaths) > 0 {
+		if err := snap.Sanitize(); err != nil {
+			p.logger.Warn("sanitize failed", "error", err)
+		} else {
+			p.logger.Info("sanitized empty dirs", "count", len(snap.SanitizeablePaths))
+			for _, m := range matches {
+				if err := os.Remove(m.donePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+					p.logger.Warn("remove done file failed", "path", m.donePath, "error", err)
+				}
+			}
+		}
+	}
+
 	for _, d := range dirs {
 		if err := ctx.Err(); err != nil {
 			return out, err
+		}
+		if len(snap.FilesIn(d.Path)) == 0 {
+			continue
 		}
 		if err := p.processUnit(ctx, d.Path); err != nil {
 			out.Failed++
@@ -187,6 +227,28 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string) error {
 		p.emit(EventUnitFailed, unit.ID, err)
 		return err
 	}
+	// Write processing artifact after successful script build, before execution.
+	scriptName := filepath.Base(cfg.Destination)
+	scriptName = strings.TrimSuffix(scriptName, filepath.Ext(cfg.Destination))
+	metaDir := filepath.Join(p.destination, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err == nil {
+		processingPath := filepath.Join(metaDir, scriptName+".processing")
+		payload := map[string]any{
+			"source_dir":  dir,
+			"unit_id":     unit.ID,
+			"script_name": scriptName,
+		}
+		payloadBytes, err := json.Marshal(payload)
+		if err != nil {
+			if p.logger != nil {
+				p.logger.Warn("processing artifact marshal failed", "error", err)
+			}
+		} else if err := os.WriteFile(processingPath, payloadBytes, 0o644); err != nil {
+			if p.logger != nil {
+				p.logger.Warn("processing artifact write failed", "path", processingPath, "error", err)
+			}
+		}
+	}
 	p.emit(EventUnitDone, unit.ID, nil)
 	return nil
 }
@@ -211,6 +273,43 @@ func (p *Pipeline) prepareFiles(sourceDir string, callNames map[string]string, b
 	return nil
 }
 
+// doneMatch pairs a source dir path with its consumed .done artifact.
+type doneMatch struct {
+	sourceDir string
+	donePath  string
+}
+
+// findDoneFile scans metaDir for .done files and returns the path of the
+// one whose JSON source_dir matches sourceDir exactly.
+func (p *Pipeline) findDoneFile(metaDir, sourceDir string) (string, bool) {
+	entries, err := os.ReadDir(metaDir)
+	if err != nil {
+		return "", false
+	}
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) != ".done" {
+			continue
+		}
+		donePath := filepath.Join(metaDir, e.Name())
+		data, err := os.ReadFile(donePath)
+		if err != nil {
+			continue
+		}
+		payload := map[string]any{}
+		if err := json.Unmarshal(data, &payload); err != nil {
+			if p.logger != nil {
+				p.logger.Warn("done file parse failed", "path", donePath, "error", err)
+			}
+			continue
+		}
+		sd, _ := payload["source_dir"].(string)
+		if sd == sourceDir {
+			return donePath, true
+		}
+	}
+	return "", false
+}
+
 func (p *Pipeline) emit(t EventType, id int64, err error) {
 	if p.events != nil {
 		p.events <- PipelineEvent{Type: t, ID: id, Error: err}
@@ -224,5 +323,42 @@ func fallbackProduct(seriesTitle string, unitID int64) *metadata.Product {
 		SeriesTitle: seriesTitle,
 		Kind:        metadata.KindMovie,
 		ID:          unitID,
+	}
+}
+
+// StatusReport is the JSON structure written to status.json after each loop.
+type StatusReport struct {
+	Processed int    `json:"processed"`
+	Failed    int    `json:"failed"`
+	Status    string `json:"status"`
+}
+
+// writeStatus persists the current processing totals to status.json.
+func (p *Pipeline) writeStatus(out RunOutput) {
+	if p.statusPath == "" {
+		return
+	}
+	report := StatusReport{
+		Processed: out.Processed,
+		Failed:    out.Failed,
+		Status:    "ok",
+	}
+	raw, err := json.Marshal(report)
+	if err != nil {
+		if p.logger != nil {
+			p.logger.Warn("status marshal failed", "error", err)
+		}
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(p.statusPath), 0o755); err != nil {
+		if p.logger != nil {
+			p.logger.Warn("status dir create failed", "path", p.statusPath, "error", err)
+		}
+		return
+	}
+	if err := os.WriteFile(p.statusPath, raw, 0o644); err != nil {
+		if p.logger != nil {
+			p.logger.Warn("status write failed", "path", p.statusPath, "error", err)
+		}
 	}
 }

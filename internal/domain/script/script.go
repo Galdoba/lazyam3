@@ -59,6 +59,9 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 	hsubMove := buildHSUBMove(cfg.HSUBFile)
 	hsubCleanup := buildHSUBCleanup(cfg.HSUBFile)
 
+	// Build done marker section
+	doneMarker := buildDoneMarker(cfg.ScriptName, cfg.Env.MetadataDir)
+
 	// Build mkdir command for output directory
 	mkdirTarget := buildMKDirTarget(predictions)
 
@@ -76,6 +79,7 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 	content = replaceAll(content, "srt_cleanup", srtCleanup)
 	content = replaceAll(content, "hsub_move", hsubMove)
 	content = replaceAll(content, "hsub_cleanup", hsubCleanup)
+	content = replaceAll(content, "done_marker", doneMarker)
 	content = replaceAll(content, "priority", fmt.Sprintf("%d", cfg.Env.Priority))
 	content = replaceAll(content, "buffer", cfg.Env.Buffer)
 	content = replaceAll(content, "in_progress", cfg.Env.InProgress)
@@ -280,6 +284,14 @@ func buildHSUBCleanup(hsubFile string) string {
 		return ""
 	}
 	return `mv "${IN_PROGRESS}/${HSUBFILE}" "${DONE}/${HSUBFILE}"`
+}
+
+// buildDoneMarker returns the bash command to rename the processing marker to done.
+func buildDoneMarker(scriptName, metadataDir string) string {
+	if scriptName == "" || metadataDir == "" {
+		return ""
+	}
+	return fmt.Sprintf(`[[ -f "%s/%s.processing" ]] && mv "%s/%s.processing" "%s/%s.done"`, metadataDir, scriptName, metadataDir, scriptName, metadataDir, scriptName)
 }
 
 // buildMKDirTarget generates the mkdir -p command for the output directory.

@@ -1,41 +1,34 @@
-# HANDOFF — Logging System Refactoring
+# HANDOFF — Sanitation Problem Implementation Complete
 
-## Session: Logging placeholder cleanup and activation
+## Session: Implemented artifact-based empty-dir sanitation
 
-### What was asked
-Investigate the Go codebase's logging system, evaluate all commented-out logging calls (`//log=...`), classify them, activate OSTAV logging, remove UDA/UJE comments, keep NE VV comments with documentation, and write this HANDOFF.md.
+### What was implemented
+1. **`fso.Snapshot`** gained `SanitizeablePaths []string` field + `Sanitize() error` method (deletes paths via `os.RemoveAll`).
+2. **`pipeline.go processUnit`** writes JSON payload to `.processing` artifact: `{"source_dir": "<abs path>", "unit_id": <int64>, "script_name": "<name>"}`.
+3. **`pipeline.go RunOnce`** after scan: identifies empty dirs, correlates with `.done` files in `destination/metadata`, populates `SanitizeablePaths`, calls `snap.Sanitize()`, removes consumed `.done` files, then continues ingestion for non-empty dirs.
+4. **`pipeline.go findDoneFile`** helper scans metadata dir for `.done` files, parses JSON, matches `source_dir`.
 
-### Classifications applied
-- **OSTAV (22)**: Activated as real logging calls via `logging.Logger` (Info/Warn).
-- **UDA (58)**: Removed — errors returned as err, domain-layer (no logger), init logging without logger access.
-- **NE VV (4)**: Kept as documentation comments for future activation.
-- **UJE (4)**: Already had real logging; placeholder comments removed.
+### Verification results
+- **Live test confirmed**: after `.processing`→`.done` rename and second `process --once`, all 6 empty `incoming/<unit>/` directories were deleted, and `.done` files consumed.
+- **Unit tests added**: `TestSanitize_EmptyDirWithDoneFile_Deleted`, `TestSanitize_EmptyDirWithoutDoneFile_Kept`, `TestSanitize_InvalidJSONDoneFile_Skipped`, `TestSanitize_DoneFileConsumedAfterDeletion`. All pass.
+- **Gates pass**: `go build ./...`, `go test -race -cover ./...`, `go vet ./...`, `golangci-lint run ./...` (0 issues).
 
-### Changes made
-- **`internal/infra/logging/logger.go`**: Removed UDA `//log=` comments.
-- **`internal/infra/config/config.go`**: Config logging handled at `AppModules.Init()` to avoid import cycle.
-- **`internal/infra/metadata/repository.go`**: Added `logging.Logger` field; logs creation and product-not-found.
-- **`internal/infra/metadata/types.go`**: Removed UDA `//log=` from `LoadRoot`.
-- **`internal/infra/persistence/jsonstore/jsonstore.go`**: Added logger; activated OSTAV logs for `Save()`/`Close()`.
-- **`internal/infra/cache/cache.go`**: Converted `//log=debug` to NE VV documentation comments.
-- **`internal/infra/fso/ffprobe.go`**: Kept NE VV comment; removed `//log=` comments.
-- **`internal/app/app.go`**: `Init()` creates and logs logger; `Store()` passes logger to jsonstore.
-- **`internal/app/ingest/ingest.go`**: Added logger; activated OSTAV log for directory ingestion.
-- **`internal/app/script/build.go`**: Added logger parameter; activated OSTAV logs.
-- **`internal/app/pipeline/pipeline.go`**: Added OSTAV logs for loop start/stop; removed UDA/UJE comments; fixed `appscript.Build` call with logger (safe type assertion for tests).
-- **`internal/domain/script/script.go`**, **`domain/callname/names_*.go`**, **`domain/ingest/*.go`**: Removed all UDA `//log=` comments.
-- **`internal/platform/retry/retry.go`**: Removed all `//log=` comments.
-- **`internal/infra/commands/cmd_process.go`**, **`cmd/lazyam3/main.go`**: Removed UDA `//log=` comments.
+### Edge cases handled
+- Empty dir with no matching `.done`: left intact (first cycle or other emptying).
+- `.done` points to non-matching path: skipped.
+- Invalid/unparseable JSON in `.done`: log warning, skipped (dir kept).
+- `.done` accumulation: `.done` deleted immediately after deleting `source_dir`.
 
-### NE VV comments kept
-1. `internal/infra/fso/ffprobe.go`: probing file per-file logging (noisy, kept as doc).
-2. `internal/infra/cache/cache.go`: cache lifecycle logs (created/set/delete/cleared).
+### Files changed
+- `internal/infra/fso/filescanner.go`: `SanitizeablePaths` field + `Sanitize()` method.
+- `internal/app/pipeline/pipeline.go`: JSON `.processing` artifact, `findDoneFile`, empty-dir correlation in `RunOnce`.
+- `internal/app/pipeline/pipeline_test.go`: 4 sanitation tests.
+- `doc/feature_list.json`: added E2 feature entry with tests.
 
-### Verification
-- `go build ./...`: passes
-- `go test -race -cover ./...`: passes (logging 93.2%, config 84.8%)
-- `go vet ./...`: passes
-- No `//log=` placeholders remain in `internal/`.
+### Maintenance notes
+- Feature E2 is complete and verified. No active work required.
+- Edge cases: hidden sidecars prevent deletion; partial execution leaves `.processing` dirs intact; stale `.done` for absent dirs is safely ignored.
+- Concurrency: single-instance cron usage assumed; concurrent runs could double-consume `.done` files.
 
-### Watch out
-- `golangci-lint run ./...` has pre-existing baseline issues (gci/gocritic formatting on non-placeholder comments). Unrelated to logging changes; not fixed.
+### Next agent
+Maintenance phase. Sanitation feature is complete. Address new issues or features as they arise per project rules.

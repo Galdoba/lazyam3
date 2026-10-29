@@ -83,6 +83,11 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	// Generate script filename using compact naming format (e.g. Show_s01e06_PRT261023120000.sh).
 	destination := callname.PredictScriptName(prod, unit, scriptRoot, hardsubTag, timestamp)
 
+	// Derive script name (basename without .sh) for execution-signal markers.
+	scriptName := filepath.Base(destination)
+	scriptName = strings.TrimSuffix(scriptName, filepath.Ext(destination))
+	metadataDir := filepath.Join(toSlash(root), "metadata")
+
 	// Normalize all executor paths for Windows
 	buffer := toSlash(executorPaths["buffer"])
 	if buffer == "" {
@@ -116,6 +121,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 		PRTTimestamp: timestamp,
 		FfmpegBinary: ffmpegBinary,
 		Harsub:       harsub,
+		ScriptName:   scriptName,
 		Env: script.Environment{
 			Buffer:        buffer,
 			InProgress:    inProgress,
@@ -124,6 +130,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 			Archive:       archive,
 			TargetRoot:    renderRoot,
 			Priority:      defaultPriority,
+			MetadataDir:   metadataDir,
 		},
 		Destination: destination,
 	}, nil

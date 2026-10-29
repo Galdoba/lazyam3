@@ -30,7 +30,7 @@
     "problem": "slog.TextHandler has no format customization options — field order, separators, timestamp format, and structure are all fixed.",
     "proposal": "Replace slog.TextHandler with a custom handler rendering a format template. Placeholders: {time}, {level}, {module}, {message}, {attrs}. {level} renders the bare level name (brackets are literal template text). Shipped as the new default via defaultCFG(); empty format_text falls back to slog.TextHandler.",
     "source": "doc/text_logger_format_refactoring.md",
-    "status": "in_review",
+    "status": "done",
     "tests": [
       "TestCustomHandler_RenderBasic — exact desired output line",
       "TestCustomHandler_RenderAttrs — quoted strings, unquoted non-strings",
@@ -206,17 +206,51 @@
     "blocked_by": [],
     "effort": "2-3 hours",
     "impact": "medium",
-    "outcome": "Not yet implemented",
+    "outcome": "Implemented execution-signal marker. Pipeline writes .processing artifact after successful script build; silently skips empty directories in scan loop; writes status.json after each loop via storage path.",
     "priority": 3,
     "problem": "When scripts render, files are moved out of the input directory. Next scan cycle detects the now-empty directory and emits a ScanError. Logs are getting messy.",
-    "proposal": "Defer deletion until script succeeds. Use a marker artifact in Output/ directory as a success signal.",
+    "proposal": "Defer deletion until script succeeds. Use a marker artifact in metadata/ directory as a success signal. Silent skip of empty dirs in scan loop.",
     "source": "doc/BACKLOG.md — Empty input directories",
-    "status": "proposed",
+    "status": "done",
     "tests": [
       "TestEmptyDir_MarkerCreatedOnSuccess",
       "TestEmptyDir_MarkerNotCreatedOnFailure",
       "TestEmptyDir_SecondScan_SkipsCompletedUnit",
       "TestEmptyDir_DryRun_NoMarkerCreated"
+    ]
+  },
+  "E2": {
+    "benefits": [
+      "Eliminates scan overhead for processed units",
+      "Keeps test ground clean (incoming/<unit>/ dirs removed once processed)",
+      "Self-contained: state travels with the artifact, no storage coupling",
+      "Reproducible in process (loop) and process --once"
+    ],
+    "blocked_by": [],
+    "effort": "2-3 hours",
+    "impact": "medium",
+    "implementation": {
+      "fso_changes": "Snapshot gains SanitizeablePaths []string field + Sanitize() error method (os.RemoveAll per path)",
+      "pipeline_changes": "processUnit writes JSON payload to .processing artifact; RunOnce correlates empty dirs with .done files, populates SanitizeablePaths, calls Sanitize(), removes consumed .done files",
+      "file": "internal/infra/fso/filescanner.go, internal/app/pipeline/pipeline.go",
+      "notes": [
+        "JSON payload: {source_dir, unit_id, script_name}",
+        "source_dir is absolute path matching fso.Scan normalization",
+        "findDoneFile scans metadata dir for .done files, parses JSON, matches source_dir",
+        "Edge cases: empty dir with no .done → leave it; unparseable JSON → warn+skip; .done consumed and deleted after deletion"
+      ]
+    },
+    "outcome": "Implemented and verified. Snapshot.SanitizeablePaths + Sanitize() added. processUnit writes JSON .processing artifact. RunOnce correlates empty dirs with .done files, sanitizes, removes consumed .done files. Live test confirmed incoming/<unit>/ directories deleted after execution.",
+    "priority": 3,
+    "problem": "After lazyam3 process, source files are moved from incoming/<unit>/ to buffer/. On next scan cycle, incoming/<unit>/ is empty, causing scan overhead and noisy logs. Directories are never deleted, so they accumulate as empty dirs.",
+    "proposal": "Pass source_dir via processing artifact JSON; at scan start, read .done files, correlate empty dirs, and delete them before scanning.",
+    "source": "doc/sanitation_problem_statement.md",
+    "status": "done",
+    "tests": [
+      "TestSanitize_EmptyDirWithDoneFile_Deleted",
+      "TestSanitize_EmptyDirWithoutDoneFile_Kept",
+      "TestSanitize_InvalidJSONDoneFile_Skipped",
+      "TestSanitize_DoneFileConsumedAfterDeletion"
     ]
   }
 }

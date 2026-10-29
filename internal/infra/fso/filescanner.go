@@ -46,9 +46,10 @@ type Directory struct {
 
 // Snapshot is the result of a scan.
 type Snapshot struct {
-	Root  *Directory            `json:"root"`
-	Files map[string]*FileEntry `json:"-"` // path -> file
-	Dirs  map[string]*Directory `json:"-"` // path -> dir
+	Root              *Directory            `json:"root"`
+	Files             map[string]*FileEntry `json:"-"` // path -> file
+	Dirs              map[string]*Directory `json:"-"` // path -> dir
+	SanitizeablePaths []string              `json:"-"` // paths safe to delete after scan
 }
 
 // Options controls scanning behavior.
@@ -256,4 +257,14 @@ func allFilesWritable(files []*FileEntry) bool {
 		}
 	}
 	return true
+}
+
+// Sanitize removes all paths listed in SanitizeablePaths.
+func (s *Snapshot) Sanitize() error {
+	for _, path := range s.SanitizeablePaths {
+		if err := os.RemoveAll(path); err != nil {
+			return fmt.Errorf("remove %q: %w", path, err)
+		}
+	}
+	return nil
 }

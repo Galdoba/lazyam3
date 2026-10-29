@@ -18,8 +18,10 @@ All docs live in `doc/`. Every file in `doc/` MUST have an entry here.
 | `PROGRESS.md` | Progress | Session progress log |
 | `BACKLOG.md` | Backlog | Known issues and footguns |
 | `NOTES.md` | Notes | Unexpected discoveries |
-| `Empty_input_directories_problem_analysis.md` | Problem Analysis | Empty input directory scan error analysis and proposed solutions |
+| `sanitation_problem_statement.md` | Problem Statement | Sanitation problem — artifact-based solution proposal for deleting empty incoming dirs |
+| `sanitation_problem.md` | Verification Results | Sanitation problem — verification results and implementation plan for artifact-based solution |
 | `text_logger_format_refactoring.md` | Spec | Logger format template specification |
+| `pipeline_chart.html` | Visualization | Mermaid graph visualizing pipeline operations, data flow, and module coverage |
 
 ## Feature Backlog
 

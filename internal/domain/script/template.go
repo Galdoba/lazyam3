@@ -49,5 +49,6 @@ var AmediaGeneric = strings.Join([]string{
 	`mv "${IN_PROGRESS}/${SOURCE}" "${DONE}/${SOURCE}"`,
 	`|=srt_cleanup=|`,
 	`|=hsub_cleanup=|`,
+	`|=done_marker=|`,
 	`mv "$0" "${ARCHIVE}"`,
 }, "\n")

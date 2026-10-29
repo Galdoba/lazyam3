@@ -2,6 +2,12 @@
 
 ## Unexpected discoveries
 
+### D5 — Sanitation edge cases verified
+
+- Hidden sidecars (e.g. `.mp4.part`, `.sidecar`) in `incoming/<unit>/` prevent deletion — `fso.Scan` counts hidden files in `FilesIn()`, so dir is correctly treated as non-empty.
+- Partial execution: only units with `.done` artifacts have empty source dirs deleted; units still in `.processing` state are left intact across cycles.
+- Stale `.done` files pointing to dirs absent from the scan are safely ignored (no correlation, no orphan deletion).
+
 ### D2 — Builder trailing separator bug
 
 - `internal/domain/script/script.go` — `buildOutputFilesPredictions` appends the shell continuation `` \" `` to every generated line, including the last one.
