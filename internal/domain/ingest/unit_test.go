@@ -18,11 +18,11 @@ func TestExtractID(t *testing.T) {
 		{"underscore then digits", "63604_1080.mp4", 63604, false},
 		{"no extension", "63603", 63603, false},
 		{"single digit", "1.mp4", 1, false},
-		{"alpha prefix", "Copy 2 of 63604.mp4", 0, true},
-		{"empty", "", 0, true},
-		{"alpha only", "unknown.mp4", 0, true},
-		{"underscore first", "_63603.mp4", 0, true},
-		{"dot first", ".63603.mp4", 0, true},
+		{"alpha prefix", "Copy 2 of 63604.mp4", SyntheticID, false},
+		{"empty", "", SyntheticID, false},
+		{"alpha only", "unknown.mp4", SyntheticID, false},
+		{"underscore first", "_63603.mp4", SyntheticID, false},
+		{"dot first", ".63603.mp4", SyntheticID, false},
 	}
 
 	for _, tt := range tests {
@@ -279,6 +279,27 @@ func TestNewMediaUnit(t *testing.T) {
 			wantFiles:   []string{},
 			wantStreams: 0,
 		},
+		{
+			name: "non-digit filename uses synthetic ID",
+			data: map[string][]byte{
+				"MyShow_E01.mp4": []byte(videoProbe),
+			},
+			wantErr:     false,
+			wantID:      SyntheticID,
+			wantFiles:   []string{"MyShow_E01.mp4"},
+			wantStreams: 1,
+		},
+		{
+			name: "mixed digit and non-digit filenames share synthetic ID",
+			data: map[string][]byte{
+				"MyShow_E01.mp4":     []byte(videoProbe),
+				"MyShow_E01-rus.srt": []byte(subProbe),
+			},
+			wantErr:     false,
+			wantID:      SyntheticID,
+			wantFiles:   []string{"MyShow_E01.mp4", "MyShow_E01-rus.srt"},
+			wantStreams: 2,
+		},
 	}
 
 	for _, tt := range tests {
@@ -296,6 +317,12 @@ func TestNewMediaUnit(t *testing.T) {
 			}
 			if mu.ID != tt.wantID {
 				t.Errorf("ID = %d, want %d", mu.ID, tt.wantID)
+			}
+			if tt.wantID == SyntheticID && !mu.Synthetic {
+				t.Errorf("Synthetic = false, want true for synthetic ID")
+			}
+			if tt.wantID != SyntheticID && mu.Synthetic {
+				t.Errorf("Synthetic = true, want false for normal ID")
 			}
 			if len(mu.Filenames) != len(tt.wantFiles) {
 				t.Errorf("Filenames: got %d files, want %d", len(mu.Filenames), len(tt.wantFiles))

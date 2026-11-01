@@ -4,6 +4,12 @@ import (
 	"fmt"
 )
 
+const (
+	// SyntheticID is the fallback product ID assigned when a filename
+	// does not start with a digit (no product ID could be extracted).
+	SyntheticID int64 = 9999
+)
+
 // MediaUnit aggregates all information about a single media product:
 // its physical files, streams across those files, and validation issues.
 type MediaUnit struct {
@@ -12,6 +18,7 @@ type MediaUnit struct {
 	Streams      map[string]Stream
 	Validation   ValidationIssues
 	PRTTimestamp string // pipeline-provided timestamp for output file naming (e.g. "261023120000")
+	Synthetic    bool   // true when ID was synthetically assigned (filename had no leading digits)
 }
 
 func newMediaUnit() MediaUnit {
@@ -54,8 +61,11 @@ func NewMediaUnit(data map[string][]byte) (MediaUnit, error) {
 		}
 		if mu.ID != 0 && mu.ID != id {
 			return MediaUnit{}, fmt.Errorf("inconsistent IDs: %d and %d in same unit", mu.ID, id)
-		} else {
+		} else if mu.ID == 0 {
 			mu.ID = id
+			if id == SyntheticID {
+				mu.Synthetic = true
+			}
 		}
 	}
 	return mu, nil

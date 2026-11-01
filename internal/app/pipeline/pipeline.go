@@ -205,6 +205,9 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string, initialFiles []s
 		p.emit(EventUnitFailed, 0, err)
 		return err
 	}
+	if unit.Synthetic {
+		p.logger.Warn("using synthetic product ID (filename had no leading digits)", "id", unit.ID)
+	}
 	prod, err := p.md.FindByID(unit.ID)
 	if err != nil {
 		p.logger.Warn("metadata lookup failed, using fallback naming",

@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/Galdoba/lazyam3/internal/domain/callname/translit"
+	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 )
 
@@ -98,12 +99,12 @@ func BuildInputName(product metadata.Product, originalFilename, timestamp string
 			break
 		}
 	}
-	if idStr == "" {
-		return ScriptInput{}, fmt.Errorf("filename %q does not start with a digit", originalFilename)
-	}
-
 	var id int64
-	fmt.Sscanf(idStr, "%d", &id) //nolint:errcheck // best-effort
+	if idStr != "" {
+		fmt.Sscanf(idStr, "%d", &id) //nolint:errcheck // best-effort
+	} else {
+		id = ingest.SyntheticID
+	}
 
 	si := ScriptInput{
 		ID:           id,
@@ -134,7 +135,7 @@ func ExtractID(filename string) (int64, error) {
 	}
 
 	if len(name) == 0 || name[0] < '0' || name[0] > '9' {
-		return 0, fmt.Errorf("filename %q does not start with a digit", filename)
+		return ingest.SyntheticID, nil
 	}
 
 	var digits string

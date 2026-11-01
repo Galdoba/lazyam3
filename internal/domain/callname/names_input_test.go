@@ -249,7 +249,10 @@ func TestBuildInputName(t *testing.T) {
 			product:   product,
 			filename:  "no_digits.mp4",
 			timestamp: "260928200000",
-			wantErr:   true,
+			wantErr:   false,
+			validate: func(si ScriptInput) bool {
+				return si.ID == 9999
+			},
 		},
 		{
 			name:      "with file tags",
@@ -347,9 +350,9 @@ func TestExtractID(t *testing.T) {
 	}{
 		{"basic", "12345.mp4", 12345, false},
 		{"with extension", "99999.mkv", 99999, false},
-		{"no leading digit", "abc.mp4", 0, true},
-		{"empty", "", 0, true},
-		{"only extension", ".mp4", 0, true},
+		{"no leading digit", "abc.mp4", 9999, false},
+		{"empty", "", 9999, false},
+		{"only extension", ".mp4", 9999, false},
 		{"large id", "9999999999999.mp4", 9999999999999, false},
 	}
 

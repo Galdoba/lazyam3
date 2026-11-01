@@ -510,6 +510,47 @@ func fileExists(path string) bool {
 	return false
 }
 
+func TestRunOnce_SyntheticID(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	// Create files with non-digit-named filenames.
+	for _, name := range []string{"no_id_in_video.mp4", "no_id_in_video-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{}
+	syntheticUnit := ingest.MediaUnit{
+		ID:        ingest.SyntheticID,
+		Synthetic: true,
+		Filenames: []string{"no_id_in_video.mp4", "no_id_in_video-rus.srt"},
+		Streams: map[string]ingest.Stream{
+			"[0:v:0]": {FileIndex: 0, Index: 0, Kind: ingest.StreamKindVideo},
+			"[1:s:0]": {FileIndex: 1, Index: 0, Kind: ingest.StreamKindSubtitle},
+		},
+	}
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: syntheticUnit}},
+		&fakeRepo{}, // no product for 9999 → fallback
+		rd, events, false)
+
+	out, err := p.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if out.Processed != 1 || out.Failed != 0 {
+		t.Errorf("RunOnce() = %+v, want Processed=1 Failed=0", out)
+	}
+	if len(rd.scripts) != 1 {
+		t.Fatalf("expected 1 script, got %d", len(rd.scripts))
+	}
+
+	evs := drainEvents(events)
+	if len(evs) != 2 || evs[0].Type != EventUnitDone || evs[0].ID != ingest.SyntheticID || evs[1].Type != EventScanDone {
+		t.Errorf("events = %+v, want [UnitDone(9999) ScanDone]", evs)
+	}
+}
+
 func TestBuildScriptConfig(t *testing.T) {
 	unit := testUnit()
 	root := t.TempDir()

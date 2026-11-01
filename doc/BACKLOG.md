@@ -12,3 +12,11 @@ We need a way to handle this issue.
 - program does not know where scripts are archived (more options MUST be explored)
   - Option 1: store a local path for scripts to be stored?
   - Option 2: infuse a signal from script to program via marker file (report?) in `Output Directory` - the one programm knows about and renders scripts to?
+
+## Feature Queue
+
+### [INGEST-001] Graceful handling of files with non-standard names
+**Status**: discovery
+**Problem**: Files with names not starting with digits (e.g. `MyShow_E01.mkv`) are silently skipped.
+**Proposal**: Assign synthetic ID 9999 when no filename has leading digits. Fallback metadata kicks in automatically.
+**Source**: `doc/INGEST-001_problem_statement.md`

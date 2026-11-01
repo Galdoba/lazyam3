@@ -6,7 +6,7 @@ import (
 
 // ExtractID parses the product ID from a filename stem (name without extension).
 // The stem must start with a digit sequence — that sequence is the ID.
-// Returns an error if the stem does not start with a digit.
+// When the stem does not start with a digit, returns SyntheticID (9999).
 func ExtractID(filename string) (int64, error) {
 	name := filename
 	if idx := len(filename) - 1; idx >= 0 {
@@ -19,7 +19,7 @@ func ExtractID(filename string) (int64, error) {
 	}
 
 	if len(name) == 0 || name[0] < '0' || name[0] > '9' {
-		return 0, fmt.Errorf("filename %q does not start with a digit", filename)
+		return SyntheticID, nil
 	}
 
 	var digits string

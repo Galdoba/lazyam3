@@ -373,5 +373,30 @@
     "outcome": "",
     "tests": [],
     "title": "Persist .done processing history to jsonstore before deletion"
+  },
+  "INGEST-001": {
+    "benefits": [
+      "Files with non-standard names are processed instead of silently skipped",
+      "No data loss: arbitrary-named media from any source is handled gracefully",
+      "Consistent pipeline behavior: same fallback path for missing metadata and missing IDs"
+    ],
+    "blocked_by": [],
+    "effort": "2-3 hours",
+    "impact": "high",
+    "status": "done",
+    "priority": 5,
+    "problem": "Files with names not starting with digits (e.g. 'MyShow_E01.mkv') are silently skipped by the pipeline. The ingest phase rejects units whose filenames lack leading-digit product IDs, causing EventUnitFailed and zero output for those directories.",
+    "proposal": "When no filename starts with a digit, assign synthetic ID 9999 to the unit. FindByID(9999) misses metadata, fallbackProduct(dirname, 9999) kicks in. Pipeline processes the unit end-to-end with EventUnitDone.",
+    "source": "doc/INGEST-001_problem_statement.md",
+    "outcome": "Implemented. Added SyntheticID constant (9999) and Synthetic bool field to MediaUnit. Both ingest.ExtractID and callname.ExtractID return SyntheticID instead of error for non-digit filenames. BuildInputName falls back to SyntheticID. Pipeline logs warning when Synthetic is true. All domain tests updated (TestExtractID, TestNewMediaUnit, TestBuildInputName). Pipeline integration test added (TestRunOnce_SyntheticID). Build, vet, test, and lint all pass.",
+    "tests": [
+      "TestExtractID_NonDigitFilename — returns SyntheticID (9999) instead of error",
+      "TestNewMediaUnit_SyntheticFlag — Synthetic=true when ID equals SyntheticID",
+      "TestBuildInputName_NonDigitFilename — success with SyntheticID fallback",
+      "TestExtractID_CallName_NonDigit — callname ExtractID returns SyntheticID",
+      "TestRunOnce_SyntheticID — pipeline processes synthetic unit with EventUnitDone",
+      "TestSyntheticID_MixedNames — unit with mixed digit/non-digit files uses valid ID"
+    ],
+    "title": "Graceful handling of files with non-standard names"
   }
 }
