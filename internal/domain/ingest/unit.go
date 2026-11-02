@@ -37,9 +37,30 @@ func NewMediaUnit(data map[string][]byte) (MediaUnit, error) {
 		}
 		parsed[filename] = streams
 	}
-	for fi, filename := range sortUnitFiles(parsed) {
+
+	filenames := collectMediaFiles(parsed)
+	streams, _ := buildStreams(parsed, filenames)
+
+	id, synthetic, err := resolveID(filenames)
+	if err != nil {
+		return MediaUnit{}, err
+	}
+
+	mu.Filenames = filenames
+	mu.Streams = streams
+	mu.ID = id
+	mu.Synthetic = synthetic
+
+	return mu, nil
+}
+
+// collectMediaFiles returns sorted filenames that contain at least one
+// non-data stream, filtering out pure data files.
+func collectMediaFiles(parsed map[string][]Stream) []string {
+	files := sortUnitFiles(parsed)
+	var result []string
+	for _, filename := range files {
 		streams := parsed[filename]
-		// skip files that have no non-data streams
 		hasMedia := false
 		for _, s := range streams {
 			if s.Kind != StreamKindData {
@@ -47,28 +68,46 @@ func NewMediaUnit(data map[string][]byte) (MediaUnit, error) {
 				break
 			}
 		}
-		if !hasMedia {
-			continue
+		if hasMedia {
+			result = append(result, filename)
 		}
-		mu.Filenames = append(mu.Filenames, filename)
-		for _, stream := range streams {
+	}
+	return result
+}
+
+// buildStreams assigns FileIndex to each stream and returns the coordinate map.
+func buildStreams(parsed map[string][]Stream, filenames []string) (map[string]Stream, int) {
+	streams := make(map[string]Stream)
+	for fi, filename := range filenames {
+		for _, stream := range parsed[filename] {
 			stream.FileIndex = fi
-			mu.Streams[stream.coordinate()] = stream
+			streams[stream.coordinate()] = stream
 		}
-		id, err := ExtractID(filename)
+	}
+	return streams, len(filenames)
+}
+
+// resolveID extracts product IDs from filenames, checks consistency, and
+// returns the unit ID along with whether it was synthetically assigned.
+func resolveID(filenames []string) (int64, bool, error) {
+	id := int64(0)
+	synthetic := false
+	for _, filename := range filenames {
+		fid, err := ExtractID(filename)
 		if err != nil {
-			return MediaUnit{}, err
+			return 0, false, err
 		}
-		if mu.ID != 0 && mu.ID != id {
-			return MediaUnit{}, fmt.Errorf("inconsistent IDs: %d and %d in same unit", mu.ID, id)
-		} else if mu.ID == 0 {
-			mu.ID = id
-			if id == SyntheticID {
-				mu.Synthetic = true
+		if id != 0 && id != fid {
+			return 0, false, fmt.Errorf("inconsistent IDs: %d and %d in same unit", id, fid)
+		}
+		if id == 0 {
+			id = fid
+			if fid == SyntheticID {
+				synthetic = true
 			}
 		}
 	}
-	return mu, nil
+	return id, synthetic, nil
 }
 
 // ValidationIssues accumulates problems found during ingest.
