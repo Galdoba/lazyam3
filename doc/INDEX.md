@@ -14,6 +14,7 @@ All docs live in `doc/`. Every file in `doc/` MUST have an entry here.
 | `feature_list.json` | Backlog | Machine-readable feature tracking |
 | `feature_index.md` | Summary | Human-readable feature table (synced from JSON) |
 | `BACKLOG.md` | Backlog | Known issues and footguns |
+| `refactoring.md` | Refactoring Plan | Ingest package refactoring plan (plan mode) |
 | `STORAGE-002_problem_statement.md` | Problem Statement | Persist .done processing history to jsonstore |
 
 ## Feature Backlog

@@ -4,24 +4,6 @@ description: "Golang refactoring — safe, at-scale restructuring of existing Go
 user-invocable: true
 license: MIT
 compatibility: Designed for Claude Code, Codex or similar harness, and for projects using Golang. Requires gopls and git.
-metadata:
-  author: samber
-  version: "1.1.1"
-  openclaw:
-    emoji: "♻️"
-    homepage: https://github.com/samber/cc-skills-golang
-    requires:
-      bins:
-        - go
-        - gopls
-    install:
-      - kind: go
-        package: golang.org/x/tools/gopls@latest
-        bins: [gopls]
-      - kind: go
-        package: golang.org/x/perf/cmd/benchstat@latest
-        bins: [benchstat]
-    skill-library-version: "0.20.0"
 allowed-tools: Read Edit Write Glob Grep Bash(go:*) Bash(golangci-lint:*) Bash(git:*) Bash(gh:*) Bash(gopls:*) Bash(benchstat:*) LSP mcp__gopls__* Agent AskUserQuestion EnterWorktree ExitWorktree WebFetch WebSearch
 paths:
   - "**/*.go"

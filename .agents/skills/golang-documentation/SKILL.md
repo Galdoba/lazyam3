@@ -4,16 +4,6 @@ description: "Comprehensive documentation guide for Golang projects, covering go
 user-invocable: true
 license: MIT
 compatibility: Designed for Claude Code, Codex or similar harness, and for projects using Golang.
-metadata:
-  author: samber
-  version: "1.3.2"
-  openclaw:
-    emoji: "📝"
-    homepage: https://github.com/samber/cc-skills-golang
-    requires:
-      bins:
-        - go
-    install: []
 allowed-tools: Read Edit Write Glob Grep Bash(go:*) Bash(golangci-lint:*) Bash(git:*) Agent WebFetch
 paths:
   - "**/*.go"

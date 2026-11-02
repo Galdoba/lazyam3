@@ -4,16 +4,6 @@ description: "Idiomatic Golang design patterns — functional options, construct
 user-invocable: true
 license: MIT
 compatibility: Designed for Claude Code, Codex or similar harness, and for projects using Golang.
-metadata:
-  author: samber
-  version: "1.2.1"
-  openclaw:
-    emoji: "🏗"
-    homepage: https://github.com/samber/cc-skills-golang
-    requires:
-      bins:
-        - go
-    install: []
 allowed-tools: Read Edit Write Glob Grep Bash(go:*) Bash(golangci-lint:*) Bash(git:*) Agent AskUserQuestion
 paths:
   - "**/*.go"
