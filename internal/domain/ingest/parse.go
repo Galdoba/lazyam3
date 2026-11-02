@@ -72,25 +72,13 @@ func parseStreams(ffprobeJSON []byte) ([]Stream, error) {
 			Duration: parseDuration(s.Duration),
 		}
 
-		// Video fields
-		if stream.Kind == StreamKindVideo {
-			stream.Width = s.Width
-			stream.Height = s.Height
-			stream.PixelFormat = s.PixFmt
-			stream.FrameRate = parseRational(s.RFrameRate)
-			stream.Interlaced = detectInterlaced(s)
-		}
-
-		// Audio fields
-		if stream.Kind == StreamKindAudio {
-			stream.SampleRate = parseInt(s.SampleRate)
-			stream.SampleFormat = s.SampleFmt
-			stream.ChannelLayout = Layout(s.ChannelLayout)
-		}
-
-		// Subtitle fields
-		if stream.Kind == StreamKindSubtitle {
-			stream.Forced = s.Disposition.Forced != 0
+		switch stream.Kind {
+		case StreamKindVideo:
+			applyVideoFields(s, &stream)
+		case StreamKindAudio:
+			applyAudioFields(s, &stream)
+		case StreamKindSubtitle:
+			applySubtitleFields(s, &stream)
 		}
 
 		// Common fields
@@ -100,6 +88,27 @@ func parseStreams(ffprobeJSON []byte) ([]Stream, error) {
 	}
 
 	return streams, nil
+}
+
+// applyVideoFields populates video-specific fields on the stream.
+func applyVideoFields(s StreamJSON, dst *Stream) {
+	dst.Width = s.Width
+	dst.Height = s.Height
+	dst.PixelFormat = s.PixFmt
+	dst.FrameRate = parseRational(s.RFrameRate)
+	dst.Interlaced = detectInterlaced(s)
+}
+
+// applyAudioFields populates audio-specific fields on the stream.
+func applyAudioFields(s StreamJSON, dst *Stream) {
+	dst.SampleRate = parseInt(s.SampleRate)
+	dst.SampleFormat = s.SampleFmt
+	dst.ChannelLayout = Layout(s.ChannelLayout)
+}
+
+// applySubtitleFields populates subtitle-specific fields on the stream.
+func applySubtitleFields(s StreamJSON, dst *Stream) {
+	dst.Forced = s.Disposition.Forced != 0
 }
 
 func parseDuration(s string) Rational {
