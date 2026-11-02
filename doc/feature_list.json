@@ -374,6 +374,24 @@
     "tests": [],
     "title": "Persist .done processing history to jsonstore before deletion"
   },
+  "INGEST-002": {
+    "benefits": [
+      "Ingest is robust against non-media files in directories",
+      "Pipeline no longer fails on directories containing logs, READMEs, or temp files",
+      "Idempotent ingestion regardless of directory contents"
+    ],
+    "blocked_by": [],
+    "effort": "1-2 hours",
+    "impact": "medium",
+    "status": "proposed",
+    "priority": 6,
+    "problem": "Ingest currently aborts the entire directory when it encounters a non-media file that ffprobe cannot probe (only metadata.json is currently skipped, and subtitle files are handled as sidecars). Non-media files like logs, READMEs, or temp files cause ProbeFile() to return an error, failing the ingest.",
+    "proposal": "During ingestion, bypass ALL non-media files. Files that ffprobe cannot probe (and are not subtitle sidecars) should be skipped with a logged warning, and the ingest should continue processing the remaining files. Only genuine media files (and subtitle sidecars) should be recorded in the MediaUnit.",
+    "source": "doc/INGEST-002_problem_statement.md",
+    "outcome": "",
+    "tests": [],
+    "title": "Bypass non-media files during ingest"
+  },
   "INGEST-001": {
     "benefits": [
       "Files with non-standard names are processed instead of silently skipped",
