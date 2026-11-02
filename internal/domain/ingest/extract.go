@@ -2,21 +2,14 @@ package ingest
 
 import (
 	"fmt"
+	"strings"
 )
 
 // ExtractID parses the product ID from a filename stem (name without extension).
 // The stem must start with a digit sequence — that sequence is the ID.
 // When the stem does not start with a digit, returns SyntheticID (9999).
 func ExtractID(filename string) (int64, error) {
-	name := filename
-	if idx := len(filename) - 1; idx >= 0 {
-		for idx >= 0 && filename[idx] != '.' {
-			idx--
-		}
-		if idx >= 0 {
-			name = filename[:idx]
-		}
-	}
+	name := strings.SplitN(filename, ".", 2)[0]
 
 	if len(name) == 0 || name[0] < '0' || name[0] > '9' {
 		return SyntheticID, nil
