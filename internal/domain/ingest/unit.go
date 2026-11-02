@@ -117,54 +117,73 @@ func ValidateMediaUnit(streams []Stream) ValidationIssues {
 		}
 		seen[s.coordinate()] = true
 
-		if s.Kind == StreamKindVideo {
-			// Resolution must be at least SD
-			if s.Width > 0 && s.Height > 0 && (s.Width < 720 || s.Height < 576) {
-				issues = append(issues, ValidationIssue{
-					StreamIndex: i,
-					Field:       "resolution",
-					Problem:     fmt.Sprintf("video resolution %dx%d is below SD (720x576)", s.Width, s.Height),
-				})
-			}
-			// Duration must be non-negative
-			if s.Duration.Num < 0 {
-				issues = append(issues, ValidationIssue{
-					StreamIndex: i,
-					Field:       "duration",
-					Problem:     "video has negative duration",
-				})
-			}
+		if s.Kind == StreamKindVideo || s.Kind == StreamKindAudio {
 			durations = append(durations, s.Duration)
-			// Bitrate sanity
-			if s.BitRate > 0 && s.BitRate < 100000 {
-				issues = append(issues, ValidationIssue{
-					StreamIndex: i,
-					Field:       "bitrate",
-					Problem:     fmt.Sprintf("video bitrate %d bps is suspiciously low", s.BitRate),
-				})
-			}
 		}
 
-		if s.Kind == StreamKindAudio {
-			if s.Duration.Num < 0 {
-				issues = append(issues, ValidationIssue{
-					StreamIndex: i,
-					Field:       "duration",
-					Problem:     "audio has negative duration",
-				})
-			}
-			durations = append(durations, s.Duration)
-			if s.BitRate > 0 && s.BitRate < 32000 {
-				issues = append(issues, ValidationIssue{
-					StreamIndex: i,
-					Field:       "bitrate",
-					Problem:     fmt.Sprintf("audio bitrate %d bps is suspiciously low", s.BitRate),
-				})
-			}
-		}
+		issues = validateVideo(s, i, issues)
+		issues = validateAudio(s, i, issues)
 	}
 
-	// Multi-file duration consistency (audio/video only)
+	return validateDurations(durations, issues)
+}
+
+// validateVideo appends validation issues for a video stream.
+func validateVideo(s Stream, i int, issues ValidationIssues) ValidationIssues {
+	if s.Kind != StreamKindVideo {
+		return issues
+	}
+	// Resolution must be at least SD
+	if s.Width > 0 && s.Height > 0 && (s.Width < 720 || s.Height < 576) {
+		issues = append(issues, ValidationIssue{
+			StreamIndex: i,
+			Field:       "resolution",
+			Problem:     fmt.Sprintf("video resolution %dx%d is below SD (720x576)", s.Width, s.Height),
+		})
+	}
+	// Duration must be non-negative
+	if s.Duration.Num < 0 {
+		issues = append(issues, ValidationIssue{
+			StreamIndex: i,
+			Field:       "duration",
+			Problem:     "video has negative duration",
+		})
+	}
+	// Bitrate sanity
+	if s.BitRate > 0 && s.BitRate < 100000 {
+		issues = append(issues, ValidationIssue{
+			StreamIndex: i,
+			Field:       "bitrate",
+			Problem:     fmt.Sprintf("video bitrate %d bps is suspiciously low", s.BitRate),
+		})
+	}
+	return issues
+}
+
+// validateAudio appends validation issues for an audio stream.
+func validateAudio(s Stream, i int, issues ValidationIssues) ValidationIssues {
+	if s.Kind != StreamKindAudio {
+		return issues
+	}
+	if s.Duration.Num < 0 {
+		issues = append(issues, ValidationIssue{
+			StreamIndex: i,
+			Field:       "duration",
+			Problem:     "audio has negative duration",
+		})
+	}
+	if s.BitRate > 0 && s.BitRate < 32000 {
+		issues = append(issues, ValidationIssue{
+			StreamIndex: i,
+			Field:       "bitrate",
+			Problem:     fmt.Sprintf("audio bitrate %d bps is suspiciously low", s.BitRate),
+		})
+	}
+	return issues
+}
+
+// validateDurations appends a duration consistency issue if streams vary by more than 10%.
+func validateDurations(durations []Rational, issues ValidationIssues) ValidationIssues {
 	if len(durations) > 1 {
 		mean := rationalMeanFloat(durations)
 		if mean > 0 {
@@ -188,6 +207,5 @@ func ValidateMediaUnit(streams []Stream) ValidationIssues {
 			}
 		}
 	}
-
 	return issues
 }

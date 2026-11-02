@@ -198,6 +198,66 @@ func TestValidateMediaUnit(t *testing.T) {
 	}
 }
 
+func TestValidateMediaUnit_Details(t *testing.T) {
+	t.Run("resolution below SD", func(t *testing.T) {
+		issues := ValidateMediaUnit([]Stream{
+			{Kind: StreamKindVideo, Width: 640, Height: 480, BitRate: 5000000},
+		})
+		if len(issues) != 1 || issues[0].Field != "resolution" {
+			t.Errorf("expected 1 resolution issue, got %d: %v", len(issues), issues)
+		}
+	})
+
+	t.Run("video negative duration", func(t *testing.T) {
+		issues := ValidateMediaUnit([]Stream{
+			{Kind: StreamKindVideo, BitRate: 5000000, Duration: Rational{Num: -1}},
+		})
+		if len(issues) != 1 || issues[0].Field != "duration" {
+			t.Errorf("expected 1 duration issue, got %d: %v", len(issues), issues)
+		}
+	})
+
+	t.Run("audio negative duration", func(t *testing.T) {
+		issues := ValidateMediaUnit([]Stream{
+			{Kind: StreamKindAudio, BitRate: 500000, Duration: Rational{Num: -5}},
+		})
+		if len(issues) != 1 || issues[0].Field != "duration" {
+			t.Errorf("expected 1 duration issue, got %d: %v", len(issues), issues)
+		}
+	})
+
+	t.Run("duplicate coordinate", func(t *testing.T) {
+		issues := ValidateMediaUnit([]Stream{
+			{Kind: StreamKindVideo, FileIndex: 0, Index: 0, BitRate: 5000000},
+			{Kind: StreamKindVideo, FileIndex: 0, Index: 0, BitRate: 5000000},
+		})
+		if len(issues) != 1 || issues[0].Field != "coordinate" {
+			t.Errorf("expected 1 coordinate issue, got %d: %v", len(issues), issues)
+		}
+	})
+
+	t.Run("duration consistency", func(t *testing.T) {
+		// Two video streams from different files with >10% duration variance
+		issues := ValidateMediaUnit([]Stream{
+			{Kind: StreamKindVideo, FileIndex: 0, Index: 0, BitRate: 5000000, Duration: Rational{Num: 100, Denom: 1}},
+			{Kind: StreamKindVideo, FileIndex: 1, Index: 0, BitRate: 5000000, Duration: Rational{Num: 125, Denom: 1}},
+		})
+		if len(issues) != 1 || issues[0].Field != "duration_consistency" {
+			t.Errorf("expected 1 duration_consistency issue, got %d: %v", len(issues), issues)
+		}
+	})
+
+	t.Run("duration consistent within 10%", func(t *testing.T) {
+		issues := ValidateMediaUnit([]Stream{
+			{Kind: StreamKindVideo, FileIndex: 0, Index: 0, BitRate: 5000000, Duration: Rational{Num: 100, Denom: 1}},
+			{Kind: StreamKindVideo, FileIndex: 1, Index: 0, BitRate: 5000000, Duration: Rational{Num: 105, Denom: 1}},
+		})
+		if len(issues) != 0 {
+			t.Errorf("expected 0 issues, got %d: %v", len(issues), issues)
+		}
+	})
+}
+
 func TestNewMediaUnit(t *testing.T) {
 	videoProbe := `{"streams":[{"index":0,"codec_type":"video","codec_name":"h264","width":1920,"height":1080,"pix_fmt":"yuv420p","r_frame_rate":"25/1","bit_rate":"5000000","tag":{"field_order":"progressive"}}]}`
 	audioProbe := `{"streams":[{"index":0,"codec_type":"audio","codec_name":"aac","sample_rate":"48000","sample_fmt":"fltp","channel_layout":"stereo","bit_rate":"128000","tags":{"language":"eng"}}]}`
