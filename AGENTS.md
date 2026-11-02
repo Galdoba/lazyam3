@@ -2,15 +2,13 @@
 
 Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata resolution → script generation → rendering).
 
-**Current State**: Tasks 1-10 complete. Pipeline fully wired end-to-end with HSUB auto-detection, movie naming fix, TOML config, config-driven paths, empty-dir sanitation, and cross-platform path resolution (PathBuilder, canonical metadata markers). Marker metadata path bug fixed. INGEST-001 complete.
+**Current State**: Tasks 1-10 complete. Pipeline fully wired end-to-end with HSUB auto-detection, movie naming fix, TOML config, config-driven paths, empty-dir sanitation, and cross-platform path resolution (PathBuilder, canonical metadata markers). Marker metadata path bug fixed. INGEST-001 and INGEST-002 complete.
 
 ## Current Feature
 
-> **STORAGE-002** — persist .done processing history to jsonstore before deletion
+> **INGEST-002** — bypass non-media files during ingest
 >
-> **Status**: Discovery complete, solution-search skill created. Ready for solution search.
-> Problem Statement: `doc/STORAGE-002_problem_statement.md` (landing gate: PASS).
-
+> **Status**: Complete. Ingest logs WARN and skips non-media files that ffprobe cannot probe (preserving subtitle sidecar handling and metadata.json skip). Test added: `TestIngest_NonMediaFilesSkipped`.
 
 ## Live Test
 

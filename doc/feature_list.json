@@ -383,13 +383,15 @@
     "blocked_by": [],
     "effort": "1-2 hours",
     "impact": "medium",
-    "status": "proposed",
+    "status": "done",
     "priority": 6,
     "problem": "Ingest currently aborts the entire directory when it encounters a non-media file that ffprobe cannot probe (only metadata.json is currently skipped, and subtitle files are handled as sidecars). Non-media files like logs, READMEs, or temp files cause ProbeFile() to return an error, failing the ingest.",
     "proposal": "During ingestion, bypass ALL non-media files. Files that ffprobe cannot probe (and are not subtitle sidecars) should be skipped with a logged warning, and the ingest should continue processing the remaining files. Only genuine media files (and subtitle sidecars) should be recorded in the MediaUnit.",
     "source": "doc/INGEST-002_problem_statement.md",
-    "outcome": "",
-    "tests": [],
+    "outcome": "Implemented. ingest.Ingest logs WARN and continues on probe error for non-media, non-subtitle files (ingest.go:55-58). Removed fmt import. Added TestIngest_NonMediaFilesSkipped verifying mixed media/subtitle/non-media directory ingestion succeeds with video stream.",
+    "tests": [
+      "TestIngest_NonMediaFilesSkipped — ingest skips non-media files and continues processing the directory"
+    ],
     "title": "Bypass non-media files during ingest"
   },
   "INGEST-001": {

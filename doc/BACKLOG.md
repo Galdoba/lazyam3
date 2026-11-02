@@ -20,3 +20,9 @@ We need a way to handle this issue.
 **Problem**: Files with names not starting with digits (e.g. `MyShow_E01.mkv`) are silently skipped.
 **Proposal**: Assign synthetic ID 9999 when no filename has leading digits. Fallback metadata kicks in automatically.
 **Source**: `doc/INGEST-001_problem_statement.md`
+
+### FFProbe Media Detection Proposition
+**Status**: proposal, future consideration
+**Problem**: Non-media file detection relies on ffprobe probe failure. Alternative: ffprobe could classify files explicitly (media vs non-media) via a detection flag or exit code.
+**Proposal**: Explore ffprobe options or a wrapper that returns a media/non-media classification, reducing brittle error-parsing in ingest logic.
+**Source**: `doc/INGEST-002_solution_options.md` (Approach 2 notes)

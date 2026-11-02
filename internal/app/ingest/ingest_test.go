@@ -3,6 +3,7 @@ package ingest
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	ingest "github.com/Galdoba/lazyam3/internal/domain/ingest"
@@ -88,5 +89,68 @@ func TestIngest_Synthetic(t *testing.T) {
 				t.Error("Expected at least one filename")
 			}
 		})
+	}
+}
+
+func TestIngest_NonMediaFilesSkipped(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "ingest-nonmedia-")
+	if err != nil {
+		t.Fatalf("MkdirTemp error: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	syntheticDir := filepath.Join("..", "..", "..", "testdata", "synthetic")
+	entries, err := os.ReadDir(syntheticDir)
+	if err != nil {
+		t.Fatalf("ReadDir error: %v", err)
+	}
+
+	srcMp4 := ""
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		if strings.HasSuffix(strings.ToLower(e.Name()), ".mp4") || strings.HasSuffix(strings.ToLower(e.Name()), ".mkv") || strings.HasSuffix(strings.ToLower(e.Name()), ".avi") {
+			srcMp4 = filepath.Join(syntheticDir, e.Name())
+			break
+		}
+	}
+	if srcMp4 == "" {
+		t.Skip("no synthetic media file available")
+	}
+
+	data, err := os.ReadFile(srcMp4)
+	if err != nil {
+		t.Fatalf("read media error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "movie.mp4"), data, 0o644); err != nil {
+		t.Fatalf("write media error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "README.txt"), []byte("some text"), 0o644); err != nil {
+		t.Fatalf("write readme error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "notes.log"), []byte("log line"), 0o644); err != nil {
+		t.Fatalf("write log error: %v", err)
+	}
+
+	ing := New("/usr/bin/ffprobe", nil)
+	mu, err := ing.Ingest(tmpDir)
+	if err != nil {
+		t.Fatalf("Ingest() error: %v", err)
+	}
+
+	hasVideo := false
+	for _, s := range mu.Streams {
+		if s.Kind == ingest.StreamKindVideo {
+			hasVideo = true
+			break
+		}
+	}
+	if !hasVideo {
+		t.Error("Expected at least one video stream")
+	}
+
+	if mu.ID == 0 {
+		t.Error("Expected non-zero ID")
 	}
 }

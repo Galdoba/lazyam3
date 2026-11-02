@@ -1,7 +1,6 @@
 package ingest
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,7 +51,10 @@ func (ing *Ingest) Ingest(dir string) (ingest.MediaUnit, error) {
 				sidecars = append(sidecars, f.Name())
 				continue
 			}
-			return ingest.MediaUnit{}, fmt.Errorf("failed to probe file %q: %w", path, err)
+			if ing.logger != nil {
+				ing.logger.Warn("skipping non-media file", "file", path, "error", err)
+			}
+			continue
 		}
 		dirData[f.Name()] = data
 	}
