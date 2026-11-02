@@ -42,6 +42,9 @@ func (ing *Ingest) Ingest(dir string) (ingest.MediaUnit, error) {
 		if !f.Type().IsRegular() {
 			continue
 		}
+		if f.Name() == "metadata.json" {
+			continue
+		}
 		path := filepath.Join(dir, f.Name())
 		data, err := prober.ProbeFile(path)
 		if err != nil {
