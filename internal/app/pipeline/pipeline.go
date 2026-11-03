@@ -17,6 +17,7 @@ import (
 	"github.com/Galdoba/lazyam3/internal/infra/fso"
 	"github.com/Galdoba/lazyam3/internal/infra/logging"
 	metadatainfra "github.com/Galdoba/lazyam3/internal/infra/metadata"
+	"github.com/Galdoba/lazyam3/internal/infra/persistence/jsonstore"
 	"github.com/Galdoba/lazyam3/internal/platform"
 )
 
@@ -46,6 +47,8 @@ type Pipeline struct {
 	pathBuilder platform.PathBuilder
 
 	statusPath string
+
+	store *jsonstore.Store
 }
 
 // NewPipeline creates a new Pipeline instance.
@@ -80,6 +83,7 @@ func NewPipeline(opts Options) *Pipeline {
 		events:      opts.Events,
 		pathBuilder: pb,
 		statusPath:  statusPath,
+		store:       opts.Store,
 	}
 }
 
@@ -165,11 +169,16 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 		if len(snap.FilesIn(d.Path)) > 0 {
 			continue
 		}
-		donePath, ok := p.findDoneFile(metaDir, d.Path)
+		donePath, payload, ok := p.findDoneFile(metaDir, d.Path)
 		if ok {
 			snap.SanitizeablePaths = append(snap.SanitizeablePaths, d.Path)
-			matches = append(matches, doneMatch{sourceDir: d.Path, donePath: donePath})
+			matches = append(matches, doneMatch{sourceDir: d.Path, donePath: donePath, payload: payload})
 		}
+	}
+	abort := p.captureProcessingHistory(matches)
+	if abort {
+		matches = []doneMatch{}
+		snap.SanitizeablePaths = []string{}
 	}
 	if len(snap.SanitizeablePaths) > 0 {
 		if err := snap.Sanitize(); err != nil {
@@ -204,6 +213,32 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 
 	p.emit(EventScanDone, 0, nil)
 	return out, nil
+}
+
+// captureProcessingHistory stores processing history to the store.
+// Returns true if the transaction aborted (store failed).
+func (p *Pipeline) captureProcessingHistory(matches []doneMatch) bool {
+	if len(matches) == 0 || p.store == nil {
+		return false
+	}
+	abort := false
+	for _, m := range matches {
+		payload := m.payload
+		sn, _ := payload["script_name"].(string)
+		key := "script_" + sn
+		if err := p.store.Set(key, payload); err != nil {
+			p.logger.Warn("store set failed, aborting transaction", "key", key, "error", err)
+			abort = true
+			break
+		}
+	}
+	if !abort {
+		if err := p.store.Save(); err != nil {
+			p.logger.Warn("store save failed, aborting transaction", "error", err)
+			abort = true
+		}
+	}
+	return abort
 }
 
 // processUnit runs the full chain for one media unit directory.
@@ -314,18 +349,20 @@ func (p *Pipeline) prepareFiles(sourceDir string, callNames map[string]string, b
 	return nil
 }
 
-// doneMatch pairs a source dir path with its consumed .done artifact.
+// doneMatch pairs a source dir path with its consumed .done artifact and payload.
 type doneMatch struct {
 	sourceDir string
 	donePath  string
+	payload   map[string]any
 }
 
 // findDoneFile scans metaDir for .done files and returns the path of the
-// one whose JSON source_dir matches sourceDir exactly.
-func (p *Pipeline) findDoneFile(metaDir, sourceDir string) (string, bool) {
+// one whose JSON source_dir matches sourceDir exactly, along with the parsed
+// payload.
+func (p *Pipeline) findDoneFile(metaDir, sourceDir string) (string, map[string]any, bool) {
 	entries, err := os.ReadDir(metaDir)
 	if err != nil {
-		return "", false
+		return "", nil, false
 	}
 	for _, e := range entries {
 		if filepath.Ext(e.Name()) != ".done" {
@@ -345,10 +382,10 @@ func (p *Pipeline) findDoneFile(metaDir, sourceDir string) (string, bool) {
 		}
 		sd, _ := payload["source_dir"].(string)
 		if sd == sourceDir {
-			return donePath, true
+			return donePath, payload, true
 		}
 	}
-	return "", false
+	return "", nil, false
 }
 
 func (p *Pipeline) emit(t EventType, id int64, err error) {

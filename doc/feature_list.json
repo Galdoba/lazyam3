@@ -365,13 +365,17 @@
     "blocked_by": [],
     "effort": "3-4 hours",
     "impact": "medium",
-    "status": "discovery",
+    "status": "done",
     "priority": 4,
     "problem": "After .done file deletion, processing history is lost. The generated .sh script remains in archive but there's no way to query what subtitles, source files, or parameters were used for a specific episode. The jsonstore infrastructure exists but is unused.",
     "proposal": "Persist .done JSON payload to jsonstore with key script_{script_name} before deletion. Store write + .done deletion as transactional operation. Store.Save() called at end of each RunOnce cycle.",
     "source": "doc/STORAGE-002_problem_statement.md",
-    "outcome": "",
-    "tests": [],
+    "outcome": "Implemented. Pipeline.Options gained Store *jsonstore.Store field. Pipeline struct stores store, NewPipeline copies from opts. findDoneFile returns parsed payload map. RunOnce transaction: captureProcessingHistory stores each payload via store.Set, aborts transaction on Set/Save error so .done files survive; sanitization and deletion only proceed after successful store operations. cmd_process wires modules.Store() into options. Transactional semantics preserve .done files on store failure.",
+    "tests": [
+      "TestPipeline_StoreHistoryOnSuccess — store.Get(script_<name>) returns payload and .done file deleted on success",
+      "TestPipeline_StoreFailurePersistsDone — store.Set failure aborts transaction, .done file survives, no sanitize",
+      "TestPipeline_StorageJsonAfterRunOnce — storage.json contains script_<name> key with expected payload after RunOnce"
+    ],
     "title": "Persist .done processing history to jsonstore before deletion"
   },
   "INGEST-002": {

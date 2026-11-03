@@ -7,6 +7,7 @@ import (
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 	"github.com/Galdoba/lazyam3/internal/domain/script"
 	"github.com/Galdoba/lazyam3/internal/infra/config"
+	"github.com/Galdoba/lazyam3/internal/infra/persistence/jsonstore"
 	"github.com/Galdoba/lazyam3/internal/platform"
 )
 
@@ -24,6 +25,7 @@ type Options struct {
 	// Infra
 	Logger Logger
 	Events chan PipelineEvent
+	Store  *jsonstore.Store // processing history store (optional; nil when disabled)
 
 	// Domain ports
 	Ingest   ingest.Organizer

@@ -95,7 +95,7 @@ apt install {package}
 
 ## 🤝 Contributing
 
-Please read the [contributing guide](CONTRIBUTING.md) before submitting a PR.
+Please read the [contributing guide](./CONTRIBUTING.md) before submitting a PR.
 
 <!-- Or if the contributing guide is very short:
 

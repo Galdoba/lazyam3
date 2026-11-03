@@ -2,13 +2,13 @@
 
 Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata resolution → script generation → rendering).
 
-**Current State**: Tasks 1-10 complete. Pipeline fully wired end-to-end with HSUB auto-detection, movie naming fix, TOML config, config-driven paths, empty-dir sanitation, and cross-platform path resolution (PathBuilder, canonical metadata markers). Marker metadata path bug fixed. INGEST-001 and INGEST-002 complete. LOG-001 (normalize Windows paths to forward slashes in log output) complete.
+**Current State**: Tasks 1-10 complete. Pipeline fully wired end-to-end with HSUB auto-detection, movie naming fix, TOML config, config-driven paths, empty-dir sanitation, and cross-platform path resolution (PathBuilder, canonical metadata markers). Marker metadata path bug fixed. INGEST-001 and INGEST-002 complete. LOG-001 (normalize Windows paths to forward slashes in log output) complete. STORAGE-002 (persist .done processing history to jsonstore with transactional semantics) complete.
 
 ## Current Feature
 
-> **LOG-001** — normalize Windows paths to forward slashes in log output
+> **STORAGE-002** — persist `.done` processing history to jsonstore before deletion, with transactional semantics (store `Set` failure aborts the transaction so `.done` files survive for the next scan cycle).
 >
-> **Status**: Complete. Added `normalizePath` and `isPathKey` helpers in `internal/infra/logging/logger.go`. JSON handler uses `ReplaceAttr` to normalize path/dir/file string values; text handler's `formatAttrValue` takes key and normalizes matching keys. Tests added: `TestCustomHandler_PathNormalization`, `TestNewFileHandler_PathNormalization`.
+> **Status**: Complete. `pipeline.Options.Store *jsonstore.Store` wired via `cmd_process.go` (modules.Store()). Pipeline stores store, `findDoneFile` returns parsed payload, `captureProcessingHistory` stores each payload transactionally, aborting on Set/Save failure so `.done` files persist. Tests added: `TestPipeline_StoreHistoryOnSuccess`, `TestPipeline_StoreFailurePersistsDone`, `TestPipeline_StorageJsonAfterRunOnce`.
 
 ## Live Test
 

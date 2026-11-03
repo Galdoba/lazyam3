@@ -87,6 +87,11 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 			return fmt.Errorf("failed to load metadata from %q: %w", metadataPath, err)
 		}
 
+		store, err := modules.Store()
+		if err != nil {
+			return fmt.Errorf("failed to initialize store: %w", err)
+		}
+
 		destination := nonEmpty(c.String(pathOut), cfg.Paths.GeneratorOutput())
 		if destination == "" {
 			logger.Error("output directory required (flag or config field)")
@@ -106,6 +111,7 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 			Metadata:       mdRepo,
 			Renderer:       scriptinfra.New(),
 			Events:         events,
+			Store:          store,
 			SourceDir:      sourceDir,
 			Destination:    destination,
 			DryRun:         false,

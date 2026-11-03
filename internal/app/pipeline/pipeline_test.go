@@ -16,6 +16,7 @@ import (
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 	"github.com/Galdoba/lazyam3/internal/domain/script"
+	"github.com/Galdoba/lazyam3/internal/infra/persistence/jsonstore"
 	"github.com/Galdoba/lazyam3/internal/platform"
 )
 
@@ -1316,5 +1317,152 @@ func TestProcessUnitArtifactBackwardCompat(t *testing.T) {
 	}
 	if payload["unit_id"] != float64(12094) {
 		t.Errorf("unit_id = %v, want 12094", payload["unit_id"])
+	}
+}
+
+func TestPipeline_StoreHistoryOnSuccess(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	absEmptyDir, err := filepath.Abs(emptyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	donePath := writeDoneFile(t, metaDir, "test.done", absEmptyDir)
+
+	storePath := filepath.Join(t.TempDir(), "storage.json")
+	store, err := jsonstore.New(storePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
+	p.store = store
+
+	out, err := p.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if out.Processed != 0 || out.Failed != 0 {
+		t.Errorf("RunOnce() = %+v, want Processed=0 Failed=0", out)
+	}
+	if pathExists(emptyDir) {
+		t.Errorf("empty dir %q should be deleted", emptyDir)
+	}
+	if pathExists(donePath) {
+		t.Errorf("done file %q should be consumed", donePath)
+	}
+	v, ok := store.Get("script_test")
+	if !ok {
+		t.Errorf("store should contain script_test key")
+	}
+	payload, ok := v.(map[string]any)
+	if !ok {
+		t.Errorf("stored value is not a map: %v", v)
+	}
+	if payload["script_name"] != "test" {
+		t.Errorf("script_name = %v, want test", payload["script_name"])
+	}
+	if err := store.Close(); err != nil {
+		t.Errorf("store.Close: %v", err)
+	}
+}
+
+func TestPipeline_StoreFailurePersistsDone(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	absEmptyDir, err := filepath.Abs(emptyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	donePath := writeDoneFile(t, metaDir, "fail.done", absEmptyDir)
+
+	storePath := filepath.Join(t.TempDir(), "storage_fail.json")
+	store, err := jsonstore.New(storePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("store.Close: %v", err)
+	}
+
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
+	p.store = store
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if !pathExists(emptyDir) {
+		t.Errorf("empty dir %q should be kept (store failed)", emptyDir)
+	}
+	if !pathExists(donePath) {
+		t.Errorf("done file %q should survive store failure", donePath)
+	}
+}
+
+func TestPipeline_StorageJsonAfterRunOnce(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	absEmptyDir, err := filepath.Abs(emptyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	donePath := writeDoneFile(t, metaDir, "json.done", absEmptyDir)
+
+	storePath := filepath.Join(t.TempDir(), "storage.json")
+	store, err := jsonstore.New(storePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
+	p.store = store
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if pathExists(donePath) {
+		t.Errorf("done file %q should be deleted", donePath)
+	}
+	raw, err := os.ReadFile(storePath)
+	if err != nil {
+		t.Fatalf("read storage.json: %v", err)
+	}
+	data := map[string]any{}
+	if err := json.Unmarshal(raw, &data); err != nil {
+		t.Fatalf("parse storage.json: %v", err)
+	}
+	if _, ok := data["script_test"]; !ok {
+		t.Errorf("storage.json missing script_test key: %v", data)
+	}
+	if err := store.Close(); err != nil {
+		t.Errorf("store.Close: %v", err)
 	}
 }

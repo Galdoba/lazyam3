@@ -1,18 +1,21 @@
 # HANDOFF
 
 ## Summary
-Completed LOG-001: normalize Windows paths to forward slashes in log output. Added `normalizePath` and `isPathKey` helpers in `internal/infra/logging/logger.go`. JSON file handler uses `ReplaceAttr` to normalize path/dir/file string values; text terminal handler's `formatAttrValue` takes key and normalizes matching keys before quoting. Tests added: `TestCustomHandler_PathNormalization`, `TestNewFileHandler_PathNormalization`.
+Completed STORAGE-002: persist `.done` processing history to jsonstore before deletion, with transactional semantics. A successful store `Set` gates the `.done` deletion; a store failure aborts the transaction so `.done` files survive for the next scan cycle.
 
 ## What was done
-- **logger.go normalizePath/isPathKey**: Added `normalizePath(s string) string` that replaces `\` with `/`, and `isPathKey(key string) bool` that matches keys containing "path", or exactly "dir"/"file" (case-insensitive).
-- **Text handler**: `formatAttrValue` signature changed to `formatAttrValue(key string, v slog.Value)`; string values for path keys are normalized before `strconv.Quote`.
-- **JSON file handler**: `newFileHandler` opts `slog.HandlerOptions.ReplaceAttr` to normalize string values for path keys via `slog.StringValue(normalizePath(...))`.
+- **dto.go**: Added `Store *jsonstore.Store` field to `Options` under the "Infra" section, plus the `jsonstore` import.
+- **pipeline.go**: Added `store *jsonstore.Store` to `Pipeline` struct; copied it from `opts.Store` in `NewPipeline`; changed `findDoneFile` signature from `(string, bool)` to `(string, map[string]any, bool)`; updated `doneMatch` struct to include `payload map[string]any`; implemented transaction logic via `captureProcessingHistory` helper method.
+- **cmd_process.go**: Fetched `store, err := modules.Store()` after metadata loading, and passed `Store: store` into `pipeline.NewPipeline` options.
+- **pipeline_test.go**: Added `jsonstore` import and three tests: `TestPipeline_StoreHistoryOnSuccess`, `TestPipeline_StoreFailurePersistsDone`, `TestPipeline_StorageJsonAfterRunOnce`.
 
 ## Verification
-- `go test -race -cover ./internal/infra/logging/` — all pass (93.1% coverage).
-- Logging package lint clean.
+- `go build ./...` — passed.
+- `go test -race -cover ./...` — passed (pipeline coverage 81.6%).
+- `go vet ./...` — passed.
+- `golangci-lint run ./...` — passed (only pre-existing unrelated `forbidigo` issue in `internal/domain/callname/shared.go:9:2`, which uses `time.Sleep`).
 
 ## Notes
-- Normalization happens only at the logging layer; domain/app code passes raw path strings unchanged.
-- Non-path string values (e.g. `note: regex: C:\Users`) are left unchanged.
-- Forward slashes work on all platforms since Go 1.9+.
+- Transactional semantics: store `Set` failure aborts the transaction, so `.done` files persist for the next scan cycle.
+- `findDoneFile` change is a signature change; only one call site exists in `RunOnce`.
+- `payload["script_name"]` is guaranteed present by the artifact writer.
