@@ -84,7 +84,7 @@ This fills the gap between ephemeral .done files and permanent archive.
   - Store grows unbounded over time (non-goal: retention policy is future work)
 
 ## open_questions:
-  - Should store write happen in the same goroutine (blocking) or async (fire-and-forget)?
-  - Should the store entry include the full .done payload or a subset?
+  - Should store write happen in the same goroutine (blocking) or async (fire-and-forget)? Let's do blocking for now.
+  - Should the store entry include the full .done payload or a subset? Full data.
   - [FUTURE] Fallback mechanism: when store write fails, log ERROR-level entry with payload for manual recovery?
   - [FUTURE] Transaction scope: should store write + .done deletion be wrapped in a single transaction block?

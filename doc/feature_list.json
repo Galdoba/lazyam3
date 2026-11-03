@@ -440,5 +440,26 @@
       "TestRepository_Reload_Untouched — Reload() returns (false, nil) when untouched"
     ],
     "title": "Hot-reload metadata.json during long-running pipeline"
+  },
+  "LOG-001": {
+    "benefits": [
+      "Windows paths in logs use forward slashes, consistent with Unix paths",
+      "Logs are easier to read, grep, and copy-paste across platforms",
+      "Normalization happens at logging layer; domain/app code unchanged"
+    ],
+    "blocked_by": [],
+    "effort": "1-2 hours",
+    "impact": "low",
+    "status": "done",
+    "priority": 8,
+    "problem": "On Windows, path values logged via the structured logger appear with escaped backslashes (e.g. \\\\192.168.31.4\\buffer\\...). The JSON file handler and text handler both use strconv.Quote which doubles backslashes, making paths hard to read and grep.",
+    "proposal": "Add a shared normalizePath helper that replaces \\ with /. Wire it into the JSON handler via ReplaceAttr (key matches 'path', 'dir', 'file') and into the text handler via formatAttrValue. Add tests for both handlers.",
+    "source": "doc/LOG-001_problem_statement.md",
+    "outcome": "Implemented. Added normalizePath and isPathKey helpers in internal/infra/logging/logger.go. JSON handler uses ReplaceAttr to normalize path/dir/file string values. Text handler formatAttrValue takes key and normalizes matching keys. Tests added: TestCustomHandler_PathNormalization, TestNewFileHandler_PathNormalization. All tests pass with race detector; logging package lint clean.",
+    "tests": [
+      "TestCustomHandler_PathNormalization — text handler normalizes input_path/dir/file, leaves non-path note unchanged",
+      "TestNewFileHandler_PathNormalization — JSON handler normalizes backslashes in path/dir attributes"
+    ],
+    "title": "Normalize Windows paths to forward slashes in log output"
   }
 }

@@ -739,3 +739,43 @@ func TestNewTermHandler_FormatTextIgnoredForJSON(t *testing.T) {
 		t.Errorf("format_text must not switch JSON output to text, got: %q", data)
 	}
 }
+
+func TestCustomHandler_PathNormalization(t *testing.T) {
+	got := renderCustom(t, renderOpts{
+		template: "{attrs}",
+		msg:      "m",
+		attrs: []slog.Attr{
+			slog.String("input_path", `C:\media\movie.mkv`),
+			slog.String("dir", `C:\media\out`),
+			slog.String("file", `C:\media\sub.mkv`),
+			slog.String("note", `regex: C:\Users`),
+		},
+	})
+	want := `input_path="C:/media/movie.mkv" dir="C:/media/out" file="C:/media/sub.mkv" note="regex: C:\\Users"` + "\n"
+	if got != want {
+		t.Errorf("path normalization:\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestNewFileHandler_PathNormalization(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.log")
+	cfg := config.Logging{Terminal: false, Path: path, Level: "info"}
+	l, err := NewLogger(cfg)
+	if err != nil {
+		t.Fatalf("NewLogger: %v", err)
+	}
+	defer l.Close()
+
+	l.With("input_path", `C:\media\movie.mkv`, "dir", `C:\media\out`).Info("processed")
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !bytes.Contains(data, []byte(`"input_path":"C:/media/movie.mkv"`)) {
+		t.Errorf("JSON handler must normalize backslashes in path attrs, got: %q", data)
+	}
+	if !bytes.Contains(data, []byte(`"dir":"C:/media/out"`)) {
+		t.Errorf("JSON handler must normalize backslashes in dir attrs, got: %q", data)
+	}
+}

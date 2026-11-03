@@ -359,7 +359,7 @@ func (h *customTextHandler) renderAttrs(r slog.Record) string {
 		}
 		b.WriteString(k)
 		b.WriteByte('=')
-		b.WriteString(formatAttrValue(v))
+		b.WriteString(formatAttrValue(k, v))
 	}
 	for _, a := range h.attrs {
 		write(a.Key, a.Value)
@@ -393,11 +393,30 @@ func (h *customTextHandler) WithGroup(name string) slog.Handler {
 	return &nh
 }
 
-func formatAttrValue(v slog.Value) string {
+func formatAttrValue(key string, v slog.Value) string {
 	if v.Kind() == slog.KindString {
-		return strconv.Quote(v.String())
+		s := v.String()
+		if isPathKey(key) {
+			s = normalizePath(s)
+		}
+		return strconv.Quote(s)
 	}
 	return fmt.Sprintf("%v", v.Any())
+}
+
+// normalizePath replaces backslashes with forward slashes so Windows paths
+// render consistently in logs.
+func normalizePath(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ReplaceAll(s, `\`, `/`)
+}
+
+// isPathKey returns true if the attribute key looks like a path attribute.
+func isPathKey(key string) bool {
+	k := strings.ToLower(key)
+	return strings.Contains(k, "path") || strings.EqualFold(k, "dir") || strings.EqualFold(k, "file")
 }
 
 func newFileHandler(cfg config.Logging) (slog.Handler, io.Closer, error) {
@@ -410,6 +429,12 @@ func newFileHandler(cfg config.Logging) (slog.Handler, io.Closer, error) {
 	}
 	opts := &slog.HandlerOptions{
 		Level: levelFromString(cfg.Level),
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if isPathKey(a.Key) && a.Value.Kind() == slog.KindString {
+				return slog.Attr{Key: a.Key, Value: slog.StringValue(normalizePath(a.Value.String()))}
+			}
+			return a
+		},
 	}
 	handler := slog.NewJSONHandler(logfile, opts)
 	return handler, logfile, nil

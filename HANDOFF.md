@@ -1,20 +1,18 @@
 # HANDOFF
 
 ## Summary
-Completed ingest domain refactoring on branch `refactor/ingest-clean`. All 4 steps executed: ExtractID parsing cleanup, ValidateMediaUnit helper extraction, parseStreams field-helper extraction, and NewMediaUnit split into collectMediaFiles/buildStreams/resolveID. Behavior preserved; ingest coverage now 97.9%.
+Completed LOG-001: normalize Windows paths to forward slashes in log output. Added `normalizePath` and `isPathKey` helpers in `internal/infra/logging/logger.go`. JSON file handler uses `ReplaceAttr` to normalize path/dir/file string values; text terminal handler's `formatAttrValue` takes key and normalizes matching keys before quoting. Tests added: `TestCustomHandler_PathNormalization`, `TestNewFileHandler_PathNormalization`.
 
 ## What was done
-- **Step 1 (extract.go):** Replaced manual backward extension scan in `ExtractID` with `strings.SplitN(filename, ".", 2)[0]`. Behavior identical for all filename/path cases.
-- **Step 2 (unit.go):** Extracted `validateVideo`, `validateAudio`, `validateDurations` from the 93-line `ValidateMediaUnit`. Kept coordinate-duplicate detection in orchestrator. Added targeted tests for resolution, bitrate, duration consistency, and duplicate coordinates.
-- **Step 3 (parse.go):** Extracted `applyVideoFields`, `applyAudioFields`, `applySubtitleFields` from `parseStreams`, replacing repetitive if-blocks with a kind switch. Left `// TODO: rework` (ffprobe format-level parsing) out of scope as planned.
-- **Step 4 (unit.go):** Split `NewMediaUnit` into `collectMediaFiles`, `buildStreams`, and `resolveID` helpers. Existing `TestNewMediaUnit` already covers multi-file units, data-only filtering, inconsistent IDs, and synthetic ID assignment.
+- **logger.go normalizePath/isPathKey**: Added `normalizePath(s string) string` that replaces `\` with `/`, and `isPathKey(key string) bool` that matches keys containing "path", or exactly "dir"/"file" (case-insensitive).
+- **Text handler**: `formatAttrValue` signature changed to `formatAttrValue(key string, v slog.Value)`; string values for path keys are normalized before `strconv.Quote`.
+- **JSON file handler**: `newFileHandler` opts `slog.HandlerOptions.ReplaceAttr` to normalize string values for path keys via `slog.StringValue(normalizePath(...))`.
 
 ## Verification
-- `go build ./...`, `go vet ./...`, `go test -race -cover ./...` — all pass.
-- `golangci-lint run ./internal/domain/ingest/` — 0 issues.
-- Ingest domain coverage: 97.9% of statements.
+- `go test -race -cover ./internal/infra/logging/` — all pass (93.1% coverage).
+- Logging package lint clean.
 
 ## Notes
-- All commits are purely structural (behavior-preserving). No behavioral changes introduced.
-- Cross-reference checks (struct tags, json/ffprobe field references) verified clean.
-- Branch `refactor/ingest-clean` is ready for PR creation and human review.
+- Normalization happens only at the logging layer; domain/app code passes raw path strings unchanged.
+- Non-path string values (e.g. `note: regex: C:\Users`) are left unchanged.
+- Forward slashes work on all platforms since Go 1.9+.
