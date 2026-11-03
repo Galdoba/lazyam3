@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 )
@@ -206,5 +207,107 @@ func TestRepository_FindByID_RealFile(t *testing.T) {
 				t.Errorf("SeasonEp = %q, want %q", prod.SeasonEp, tt.wantSeasonEp)
 			}
 		})
+	}
+}
+
+func TestRepository_Reload_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	metaFile := filepath.Join(tmpDir, "metadata.json")
+
+	data := `{"series": [{"id": 100, "title": "Series A", "start_date": "2020-01-01T00:00:00Z", "mainGenre": "drama", "genres": [], "countries": [], "imdbId": "tt1", "kinopoiskId": "1"}], "movies": []}`
+	if err := os.WriteFile(metaFile, []byte(data), 0o644); err != nil {
+		t.Fatalf("failed to write test metadata: %v", err)
+	}
+
+	repo, err := New(nil, metaFile)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	if _, err := repo.FindByID(100); err != nil {
+		t.Fatalf("FindByID(100) failed: %v", err)
+	}
+
+	// modify metadata with a distinct mtime
+	mtime := time.Now().Add(time.Hour)
+	data2 := `{"series": [{"id": 100, "title": "Series A", "start_date": "2020-01-01T00:00:00Z", "mainGenre": "drama", "genres": [], "countries": [], "imdbId": "tt1", "kinopoiskId": "1"}, {"id": 101, "title": "Series B", "start_date": "2021-01-01T00:00:00Z", "mainGenre": "comedy", "genres": [], "countries": [], "imdbId": "tt2", "kinopoiskId": "2"}], "movies": []}`
+	if err := os.WriteFile(metaFile, []byte(data2), 0o644); err != nil {
+		t.Fatalf("failed to write test metadata: %v", err)
+	}
+	if err := os.Chtimes(metaFile, mtime, mtime); err != nil {
+		t.Fatalf("failed to set mtime: %v", err)
+	}
+
+	changed, err := repo.Reload()
+	if err != nil {
+		t.Fatalf("Reload() error: %v", err)
+	}
+	if !changed {
+		t.Error("expected changed=true, got false")
+	}
+
+	if _, err := repo.FindByID(101); err != nil {
+		t.Fatalf("FindByID(101) failed after reload: %v", err)
+	}
+}
+
+func TestRepository_Reload_FailureFallback(t *testing.T) {
+	tmpDir := t.TempDir()
+	metaFile := filepath.Join(tmpDir, "metadata.json")
+
+	data := `{"series": [{"id": 100, "title": "Series A", "start_date": "2020-01-01T00:00:00Z", "mainGenre": "drama", "genres": [], "countries": [], "imdbId": "tt1", "kinopoiskId": "1"}], "movies": []}`
+	if err := os.WriteFile(metaFile, []byte(data), 0o644); err != nil {
+		t.Fatalf("failed to write test metadata: %v", err)
+	}
+
+	repo, err := New(nil, metaFile)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	if err := os.WriteFile(metaFile, []byte("{invalid json"), 0o644); err != nil {
+		t.Fatalf("failed to write test metadata: %v", err)
+	}
+	mtime := time.Now().Add(time.Hour)
+	if err := os.Chtimes(metaFile, mtime, mtime); err != nil {
+		t.Fatalf("failed to set mtime: %v", err)
+	}
+
+	changed, err := repo.Reload()
+	if err == nil {
+		t.Error("expected error on reload, got nil")
+	}
+	if changed {
+		t.Error("expected changed=false on reload failure")
+	}
+
+	if _, err := repo.FindByID(100); err != nil {
+		t.Fatalf("FindByID(100) failed after corrupt reload: %v", err)
+	}
+	if _, err := repo.FindByID(999); err == nil {
+		t.Error("expected error for product 999 after corrupt reload")
+	}
+}
+
+func TestRepository_Reload_Untouched(t *testing.T) {
+	tmpDir := t.TempDir()
+	metaFile := filepath.Join(tmpDir, "metadata.json")
+
+	data := `{"series": [{"id": 100, "title": "Series A", "start_date": "2020-01-01T00:00:00Z", "mainGenre": "drama", "genres": [], "countries": [], "imdbId": "tt1", "kinopoiskId": "1"}], "movies": []}`
+	if err := os.WriteFile(metaFile, []byte(data), 0o644); err != nil {
+		t.Fatalf("failed to write test metadata: %v", err)
+	}
+
+	repo, err := New(nil, metaFile)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	changed, err := repo.Reload()
+	if err != nil {
+		t.Fatalf("Reload() error: %v", err)
+	}
+	if changed {
+		t.Error("expected changed=false when untouched")
 	}
 }

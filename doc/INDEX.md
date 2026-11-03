@@ -16,6 +16,7 @@ All docs live in `doc/`. Every file in `doc/` MUST have an entry here.
 | `BACKLOG.md` | Backlog | Known issues and footguns |
 | `refactoring.md` | Refactoring Plan | Ingest package refactoring plan (plan mode) |
 | `STORAGE-002_problem_statement.md` | Problem Statement | Persist .done processing history to jsonstore |
+| `METADATA-001_problem_statement.md` | Problem Statement | Hot-reload metadata.json during long-running pipeline |
 
 ## Feature Backlog
 

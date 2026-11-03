@@ -418,5 +418,27 @@
       "TestSyntheticID_MixedNames — unit with mixed digit/non-digit files uses valid ID"
     ],
     "title": "Graceful handling of files with non-standard names"
+  },
+  "METADATA-001": {
+    "benefits": [
+      "Pipeline detects metadata.json changes between scan passes and reloads it transparently",
+      "Long-running pipelines process new episodes/movies added to the catalog without restart",
+      "No silent stale-catalog processing"
+    ],
+    "blocked_by": [],
+    "effort": "2-3 hours",
+    "impact": "medium",
+    "status": "done",
+    "priority": 7,
+    "problem": "Pipeline loads metadata.json exactly once at startup. For long-running pipelines, external updates to metadata.json (new episodes, corrected titles, added movies) are not reflected; the pipeline uses the stale startup snapshot.",
+    "proposal": "On each scan pass in the Run() loop, stat metadata.json and reload if mtime changed. Reload is atomic under write-lock; on failure, log warning and fall back to previous snapshot.",
+    "source": "doc/METADATA-001_problem_statement.md",
+    "outcome": "Implemented. Repository gained metadataPath and lastMod fields; New() stats file and stores lastMod. Reload() stats file, compares mtime, reloads on change under write-lock, logs INFO on reload. Pipeline calls Reload() before RunOnce() in Run() loop via type assertion. Tests: TestRepository_Reload_Success, TestRepository_Reload_FailureFallback, TestRepository_Reload_Untouched. All tests pass with race detector; live test passes.",
+    "tests": [
+      "TestRepository_Reload_Success — reload triggers on mtime change and serves new products",
+      "TestRepository_Reload_FailureFallback — corrupt JSON reload fails, repo serves old data",
+      "TestRepository_Reload_Untouched — Reload() returns (false, nil) when untouched"
+    ],
+    "title": "Hot-reload metadata.json during long-running pipeline"
   }
 }

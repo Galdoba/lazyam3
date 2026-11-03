@@ -16,6 +16,7 @@ import (
 	"github.com/Galdoba/lazyam3/internal/domain/script"
 	"github.com/Galdoba/lazyam3/internal/infra/fso"
 	"github.com/Galdoba/lazyam3/internal/infra/logging"
+	metadatainfra "github.com/Galdoba/lazyam3/internal/infra/metadata"
 	"github.com/Galdoba/lazyam3/internal/platform"
 )
 
@@ -95,6 +96,14 @@ func (p *Pipeline) Run(ctx context.Context) (RunOutput, error) {
 			p.logger.Info("pipeline stopped", "error", ctx.Err())
 			return total, ctx.Err()
 		default:
+		}
+
+		if repo, ok := p.md.(*metadatainfra.Repository); ok {
+			if changed, err := repo.Reload(); err == nil && changed {
+				p.logger.Info("metadata reloaded")
+			} else if err != nil {
+				p.logger.Warn("metadata reload failed", "error", err)
+			}
 		}
 
 		out, err := p.RunOnce(ctx)
