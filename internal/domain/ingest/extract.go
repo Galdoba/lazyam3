@@ -8,6 +8,9 @@ import (
 // ExtractID parses the product ID from a filename stem (name without extension).
 // The stem must start with a digit sequence — that sequence is the ID.
 // When the stem does not start with a digit, returns SyntheticID (9999).
+//
+// NOTE: ID extraction is being moved to the callname subdomain. This will be
+// deprecated once callers migrate to callname.ExtractID.
 func ExtractID(filename string) (int64, error) {
 	name := strings.SplitN(filename, ".", 2)[0]
 

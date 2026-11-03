@@ -1,6 +1,8 @@
 package script
 
 import (
+	"fmt"
+
 	"github.com/Galdoba/lazyam3/internal/domain/callname"
 	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
@@ -73,6 +75,11 @@ type HarsubConfig struct {
 	MarginR         int     // force_style margin_r
 	MarginV         int     // force_style margin_v
 	Encoding        int     // subtitles filter encoding
+}
+
+// FilterString returns the ffmpeg subtitles filter string for this HarsubConfig.
+func (h HarsubConfig) FilterString() string {
+	return fmt.Sprintf(`original_size=%s:force_style='FontName=%s,Fontsize=%v,PrimaryColour='%s',SecondaryColour='%s',OutlineColour='%s',BackColour='%s',Underline=%d,StrikeOut=%d,ScaleX=%v,ScaleY=%v,Spacing=%d,Angle=%d,BorderStyle=%d,Outline=%v,Shadow=%d,Alignment=%d,MarginL=%d,MarginR=%d,MarginV=%d,Encoding=%d'`, h.OriginalSize, h.FontName, h.FontSize, h.PrimaryColour, h.SecondaryColour, h.OutlineColour, h.BackColour, h.Underline, h.StrikeOut, h.ScaleX, h.ScaleY, h.Spacing, h.Angle, h.BorderStyle, h.Outline, h.Shadow, h.Alignment, h.MarginL, h.MarginR, h.MarginV, h.Encoding)
 }
 
 // Environment holds filesystem paths used by the generated script.

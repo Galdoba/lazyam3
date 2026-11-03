@@ -118,11 +118,11 @@ func BuildInputName(product metadata.Product, originalFilename, timestamp string
 }
 
 // ExtractID parses the product ID from an original filename (leading digits
-// of the stem). Handles the bare-ID format only; ingest's ExtractID gets the
-// callname-format update (task 29). Copied from ingest.ExtractID for domain
-// purity — no callname → ingest dependency.
+// of the stem). Handles the bare-ID format only.
 //
-// TODO: ingest.ExtractID is deprecated
+// ID extraction is being moved to the callname subdomain; ingest.ExtractID
+// will be deprecated once callers migrate here. Copied into callname
+// for domain purity — no callname → ingest dependency.
 func ExtractID(filename string) (int64, error) {
 	name := filename
 	if idx := len(filename) - 1; idx >= 0 {

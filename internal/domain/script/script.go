@@ -217,16 +217,7 @@ func buildSRTSection(srt string, predictions []callname.PredictedOutput) string 
 		return ""
 	}
 	// Find the directory from the first prediction (video).
-	var predPath string
-	for _, p := range predictions {
-		if p.MediaType == "video" {
-			predPath = p.Path
-			break
-		}
-	}
-	if predPath == "" {
-		predPath = predictions[0].Path
-	}
+	predPath := firstVideoPath(predictions)
 	// Extract directory from prediction path.
 	dir := filepath.ToSlash(filepath.Dir(predPath))
 
@@ -264,8 +255,7 @@ func buildHSUB(hsubFile, inProgress string, hsub HarsubConfig) string {
 	if inProgress != "" {
 		path = filepath.ToSlash(filepath.Join(inProgress, hsubFile))
 	}
-	p := hsub
-	return fmt.Sprintf(`subtitles=filename=%s:original_size=%s:force_style='FontName=%s,Fontsize=%v,PrimaryColour='%s',SecondaryColour='%s',OutlineColour='%s',BackColour='%s',Underline=%d,StrikeOut=%d,ScaleX=%v,ScaleY=%v,Spacing=%d,Angle=%d,BorderStyle=%d,Outline=%v,Shadow=%d,Alignment=%d,MarginL=%d,MarginR=%d,MarginV=%d,Encoding=%d',`, path, p.OriginalSize, p.FontName, p.FontSize, p.PrimaryColour, p.SecondaryColour, p.OutlineColour, p.BackColour, p.Underline, p.StrikeOut, p.ScaleX, p.ScaleY, p.Spacing, p.Angle, p.BorderStyle, p.Outline, p.Shadow, p.Alignment, p.MarginL, p.MarginR, p.MarginV, p.Encoding)
+	return "subtitles=filename=" + path + ":" + hsub.FilterString()
 }
 
 // buildHSUBMove generates the shell line to move the hardsub file from
@@ -300,17 +290,7 @@ func buildMKDirTarget(predictions []callname.PredictedOutput) string {
 	if len(predictions) == 0 {
 		return ""
 	}
-	var path string
-	for _, p := range predictions {
-		if p.MediaType == "video" {
-			path = p.Path
-			break
-		}
-	}
-	if path == "" {
-		path = predictions[0].Path
-	}
-	dir := filepath.ToSlash(filepath.Dir(path))
+	dir := filepath.ToSlash(filepath.Dir(firstVideoPath(predictions)))
 	return `mkdir -p "` + dir + `"`
 }
 
@@ -320,16 +300,7 @@ func buildReadyFile(predictions []callname.PredictedOutput) string {
 	if len(predictions) == 0 {
 		return ""
 	}
-	var path string
-	for _, p := range predictions {
-		if p.MediaType == "video" {
-			path = p.Path
-			break
-		}
-	}
-	if path == "" {
-		path = predictions[0].Path
-	}
+	path := firstVideoPath(predictions)
 	// Derive .ready filename from video path: replace .mp4 with .ready
 	base := filepath.Base(path)
 	ext := filepath.Ext(base)
@@ -360,6 +331,22 @@ func derivePredictionsFromStreams(product metadata.Product, streams []ingest.Str
 		PRTTimestamp: prtTimestamp,
 	}
 	return callname.PredictOutputs(product, unit, targetRoot, "", product.ID)
+}
+
+// firstVideoPath returns the path of the first video prediction, or the first
+// prediction's path if no video prediction exists. Predictions must be non-empty.
+func firstVideoPath(predictions []callname.PredictedOutput) string {
+	var path string
+	for _, p := range predictions {
+		if p.MediaType == "video" {
+			path = p.Path
+			break
+		}
+	}
+	if path == "" {
+		path = predictions[0].Path
+	}
+	return path
 }
 
 func abbrevKind(kind ingest.StreamKind) string {

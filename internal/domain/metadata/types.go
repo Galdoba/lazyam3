@@ -27,3 +27,33 @@ const (
 	KindSeason        Kind = "series.season"
 	KindSeriesEpisode Kind = "series.season.episode"
 )
+
+// IsMovie returns true if the kind is a movie.
+func (k Kind) IsMovie() bool {
+	return k == KindMovie
+}
+
+// IsSeries returns true if the kind is a series.
+func (k Kind) IsSeries() bool {
+	return k == KindSeries
+}
+
+// IsSeason returns true if the kind is a season.
+func (k Kind) IsSeason() bool {
+	return k == KindSeason
+}
+
+// IsEpisode returns true if the kind is an episode (movie or series episode).
+func (k Kind) IsEpisode() bool {
+	return k == KindMovieEpisode || k == KindSeriesEpisode
+}
+
+// IsMovieEpisode returns true if the kind is a movie episode.
+func (k Kind) IsMovieEpisode() bool {
+	return k == KindMovieEpisode
+}
+
+// IsSeriesEpisode returns true if the kind is a series episode.
+func (k Kind) IsSeriesEpisode() bool {
+	return k == KindSeriesEpisode
+}
