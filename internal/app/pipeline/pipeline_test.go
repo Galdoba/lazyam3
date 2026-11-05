@@ -1466,3 +1466,53 @@ func TestPipeline_StorageJsonAfterRunOnce(t *testing.T) {
 		t.Errorf("store.Close: %v", err)
 	}
 }
+
+func TestRunOnce_PersistsStoreAfterProcessing(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"12094.mp4", "12094-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{}
+	storePath := filepath.Join(t.TempDir(), "storage.json")
+	store, err := jsonstore.New(storePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: testUnit()}},
+		&fakeRepo{products: map[int64]*metadata.Product{12094: testProduct()}},
+		rd, events, false)
+	p.store = store
+
+	// Seed in-memory store data that should be persisted after RunOnce.
+	if err := store.Set("seed_key", "seed_value"); err != nil {
+		t.Fatalf("store.Set: %v", err)
+	}
+
+	out, err := p.RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if out.Processed != 1 || out.Failed != 0 {
+		t.Errorf("RunOnce() = %+v, want Processed=1 Failed=0", out)
+	}
+
+	// Verify the store was persisted after processing (write-through).
+	raw, err := os.ReadFile(storePath)
+	if err != nil {
+		t.Fatalf("read storage.json: %v", err)
+	}
+	data := map[string]any{}
+	if err := json.Unmarshal(raw, &data); err != nil {
+		t.Fatalf("parse storage.json: %v", err)
+	}
+	if v, ok := data["seed_key"]; !ok || v != "seed_value" {
+		t.Errorf("storage.json missing seed_key with seed_value, got: %v", data)
+	}
+	if err := store.Close(); err != nil {
+		t.Errorf("store.Close: %v", err)
+	}
+}

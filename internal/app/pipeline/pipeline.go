@@ -219,6 +219,12 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 		out.Processed++
 	}
 
+	if p.store != nil {
+		if err := p.store.Save(); err != nil {
+			p.logger.Warn("store save failed", "error", err)
+		}
+	}
+
 	p.emit(EventScanDone, 0, nil)
 	return out, nil
 }
