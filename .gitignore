@@ -1,2 +1,31 @@
 # Crush state
 .crush/
+
+# Go build output
+*.exe
+*.exe~
+*.test
+*.out
+*.dll
+*.so*
+*.a
+*.dylib
+*.exe.manifest
+systemd-delta
+cmd/screentime/screentime
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
