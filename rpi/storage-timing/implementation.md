@@ -6,7 +6,7 @@ Implemented write-through persistence by adding a guarded `p.store.Save()` call 
 ## Pull Requests
 | PR | Description | Status |
 |----|-------------|--------|
-| (draft) | Storage timing: write-through persistence in pipeline loop | Draft |
+| [#1](https://github.com/Galdoba/lazyam3/pull/1) | Storage timing: write-through persistence in pipeline loop | Draft (PR to be opened) |
 
 ## Unexpected Discoveries
 The `jsonstore.Store.Save()` method is already thread-safe via `sync.RWMutex` and performs a full in-memory snapshot before JSON marshaling, so concurrent reads during the write are safe. The `captureProcessingHistory` path already calls `store.Save()` on transaction completion, so the new unconditional save after the unit loop is consistent with existing semantics.
