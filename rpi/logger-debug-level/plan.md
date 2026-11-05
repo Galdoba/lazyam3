@@ -23,40 +23,40 @@ Organized into logical phases with atomic tasks using checkboxes. Each task is s
 
 ### Phase 1: Downgrade per-unit Info calls to Debug
 
-- [ ] In `internal/app/pipeline/pipeline.go:158`, change `p.logger.Info("scan")` to `p.logger.Debug("scan")`.
-- [ ] In `internal/app/pipeline/pipeline.go:164`, change `p.logger.Info("dirs found", "count", len(dirs))` to `p.logger.Debug("dirs found", "count", len(dirs))`.
-- [ ] In `internal/app/pipeline/pipeline.go:187`, change `p.logger.Info("sanitized empty dirs", "count", len(snap.SanitizeablePaths))` to `p.logger.Debug("sanitized empty dirs", "count", len(snap.SanitizeablePaths))`.
-- [ ] In `internal/app/pipeline/pipeline.go:246`, change `p.logger.Info("processing", "dir", dir)` to `p.logger.Debug("processing", "dir", dir)`.
-- [ ] In `internal/app/pipeline/pipeline.go:266`, change `p.logger.Info("dry run: script build skipped", "id", unit.ID)` to `p.logger.Debug("dry run: script build skipped", "id", unit.ID)`.
-- [ ] In `internal/app/ingest/ingest.go:31`, change `ing.logger.Info("ingesting directory", "dir", dir)` to `ing.logger.Debug("ingesting directory", "dir", dir)`.
-- [ ] In `internal/app/script/build.go:15`, change `logger.Info("building rendering script")` to `logger.Debug("building rendering script")`.
-- [ ] In `internal/app/script/build.go:28`, change `logger.Info("writing rendered script to destination", "path", config.Destination)` to `logger.Debug("writing rendered script to destination", "path", config.Destination)`.
-- [ ] In `internal/infra/commands/cmd_process.go:134`, change `logger.Info("unit done", "id", e.ID)` to `logger.Debug("unit done", "id", e.ID)`.
-- [ ] In `internal/infra/metadata/repository.go:61`, change `r.logger.Info("metadata reloaded", "path", r.metadataPath)` to `r.logger.Debug("metadata reloaded", "path", r.metadataPath)`.
-- [ ] In `internal/infra/persistence/jsonstore/jsonstore.go:122`, change `s.logger.Info("store saved entries", "count", len(s.data))` to `s.logger.Debug("store saved entries", "count", len(s.data))`.
-- [ ] In `internal/infra/persistence/jsonstore/jsonstore.go:135`, change `s.logger.Info("store closed and saved")` to `s.logger.Debug("store closed and saved")`.
+- [x] In `internal/app/pipeline/pipeline.go:158`, change `p.logger.Info("scan")` to `p.logger.Debug("scan")`.
+- [x] In `internal/app/pipeline/pipeline.go:164`, change `p.logger.Info("dirs found", "count", len(dirs))` to `p.logger.Debug("dirs found", "count", len(dirs))`.
+- [x] In `internal/app/pipeline/pipeline.go:187`, change `p.logger.Info("sanitized empty dirs", "count", len(snap.SanitizeablePaths))` to `p.logger.Debug("sanitized empty dirs", "count", len(snap.SanitizeablePaths))`.
+- [x] In `internal/app/pipeline/pipeline.go:246`, change `p.logger.Info("processing", "dir", dir)` to `p.logger.Debug("processing", "dir", dir)`.
+- [x] In `internal/app/pipeline/pipeline.go:266`, change `p.logger.Info("dry run: script build skipped", "id", unit.ID)` to `p.logger.Debug("dry run: script build skipped", "id", unit.ID)`.
+- [x] In `internal/app/ingest/ingest.go:31`, change `ing.logger.Info("ingesting directory", "dir", dir)` to `ing.logger.Debug("ingesting directory", "dir", dir)`.
+- [x] In `internal/app/script/build.go:15`, change `logger.Info("building rendering script")` to `logger.Debug("building rendering script")`.
+- [x] In `internal/app/script/build.go:28`, change `logger.Info("writing rendered script to destination", "path", config.Destination)` to `logger.Debug("writing rendered script to destination", "path", config.Destination)`.
+- [x] In `internal/infra/commands/cmd_process.go:134`, change `logger.Info("unit done", "id", e.ID)` to `logger.Debug("unit done", "id", e.ID)`.
+- [x] In `internal/infra/metadata/repository.go:61`, change `r.logger.Info("metadata reloaded", "path", r.metadataPath)` to `r.logger.Debug("metadata reloaded", "path", r.metadataPath)`.
+- [x] In `internal/infra/persistence/jsonstore/jsonstore.go:122`, change `s.logger.Info("store saved entries", "count", len(s.data))` to `s.logger.Debug("store saved entries", "count", len(s.data))`.
+- [x] In `internal/infra/persistence/jsonstore/jsonstore.go:135`, change `s.logger.Info("store closed and saved")` to `s.logger.Debug("store closed and saved")`.
 
 ### Phase 2: Add Debug calls in pipeline.go decision points
 
-- [ ] In `internal/app/pipeline/pipeline.go:196-212` loop entry, add `p.logger.Debug("unit loop entry", "dir", d.Path)` before processing each directory, and add Debug for `snap.FilesIn(d.Path)` count and `processUnit` result (success/failure).
-- [ ] In `internal/app/pipeline/pipeline.go:247-251` after ingest, add Debug for ingest complete: `p.logger.Debug("ingest complete", "unit_id", unit.ID, "streams", len(unit.Streams))`.
-- [ ] In `internal/app/pipeline/pipeline.go:255-264` after metadata lookup, add Debug for metadata found/not-found with fallback indication.
-- [ ] In `internal/app/pipeline/pipeline.go:270-274` after script config build, add Debug: `p.logger.Debug("script config built", "unit_id", unit.ID, "predictions", len(cfg.Predictions))`.
-- [ ] In `internal/app/pipeline/pipeline.go:335-349` prepareFiles, add aggregate Debug for files moved: `p.logger.Debug("files prepared", "count", len(callNames))` after the loop.
-- [ ] In `internal/app/pipeline/pipeline.go:362-388` findDoneFile, add Debug for entries scanned, payloads parsed, and matches found.
-- [ ] In `internal/app/pipeline/pipeline.go:220-242` captureProcessingHistory, add Debug for keys stored and save result.
+- [x] In `internal/app/pipeline/pipeline.go:196-212` loop entry, add `p.logger.Debug("unit loop entry", "dir", d.Path)` before processing each directory, and add Debug for `snap.FilesIn(d.Path)` count and `processUnit` result (success/failure).
+- [x] In `internal/app/pipeline/pipeline.go:247-251` after ingest, add Debug for ingest complete: `p.logger.Debug("ingest complete", "unit_id", unit.ID, "streams", len(unit.Streams))`.
+- [x] In `internal/app/pipeline/pipeline.go:255-264` after metadata lookup, add Debug for metadata found/not-found with fallback indication.
+- [x] In `internal/app/pipeline/pipeline.go:270-274` after script config build, add Debug: `p.logger.Debug("script config built", "unit_id", unit.ID, "predictions", len(cfg.Predictions))`.
+- [x] In `internal/app/pipeline/pipeline.go:335-349` prepareFiles, add aggregate Debug for files moved: `p.logger.Debug("files prepared", "count", len(callNames))` after the loop.
+- [x] In `internal/app/pipeline/pipeline.go:362-388` findDoneFile, add Debug for entries scanned, payloads parsed, and matches found.
+- [x] In `internal/app/pipeline/pipeline.go:220-242` captureProcessingHistory, add Debug for keys stored and save result.
 
 ### Phase 3: Add Debug calls in infra files
 
-- [ ] In `internal/infra/fso/filescanner.go:73-133`, add Debug for root path scanned, files found count, dirs found count, and writable check summary.
-- [ ] In `internal/infra/fso/ffprobe.go:41-57`, add Debug for file path being probed, probe result status, and streams found count.
+- [x] In `internal/infra/fso/filescanner.go:73-133`, add Debug for root path scanned, files found count, dirs found count, and writable check summary.
+- [x] In `internal/infra/fso/ffprobe.go:41-57`, add Debug for file path being probed, probe result status, and streams found count.
 
 ### Phase 4: Tests and verification
 
-- [ ] Add unit tests verifying Debug messages are emitted when level is debug and filtered when level is info.
-- [ ] Run `scripts/live_test.sh` with `level = 'debug'` and verify Debug messages appear in terminal and file output.
-- [ ] Run with `level = 'info'` and verify Debug messages are NOT present.
-- [ ] Run `go test -race -cover ./...`, `go vet ./...`, and `golangci-lint run ./...`.
+- [x] Add unit tests verifying Debug messages are emitted when level is debug and filtered when level is info.
+- [x] Run `scripts/live_test.sh` with `level = 'debug'` and verify Debug messages appear in terminal and file output.
+- [x] Run with `level = 'info'` and verify Debug messages are NOT present.
+- [x] Run `go test -race -cover ./...`, `go vet ./...`, and `golangci-lint run ./...`.
 
 ## Code References
 

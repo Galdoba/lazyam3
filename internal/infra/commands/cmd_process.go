@@ -131,7 +131,7 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 			for e := range events {
 				switch e.Type {
 				case pipeline.EventUnitDone:
-					logger.Info("unit done", "id", e.ID)
+					logger.Debug("unit done", "id", e.ID)
 				case pipeline.EventUnitFailed:
 					logger.Warn("unit failed", "id", e.ID, "error", e.Error)
 				}

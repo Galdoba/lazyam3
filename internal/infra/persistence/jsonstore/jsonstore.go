@@ -119,7 +119,7 @@ func (s *Store) Save() error {
 		return fmt.Errorf("failed to write store file: %w", err)
 	}
 	if s.logger != nil {
-		s.logger.Info("store saved entries", "count", len(s.data))
+		s.logger.Debug("store saved entries", "count", len(s.data))
 	}
 	return nil
 }
@@ -132,7 +132,7 @@ func (s *Store) Close() error {
 	}
 	s.closed = true
 	if s.logger != nil {
-		s.logger.Info("store closed and saved")
+		s.logger.Debug("store closed and saved")
 	}
 	return s.Save()
 }

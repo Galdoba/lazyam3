@@ -155,13 +155,18 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 		return out, err
 	}
 
-	p.logger.Info("scan")
-	snap, err := fso.Scan(p.sourceDir, fso.DefaultOptions())
+	p.logger.Debug("scan")
+	log, ok := p.logger.(*logging.Logger)
+	opts := fso.DefaultOptions()
+	if ok {
+		opts.Logger = log
+	}
+	snap, err := fso.Scan(p.sourceDir, opts)
 	if err != nil {
 		return out, fmt.Errorf("scan %q: %w", p.sourceDir, err)
 	}
 	dirs := snap.TopDirsAllFilesWritable()
-	p.logger.Info("dirs found", "count", len(dirs))
+	p.logger.Debug("dirs found", "count", len(dirs))
 
 	metaDir := p.pathBuilder.Canonical("metadata")
 	matches := make([]doneMatch, 0)
@@ -184,7 +189,7 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 		if err := snap.Sanitize(); err != nil {
 			p.logger.Warn("sanitize failed", "error", err)
 		} else {
-			p.logger.Info("sanitized empty dirs", "count", len(snap.SanitizeablePaths))
+			p.logger.Debug("sanitized empty dirs", "count", len(snap.SanitizeablePaths))
 			for _, m := range matches {
 				if err := os.Remove(m.donePath); err != nil && !errors.Is(err, os.ErrNotExist) {
 					p.logger.Warn("remove done file failed", "path", m.donePath, "error", err)
@@ -200,14 +205,17 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 		if len(snap.FilesIn(d.Path)) == 0 {
 			continue
 		}
+		p.logger.Debug("unit loop entry", "dir", d.Path, "files", len(snap.FilesIn(d.Path)))
 		initialFiles := make([]string, 0, len(snap.FilesIn(d.Path)))
 		for _, f := range snap.FilesIn(d.Path) {
 			initialFiles = append(initialFiles, f.Path)
 		}
 		if err := p.processUnit(ctx, d.Path, initialFiles); err != nil {
+			p.logger.Debug("unit failed", "dir", d.Path, "error", err)
 			out.Failed++
 			continue
 		}
+		p.logger.Debug("unit processed", "dir", d.Path)
 		out.Processed++
 	}
 
@@ -231,11 +239,16 @@ func (p *Pipeline) captureProcessingHistory(matches []doneMatch) bool {
 			abort = true
 			break
 		}
+		if p.logger != nil {
+			p.logger.Debug("processing history stored", "key", key)
+		}
 	}
 	if !abort {
 		if err := p.store.Save(); err != nil {
 			p.logger.Warn("store save failed, aborting transaction", "error", err)
 			abort = true
+		} else if p.logger != nil {
+			p.logger.Debug("processing history saved")
 		}
 	}
 	return abort
@@ -243,27 +256,30 @@ func (p *Pipeline) captureProcessingHistory(matches []doneMatch) bool {
 
 // processUnit runs the full chain for one media unit directory.
 func (p *Pipeline) processUnit(ctx context.Context, dir string, initialFiles []string) error {
-	p.logger.Info("processing", "dir", dir)
+	p.logger.Debug("processing", "dir", dir)
 	unit, err := p.in.Ingest(dir)
 	if err != nil {
 		p.emit(EventUnitFailed, 0, err)
 		return err
 	}
+	p.logger.Debug("ingest complete", "unit_id", unit.ID, "streams", len(unit.Streams))
 	if unit.Synthetic {
 		p.logger.Warn("using synthetic product ID (filename had no leading digits)", "id", unit.ID)
 	}
 	prod, err := p.md.FindByID(unit.ID)
 	if err != nil {
+		p.logger.Debug("metadata lookup failed", "unit_id", unit.ID, "error", err)
 		p.logger.Warn("metadata lookup failed, using fallback naming",
 			"id", unit.ID, "dir", dir, "error", err)
 		prod = fallbackProduct(filepath.Base(dir), unit.ID)
 	} else if prod == nil {
+		p.logger.Debug("metadata not found", "unit_id", unit.ID)
 		p.logger.Warn("metadata not found, using fallback naming",
 			"id", unit.ID, "dir", dir, "fallback_base", filepath.Base(dir))
 		prod = fallbackProduct(filepath.Base(dir), unit.ID)
 	}
 	if p.dryRun {
-		p.logger.Info("dry run: script build skipped", "id", unit.ID)
+		p.logger.Debug("dry run: script build skipped", "id", unit.ID)
 		p.emit(EventUnitDone, unit.ID, nil)
 		return nil
 	}
@@ -272,6 +288,7 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string, initialFiles []s
 		p.emit(EventUnitFailed, unit.ID, err)
 		return err
 	}
+	p.logger.Debug("script config built", "unit_id", unit.ID, "predictions", len(cfg.Predictions))
 	// Move source files to OUTPUT directory (same place where scripts land).
 	if err := p.prepareFiles(dir, cfg.CallNames, p.destination); err != nil {
 		p.emit(EventUnitFailed, unit.ID, fmt.Errorf("prepare files: %w", err))
@@ -346,6 +363,9 @@ func (p *Pipeline) prepareFiles(sourceDir string, callNames map[string]string, b
 			return fmt.Errorf("move %q → %q: %w", src, dst, err)
 		}
 	}
+	if p.logger != nil {
+		p.logger.Debug("files prepared", "count", len(callNames))
+	}
 	return nil
 }
 
@@ -363,6 +383,9 @@ func (p *Pipeline) findDoneFile(metaDir, sourceDir string) (string, map[string]a
 	entries, err := os.ReadDir(metaDir)
 	if err != nil {
 		return "", nil, false
+	}
+	if p.logger != nil {
+		p.logger.Debug("find done file entries scanned", "dir", metaDir, "count", len(entries))
 	}
 	for _, e := range entries {
 		if filepath.Ext(e.Name()) != ".done" {
@@ -382,6 +405,9 @@ func (p *Pipeline) findDoneFile(metaDir, sourceDir string) (string, map[string]a
 		}
 		sd, _ := payload["source_dir"].(string)
 		if sd == sourceDir {
+			if p.logger != nil {
+				p.logger.Debug("find done file match found", "path", donePath)
+			}
 			return donePath, payload, true
 		}
 	}

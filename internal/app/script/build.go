@@ -12,7 +12,7 @@ import (
 // materializes it as a usable artifact via the Renderer.
 func Build(logger *logging.Logger, ctx context.Context, config script.ScriptConfig, renderer script.Renderer) error {
 	if logger != nil {
-		logger.Info("building rendering script")
+		logger.Debug("building rendering script")
 	}
 	if err := ctx.Err(); err != nil {
 		if logger != nil {
@@ -25,7 +25,7 @@ func Build(logger *logging.Logger, ctx context.Context, config script.ScriptConf
 		return fmt.Errorf("build script: %w", err)
 	}
 	if logger != nil {
-		logger.Info("writing rendered script to destination", "path", config.Destination)
+		logger.Debug("writing rendered script to destination", "path", config.Destination)
 	}
 	return renderer.Render(sc)
 }

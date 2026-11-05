@@ -51,7 +51,7 @@ func helperProber(t *testing.T, mode string) *Prober {
 	ffprobeScanArgs = []string{"-test.run=TestHelperProcess", "--"}
 	t.Cleanup(func() { ffprobeScanArgs = old })
 
-	return NewProber(os.Args[0])
+	return NewProber(os.Args[0], nil)
 }
 
 func mkFile(t *testing.T) string {
@@ -64,20 +64,20 @@ func mkFile(t *testing.T) string {
 }
 
 func TestNewProber_DefaultPath(t *testing.T) {
-	if got := NewProber("").binPath; got != "ffprobe" {
+	if got := NewProber("", nil).binPath; got != "ffprobe" {
 		t.Fatalf("binPath = %q, want %q", got, "ffprobe")
 	}
 }
 
 func TestNewProber_CustomPath(t *testing.T) {
 	const custom = "/opt/bin/ffprobe"
-	if got := NewProber(custom).binPath; got != custom {
+	if got := NewProber(custom, nil).binPath; got != custom {
 		t.Fatalf("binPath = %q, want %q", got, custom)
 	}
 }
 
 func TestProbeFile_StatError(t *testing.T) {
-	p := NewProber("ffprobe")
+	p := NewProber("ffprobe", nil)
 	missing := filepath.Join(t.TempDir(), "nope.mkv")
 
 	_, err := p.ProbeFile(missing)

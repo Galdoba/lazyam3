@@ -18,6 +18,8 @@ import (
 	"path/filepath"
 	"sort"
 	"time"
+
+	"github.com/Galdoba/lazyam3/internal/infra/logging"
 )
 
 // FileEntry represents a single file in the snapshot.
@@ -60,6 +62,8 @@ type Options struct {
 	SkipDir func(path string) bool
 	// SkipFile, if it returns true, the file is not included in the snapshot.
 	SkipFile func(path string) bool
+	// Logger for debug logging (optional).
+	Logger *logging.Logger
 }
 
 // DefaultOptions returns the default values.
@@ -99,6 +103,15 @@ func Scan(root string, opts *Options) (*Snapshot, error) {
 	}
 	snap.Dirs[rootAbs] = snap.Root
 	scanDir(rootAbs, snap.Root, snap, opts)
+	if opts.Logger != nil {
+		writable := 0
+		for _, f := range snap.Files {
+			if f.Writable {
+				writable++
+			}
+		}
+		opts.Logger.Debug("filescanner scan complete", "root", rootAbs, "files", len(snap.Files), "dirs", len(snap.Dirs), "writable", writable)
+	}
 	return snap, nil
 }
 
