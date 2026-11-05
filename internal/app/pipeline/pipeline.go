@@ -340,31 +340,10 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string, initialFiles []s
 			if p.logger != nil {
 				p.logger.Warn("processing artifact write failed", "path", processingPath, "error", err)
 			}
-		} else {
-			p.storeProcessingHistory(scriptName, payload)
 		}
 	}
 	p.emit(EventUnitDone, unit.ID, nil)
 	return nil
-}
-
-// storeProcessingHistory persists processing history to the store if enabled.
-func (p *Pipeline) storeProcessingHistory(scriptName string, payload map[string]any) {
-	if p.store == nil {
-		return
-	}
-	key := "script_" + scriptName
-	if err := p.store.Set(key, payload); err != nil {
-		if p.logger != nil {
-			p.logger.Warn("processing history store set failed", "key", key, "error", err)
-		}
-		return
-	}
-	if err := p.store.Save(); err != nil {
-		if p.logger != nil {
-			p.logger.Warn("processing history store save failed", "error", err)
-		}
-	}
 }
 
 // prepareFiles moves each file from the source unit directory to the

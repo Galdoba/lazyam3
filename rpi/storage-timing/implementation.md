@@ -1,7 +1,7 @@
 # Storage Timing: Data Loss Risk in Pipeline Loop Implementation
 
 ## Summary
-Implemented write-through persistence by storing processing history in the store immediately after `processUnit` successfully builds a script (`storeProcessingHistory`), and by separating the status file from the store storage path (`status.json` vs `storage.json`) so `writeStatus` no longer overwrites processing history. This closes the data-loss window that existed when data only reached `storage.json` on the next cycle's `captureProcessingHistory` call, and when the status file overwrote store data. Build, lint, and tests pass.
+Determined that `storage.json` should be updated when `.processing` is renamed to `.done` (execution complete), not at script-build time. This avoids a false-positive where `storage.json` marks work "done" while the external executor is still processing (minutes to hours). The store is updated via `captureProcessingHistory` when `.done` files are detected and the source directory is empty, and the status totals file was separated from `storage.json` (`status.json`) so `writeStatus` no longer corrupts store data. Build, lint, and tests pass.
 
 ## Pull Requests
 | PR | Description | Status |
@@ -9,30 +9,30 @@ Implemented write-through persistence by storing processing history in the store
 | [#1](https://github.com/Galdoba/lazyam3/pull/1) | Storage timing: write-through persistence in pipeline loop | Draft (PR to be opened) |
 
 ## Unexpected Discoveries
-The status totals were being written to the same `storage.json` path as the processing-history store, so `writeStatus(total)` overwrote the store data on every pass. The `.processing` to `.done` rename happens in the generated bash script, not Go code, so processing history must be stored in `processUnit` right after the script builds, not in `captureProcessingHistory`.
+The status totals were being written to the same `storage.json` path as the processing-history store, so `writeStatus(total)` overwrote the store data on every pass. The `.processing` to `.done` rename happens in the generated bash script, not Go code, so Go detects completion when `.done` files are found at the start of the next cycle.
 
 ## Plan Deviations
-The plan specified adding `store.Save()` at the end of `RunOnce()`, but that only saves whatever was already in the store (processing history is added in `processUnit`). The actual fix stores history in `processUnit` via `storeProcessingHistory`, and additionally fixed a path collision where status and store shared `storage.json`.
+The plan specified adding `store.Save()` at the end of `RunOnce()`, but storing at build time would create a false-positive for the inter-process pipeline (work isn't done until execution completes). The correct approach relies on the existing `captureProcessingHistory` to persist when `.done` files are found, plus separating the status file path to prevent corruption.
 
 ## Architecture Decision Records
-### Store Processing History in processUnit
+### Store on .done Detection (Business Logic)
 
 context:
-Processing history (script metadata) needs to reach `storage.json` immediately after a unit is processed, before the program can be stopped or crash. Previously it was only stored in `captureProcessingHistory` from `.done` files of the previous cycle.
+Work has two stages: build script (cheap, ~1s) and process media (external executor, minutes to hours). From the stakeholder's perspective, work is not done until the script finishes processing.
 
 options:
-- Store history in `processUnit` after successful script build (write-through).
-- Store history in `captureProcessingHistory` only (plan, ineffective).
+- Store in `processUnit` at build time (false-positive risk).
+- Store in `captureProcessingHistory` when `.done` files are found (execution complete).
 
 decision:
-Added `storeProcessingHistory(scriptName, payload)` called after the `.processing` artifact is written in `processUnit`, persisting to the store immediately.
+Rely on `captureProcessingHistory` to persist processing history when `.done` files are detected and the source directory is empty.
 
 rationale:
-This closes the data-loss window: data is in `storage.json` as soon as the script builds, regardless of when the next cycle's `captureProcessingHistory` runs or whether the program stops.
+Storing at `.done` detection avoids false-positives for the inter-process pipeline: `storage.json` only records work that has actually completed. A missed signal is less dangerous than a false positive for the larger pipeline of which lazyam3 is an element.
 
 consequences:
-- Each successful unit triggers a `store.Save()`, adding disk writes proportional to processed units.
-- The store and status now use separate files (`storage.json` vs `status.json`).
+- `storage.json` is updated at the start of the cycle after `.done` appears (~1s poll interval).
+- Build-time data is not recorded, avoiding false positives.
 
 ### Separate Status Path from Store Path
 
@@ -55,7 +55,7 @@ consequences:
 ## Handoff Notes
 
 ### Known Limitations
-- Each successfully processed unit triggers a `store.Save()`, adding disk writes. For large batches this is acceptable given the small JSON file size.
+- `storage.json` is updated at the start of the cycle after `.done` files appear, not at the exact rename moment.
 - Store save failures are logged as warnings and do not abort processing.
 
 ### Data Models
