@@ -2,8 +2,6 @@
 
 Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata resolution → script generation → rendering).
 
-**Current State**: Tasks 1-10 complete. Pipeline fully wired end-to-end with HSUB auto-detection, movie naming fix, TOML config, config-driven paths, empty-dir sanitation, and cross-platform path resolution (PathBuilder, canonical metadata markers). Marker metadata path bug fixed. INGEST-001 and INGEST-002 complete. LOG-001 (normalize Windows paths to forward slashes in log output) complete. STORAGE-002 (persist .done processing history to jsonstore with transactional semantics) complete. logger-debug-level (enable Debug logging for per-unit decisions, file ops, metadata lookups, script gen, storage ops at `[logger] level = 'debug'`) implement phase complete with implementation.md and draft PR on implement/logger-debug-level branch.
-
 ## Current Feature
 
 read `.rpi-workflow.json` to understand what is the current RPI step. If asked to work load apropriate rpi-* skill for next phase.
@@ -59,12 +57,9 @@ platform (internal/platform/*)     ← Stateless services (no domain deps)
 
 ### Workflow
 - Work one feature at a time; the current feature is defined in **Current Feature** above
-- Every feature: analyse → plan → implement → test → `go build` + `go test -race -cover` + `go vet` + `golangci-lint run` → update `status` in `doc/feature_list.json` and other related documentation
-- Every fixed bug MUST produce a test
-- New features MUST list their tests in `doc/feature_list.json`
-- Update **Current Feature** in this file when starting/finishing work
-- HANDOFF.md is always to be REWRITTEN completly with your personal findings
-- PROGRESS.md is APPEND only
+- RPI stands for Research -> Plan -> Implement
+- Implementation of current feature/problem MUST be done in it's own branch
+- Agent SHOULD commit, but MUST NOT push
 
 ### Code
 - Domains are pure — no imports from infra or app
