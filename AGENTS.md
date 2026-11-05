@@ -6,9 +6,7 @@ Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata r
 
 ## Current Feature
 
-> **STORAGE-002** — persist `.done` processing history to jsonstore before deletion, with transactional semantics (store `Set` failure aborts the transaction so `.done` files survive for the next scan cycle).
->
-> **Status**: Complete. `pipeline.Options.Store *jsonstore.Store` wired via `cmd_process.go` (modules.Store()). Pipeline stores store, `findDoneFile` returns parsed payload, `captureProcessingHistory` stores each payload transactionally, aborting on Set/Save failure so `.done` files persist. Tests added: `TestPipeline_StoreHistoryOnSuccess`, `TestPipeline_StoreFailurePersistsDone`, `TestPipeline_StorageJsonAfterRunOnce`.
+read `.rpi-workflow.json` to understand what is the current RPI step. If asked to work load apropriate rpi-* skill for next phase.
 
 ## Live Test
 
