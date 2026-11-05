@@ -779,3 +779,51 @@ func TestNewFileHandler_PathNormalization(t *testing.T) {
 		t.Errorf("JSON handler must normalize backslashes in dir attrs, got: %q", data)
 	}
 }
+
+func TestLogger_DebugLevel_EmitsDebug(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "debug.log")
+	cfg := config.Logging{Terminal: false, Path: path, Level: "debug"}
+	l, err := NewLogger(cfg)
+	if err != nil {
+		t.Fatalf("NewLogger: %v", err)
+	}
+	defer l.Close()
+
+	l.Debug("debug message")
+	l.Info("info message")
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if !bytes.Contains(data, []byte("debug message")) {
+		t.Errorf("expected debug message in output at debug level:\n%s", data)
+	}
+	if !bytes.Contains(data, []byte("info message")) {
+		t.Errorf("expected info message in output:\n%s", data)
+	}
+}
+
+func TestLogger_InfoLevel_FilterDebug(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "info.log")
+	cfg := config.Logging{Terminal: false, Path: path, Level: "info"}
+	l, err := NewLogger(cfg)
+	if err != nil {
+		t.Fatalf("NewLogger: %v", err)
+	}
+	defer l.Close()
+
+	l.Debug("debug message")
+	l.Info("info message")
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if bytes.Contains(data, []byte("debug message")) {
+		t.Errorf("debug message should be filtered at info level:\n%s", data)
+	}
+	if !bytes.Contains(data, []byte("info message")) {
+		t.Errorf("expected info message in output:\n%s", data)
+	}
+}

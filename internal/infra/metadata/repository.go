@@ -58,7 +58,7 @@ func (r *Repository) Reload() (bool, error) {
 	r.mu.Unlock()
 
 	if r.logger != nil {
-		r.logger.Info("metadata reloaded", "path", r.metadataPath)
+		r.logger.Debug("metadata reloaded", "path", r.metadataPath)
 	}
 	return true, nil
 }

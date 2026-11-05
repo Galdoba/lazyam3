@@ -28,7 +28,7 @@ func New(ffprobeBinaryPath string, logger *logging.Logger) *Ingest {
 // recorded in Filenames so the pipeline can later classify them as SRT or HSUB.
 func (ing *Ingest) Ingest(dir string) (ingest.MediaUnit, error) {
 	if ing.logger != nil {
-		ing.logger.Info("ingesting directory", "dir", dir)
+		ing.logger.Debug("ingesting directory", "dir", dir)
 	}
 	fls, err := os.ReadDir(dir)
 	if err != nil {
@@ -36,7 +36,7 @@ func (ing *Ingest) Ingest(dir string) (ingest.MediaUnit, error) {
 	}
 	dirData := make(map[string][]byte)
 	sidecars := make([]string, 0)
-	prober := fso.NewProber(ing.ffprobeBinary)
+	prober := fso.NewProber(ing.ffprobeBinary, ing.logger)
 	for _, f := range fls {
 		if !f.Type().IsRegular() {
 			continue
