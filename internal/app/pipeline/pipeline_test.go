@@ -1487,11 +1487,6 @@ func TestRunOnce_PersistsStoreAfterProcessing(t *testing.T) {
 		rd, events, false)
 	p.store = store
 
-	// Seed in-memory store data that should be persisted after RunOnce.
-	if err := store.Set("seed_key", "seed_value"); err != nil {
-		t.Fatalf("store.Set: %v", err)
-	}
-
 	out, err := p.RunOnce(context.Background())
 	if err != nil {
 		t.Fatalf("RunOnce() error: %v", err)
@@ -1500,7 +1495,7 @@ func TestRunOnce_PersistsStoreAfterProcessing(t *testing.T) {
 		t.Errorf("RunOnce() = %+v, want Processed=1 Failed=0", out)
 	}
 
-	// Verify the store was persisted after processing (write-through).
+	// Verify processing history was persisted to the store after processing.
 	raw, err := os.ReadFile(storePath)
 	if err != nil {
 		t.Fatalf("read storage.json: %v", err)
@@ -1509,8 +1504,15 @@ func TestRunOnce_PersistsStoreAfterProcessing(t *testing.T) {
 	if err := json.Unmarshal(raw, &data); err != nil {
 		t.Fatalf("parse storage.json: %v", err)
 	}
-	if v, ok := data["seed_key"]; !ok || v != "seed_value" {
-		t.Errorf("storage.json missing seed_key with seed_value, got: %v", data)
+	found := false
+	for k := range data {
+		if strings.HasPrefix(k, "script_") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("storage.json missing script_* key after processing, keys: %v", data)
 	}
 	if err := store.Close(); err != nil {
 		t.Errorf("store.Close: %v", err)
