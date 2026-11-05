@@ -29,8 +29,8 @@ def write_handoff_marker(status_path, stage, problem, document, facts_mean=None,
     problem: problem directory name (e.g. 'phase-1-notification')
     document: relative document path that just passed (e.g. 'plan.md')
     """
-    next_stage_map = {"research": "plan", "plan": "implement", "implement": "none"}
-    next_doc_map = {"research": "plan.md", "plan": "implementation.md", "implement": "none"}
+    next_stage_map = {"research": "plan", "plan": "implement", "implement": "wrap-up", "wrap-up": "none"}
+    next_doc_map = {"research": "plan.md", "plan": "implementation.md", "implement": "none", "wrap-up": "none"}
     next_stage = next_stage_map.get(stage, "none")
     next_document = next_doc_map.get(stage, "none")
 

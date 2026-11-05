@@ -225,7 +225,9 @@ def main():
 
     if result["status"] == "valid":
         repo_root = research_path.parent.parent.parent
-        write_handoff_marker(repo_root / ".rpi-workflow.json", "research", research_path.parent.name, "research.md")
+        lines = load_lines(research_path)
+        f, a, r, mean = extract_far_scores(lines)
+        write_handoff_marker(repo_root / ".rpi-workflow.json", "research", research_path.parent.name, "research.md", facts_mean=mean)
 
     if json_output:
         print(json.dumps(result, indent=2))
