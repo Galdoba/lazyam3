@@ -59,7 +59,7 @@ func NewPipeline(opts Options) *Pipeline {
 	}
 	statusPath := ""
 	if opts.CFG.Storage.Path != "" {
-		statusPath = filepath.Join(filepath.Dir(opts.CFG.Storage.Path), "status.json")
+		statusPath = toSlash(filepath.Join(filepath.Dir(opts.CFG.Storage.Path), "status.json"))
 	}
 	pb := opts.PathBuilder
 	if pb.IsEmpty() {

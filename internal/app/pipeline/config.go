@@ -48,7 +48,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	// video/audio files will land after the script runs.
 	renderRoot := toSlash(executorPaths["target"])
 	if renderRoot == "" {
-		renderRoot = filepath.Join(toSlash(root), "target")
+		renderRoot = path.Join(toSlash(root), "target")
 	}
 
 	// Predict script destination uses the generator output directory.
