@@ -34,11 +34,11 @@ Integration points:
 
 ### Phase 4: Logger Consistency
 
-- [ ] In `internal/infra/logging/logger.go`, review `normalizePath()` at lines 407-413 to ensure it handles UNC paths and Windows drive letters consistently, matching the research findings
+- [x] In `internal/infra/logging/logger.go`, review `normalizePath()` at lines 407-413 to ensure it handles UNC paths and Windows drive letters consistently, matching the research findings
 
 ### Phase 5: PathBuilder Verification
 
-- [ ] Verify `internal/platform/pathbuilder.go` `Canonical()` method at lines 31-32 correctly uses `path.Join()` and `native()` at lines 26-28 correctly uses `filepath.Join()`; add edge-case tests for empty root, Windows drive letters, UNC paths
+- [x] Verify `internal/platform/pathbuilder.go` `Canonical()` method at lines 31-32 correctly uses `path.Join()` and `native()` at lines 26-28 correctly uses `filepath.Join()`; add edge-case tests for empty root, Windows drive letters, UNC paths
 
 ## Code References
 

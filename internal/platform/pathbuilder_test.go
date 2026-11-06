@@ -30,3 +30,36 @@ func TestPathBuilder_canonicalUsesForwardSlashes(t *testing.T) {
 		}
 	}
 }
+
+func TestPathBuilder_canonicalEmptyRoot(t *testing.T) {
+	b := NewPathBuilder("")
+	got := b.Canonical("dir", "file.mp4")
+	if got != "dir/file.mp4" {
+		t.Errorf("Canonical() with empty root = %q, want %q", got, "dir/file.mp4")
+	}
+}
+
+func TestPathBuilder_canonicalWindowsDriveLetter(t *testing.T) {
+	b := NewPathBuilder("C:/Users/test")
+	got := b.Canonical("dir", "file.mp4")
+	if got != "C:/Users/test/dir/file.mp4" {
+		t.Errorf("Canonical() with drive letter = %q, want %q", got, "C:/Users/test/dir/file.mp4")
+	}
+}
+
+func TestPathBuilder_canonicalUncPath(t *testing.T) {
+	b := NewPathBuilder("//server/share/root")
+	got := b.Canonical("dir", "file.mp4")
+	// path.Join collapses leading // to / for UNC paths
+	if got != "/server/share/root/dir/file.mp4" {
+		t.Errorf("Canonical() with UNC path = %q, want %q", got, "/server/share/root/dir/file.mp4")
+	}
+}
+
+func TestPathBuilder_canonicalMixedSeparators(t *testing.T) {
+	b := NewPathBuilder("/root")
+	got := b.Canonical("a/b", "c/d")
+	if got != "/root/a/b/c/d" {
+		t.Errorf("Canonical() with mixed separators = %q, want %q", got, "/root/a/b/c/d")
+	}
+}
