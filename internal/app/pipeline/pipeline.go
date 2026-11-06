@@ -234,6 +234,7 @@ func (p *Pipeline) captureProcessingHistory(matches []doneMatch) bool {
 		payload := m.payload
 		sn, _ := payload["script_name"].(string)
 		key := "script_" + sn
+		p.logger.Info("script executed", "name", sn+".sh") //TODO: need to refine logic of getting/passing script name
 		if err := p.store.Set(key, payload); err != nil {
 			p.logger.Warn("store set failed, aborting transaction", "key", key, "error", err)
 			abort = true
