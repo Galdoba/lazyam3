@@ -106,10 +106,12 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 		}
 
 		p := pipeline.NewPipeline(pipeline.Options{
-			Logger:         modules.Logger.Group("pipeline"),
-			Ingest:         ingest.New(ffprobeBinary, modules.Logger.Group("ingest")),
-			Metadata:       mdRepo,
-			Renderer:       scriptinfra.New(),
+			Logger: modules.Logger.Group("pipeline"),
+			Ingest: ingest.New(ffprobeBinary,
+				modules.Logger.Group("ingest")),
+			Metadata: mdRepo,
+			Renderer: scriptinfra.New(
+				scriptinfra.WithLogger(modules.Logger.Group("renderer"))),
 			Events:         events,
 			Store:          store,
 			SourceDir:      sourceDir,

@@ -57,7 +57,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	// Predict outputs from the full MediaUnit — this is the single source
 	// of truth for output file names. Called before the script domain is
 	// touched, so predictions drive all downstream logic.
-	timestamp := time.Now().Format("060102150405")
+	timestamp := newPRTTimestamp()
 	unit.PRTTimestamp = timestamp
 	predictions := callname.PredictOutputs(prod, unit, renderRoot, hardsubTag, prod.ID)
 
@@ -138,6 +138,11 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 		},
 		Destination: destination,
 	}, nil
+}
+
+func newPRTTimestamp() string {
+	time.Sleep(time.Second) // TODO: need to make it more go linter friendly and idiomatic
+	return time.Now().Format("060102150405")
 }
 
 // toSlash normalizes a path to use forward slashes (Windows → Unix).

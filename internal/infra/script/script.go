@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	dscript "github.com/Galdoba/lazyam3/internal/domain/script"
+	"github.com/Galdoba/lazyam3/internal/infra/logging"
 )
 
 // DefaultMode is the file mode used for rendered scripts unless overridden.
@@ -15,7 +16,8 @@ const DefaultMode os.FileMode = 0o755
 
 // Renderer materializes a built script as a usable file artifact.
 type Renderer struct {
-	mode os.FileMode
+	mode   os.FileMode
+	logger *logging.Logger
 }
 
 // Option configures a Renderer.
@@ -24,6 +26,11 @@ type Option func(*Renderer)
 // WithMode sets the file mode for written scripts.
 func WithMode(m os.FileMode) Option {
 	return func(r *Renderer) { r.mode = m }
+}
+
+// WithLogger sets the logger for renderer.
+func WithLogger(l *logging.Logger) Option {
+	return func(r *Renderer) { r.logger = l }
 }
 
 // New returns a Renderer with the given options.
@@ -48,5 +55,6 @@ func (r *Renderer) Render(sc dscript.Script) error {
 	if err := os.Chmod(sc.Destination, r.mode); err != nil {
 		return fmt.Errorf("set script mode %q: %w", sc.Destination, err)
 	}
+	r.logger.Info("script rendered", "path", sc.Destination)
 	return nil
 }
