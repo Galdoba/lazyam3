@@ -2,7 +2,7 @@ package script
 
 import (
 	"fmt"
-	"path/filepath"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -219,14 +219,14 @@ func buildSRTSection(srt string, predictions []callname.PredictedOutput) string 
 	// Find the directory from the first prediction (video).
 	predPath := firstVideoPath(predictions)
 	// Extract directory from prediction path.
-	dir := filepath.ToSlash(filepath.Dir(predPath))
+	dir := path.Dir(predPath)
 
 	// Use the subtitle prediction's filename as the destination,
 	// falling back to the input SRT filename if no subtitle prediction exists.
 	dstName := srt
 	for _, p := range predictions {
 		if p.MediaType == "subtitle" {
-			dstName = filepath.Base(p.Path)
+			dstName = path.Base(p.Path)
 			break
 		}
 	}
@@ -251,11 +251,11 @@ func buildHSUB(hsubFile, inProgress string, hsub HarsubConfig) string {
 	if hsubFile == "" {
 		return ""
 	}
-	path := hsubFile
+	resolvedPath := hsubFile
 	if inProgress != "" {
-		path = filepath.ToSlash(filepath.Join(inProgress, hsubFile))
+		resolvedPath = path.Join(inProgress, hsubFile)
 	}
-	return "subtitles=filename=" + path + ":" + hsub.FilterString()
+	return "subtitles=filename=" + resolvedPath + ":" + hsub.FilterString()
 }
 
 // buildHSUBMove generates the shell line to move the hardsub file from
@@ -290,7 +290,7 @@ func buildMKDirTarget(predictions []callname.PredictedOutput) string {
 	if len(predictions) == 0 {
 		return ""
 	}
-	dir := filepath.ToSlash(filepath.Dir(firstVideoPath(predictions)))
+	dir := path.Dir(firstVideoPath(predictions))
 	return `mkdir -p "` + dir + `"`
 }
 
@@ -300,13 +300,12 @@ func buildReadyFile(predictions []callname.PredictedOutput) string {
 	if len(predictions) == 0 {
 		return ""
 	}
-	path := firstVideoPath(predictions)
+	videoPath := firstVideoPath(predictions)
 	// Derive .ready filename from video path: replace .mp4 with .ready
-	base := filepath.Base(path)
-	ext := filepath.Ext(base)
+	base := path.Base(videoPath)
+	ext := path.Ext(base)
 	base = base[:len(base)-len(ext)]
-	readyPath := filepath.Join(filepath.Dir(path), base+".ready")
-	readyPath = filepath.ToSlash(readyPath)
+	readyPath := path.Join(path.Dir(videoPath), base+".ready")
 	return `touch "` + readyPath + `"`
 }
 

@@ -2,7 +2,7 @@ package callname
 
 import (
 	"fmt"
-	"path/filepath"
+	"path"
 	"slices"
 	"strings"
 
@@ -58,12 +58,10 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot,
 	// e.g. /mnt/ROOT/EDIT/Belaya_koroleva_s01
 	var targetDir string
 	if seasonDir != "" {
-		targetDir = filepath.Join(targetRoot, baseName+seasonDir)
+		targetDir = path.Join(targetRoot, baseName+seasonDir)
 	} else {
-		targetDir = filepath.Join(targetRoot, baseName)
+		targetDir = path.Join(targetRoot, baseName)
 	}
-	// Normalize to forward slashes for cross-platform compatibility
-	targetDir = filepath.ToSlash(targetDir)
 
 	// OUTBASE = baseName + nameTag + "_PRT" + timestamp + "_idN"
 	// (e.g. Belaya_koroleva_s01_01_PRT261001120000_id12345)
@@ -82,7 +80,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot,
 
 	// Video: always one output.
 	video := PredictedOutput{
-		Path:      filepath.ToSlash(filepath.Join(targetDir, outBase+"_HD.mp4")),
+		Path:      path.Join(targetDir, outBase+"_HD.mp4"),
 		MediaType: "video",
 		HsubFile:  hsubFile,
 	}
@@ -100,7 +98,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot,
 		}
 		layout := layoutTag(s.ChannelLayout)
 		outputs = append(outputs, PredictedOutput{
-			Path:       filepath.ToSlash(filepath.Join(targetDir, fmt.Sprintf("%s_HD_AUDIO%02d_%s%s.m4a", outBase, audioIdx, strings.ToUpper(lang), layout))),
+			Path:       path.Join(targetDir, fmt.Sprintf("%s_HD_AUDIO%02d_%s%s.m4a", outBase, audioIdx, strings.ToUpper(lang), layout)),
 			MediaType:  "audio",
 			Language:   lang,
 			Layout:     layout,
@@ -113,7 +111,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot,
 	for _, s := range streams {
 		if s.Kind == ingest.StreamKindSubtitle {
 			outputs = append(outputs, PredictedOutput{
-				Path:      filepath.ToSlash(filepath.Join(targetDir, outBase+"_HD.srt")),
+				Path:      path.Join(targetDir, outBase+"_HD.srt"),
 				MediaType: "subtitle",
 			})
 			break
@@ -219,5 +217,5 @@ func PredictScriptName(product metadata.Product, unit ingest.MediaUnit, targetRo
 		scriptName = baseName + "_" + nameTag + "_PRT" + timestamp
 	}
 
-	return filepath.ToSlash(filepath.Join(targetRoot, scriptName+".sh"))
+	return path.Join(targetRoot, scriptName+".sh")
 }
