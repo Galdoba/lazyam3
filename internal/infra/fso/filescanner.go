@@ -122,7 +122,7 @@ func scanDir(path string, dir *Directory, snap *Snapshot, opts *Options) {
 		return
 	}
 	for _, e := range entries {
-		full := filepath.Join(path, e.Name())
+		full := filepath.ToSlash(filepath.Join(path, e.Name()))
 
 		// Directories (do NOT follow symlinks — traversal without cycles).
 		if e.IsDir() {

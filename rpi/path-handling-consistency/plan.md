@@ -25,12 +25,12 @@ Integration points:
 
 ### Phase 2: Pipeline Config Normalization
 
-- [ ] In `internal/app/pipeline/config.go`, review the `toSlash()` function at lines 149-154 and ensure it consistently uses `filepath.ToSlash()`; verify all call sites (lines 49-55, 92-110) receive normalized paths; change line 51 `filepath.Join(toSlash(root), "target")` to `path.Join(toSlash(root), "target")` for consistency
-- [ ] In `internal/app/pipeline/pipeline.go`, normalize `statusPath` construction at line 62 to use forward slashes via `toSlash()` or `filepath.ToSlash()`
+- [x] In `internal/app/pipeline/config.go`, review the `toSlash()` function at lines 149-154 and ensure it consistently uses `filepath.ToSlash()`; verify all call sites (lines 49-55, 92-110) receive normalized paths; change line 51 `filepath.Join(toSlash(root), "target")` to `path.Join(toSlash(root), "target")` for consistency
+- [x] In `internal/app/pipeline/pipeline.go`, normalize `statusPath` construction at line 62 to use forward slashes via `toSlash()` or `filepath.ToSlash()`
 
 ### Phase 3: File Scanner Path Handling
 
-- [ ] In `internal/infra/fso/filescanner.go`, update `scanDir` at line 125 to normalize paths with forward slashes using `filepath.ToSlash(filepath.Join(path, e.Name()))`. Go's `os` functions accept forward slashes on Windows natively, so `filepath.FromSlash()` is NOT needed for OS calls.
+- [x] In `internal/infra/fso/filescanner.go`, update `scanDir` at line 125 to normalize paths with forward slashes using `filepath.ToSlash(filepath.Join(path, e.Name()))`. Go's `os` functions accept forward slashes on Windows natively, so `filepath.FromSlash()` is NOT needed for OS calls.
 
 ### Phase 4: Logger Consistency
 
