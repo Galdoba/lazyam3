@@ -1360,16 +1360,26 @@ func TestPipeline_StoreHistoryOnSuccess(t *testing.T) {
 	if pathExists(donePath) {
 		t.Errorf("done file %q should be consumed", donePath)
 	}
-	v, ok := store.Get("script_test")
-	if !ok {
-		t.Errorf("store should contain script_test key")
+	raw, err := os.ReadFile(storePath)
+	if err != nil {
+		t.Fatalf("read storage.json: %v", err)
 	}
-	payload, ok := v.(map[string]any)
-	if !ok {
-		t.Errorf("stored value is not a map: %v", v)
+	found := false
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		payload := map[string]any{}
+		if err := json.Unmarshal([]byte(line), &payload); err != nil {
+			t.Fatalf("parse jsonl line: %v", err)
+		}
+		if payload["script_name"] == "test" {
+			found = true
+			break
+		}
 	}
-	if payload["script_name"] != "test" {
-		t.Errorf("script_name = %v, want test", payload["script_name"])
+	if !found {
+		t.Errorf("no line with script_name=test found")
 	}
 	if err := store.Close(); err != nil {
 		t.Errorf("store.Close: %v", err)
@@ -1455,12 +1465,22 @@ func TestPipeline_StorageJsonAfterRunOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read storage.json: %v", err)
 	}
-	data := map[string]any{}
-	if err := json.Unmarshal(raw, &data); err != nil {
-		t.Fatalf("parse storage.json: %v", err)
+	found := false
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		payload := map[string]any{}
+		if err := json.Unmarshal([]byte(line), &payload); err != nil {
+			t.Fatalf("parse jsonl line: %v", err)
+		}
+		if payload["script_name"] == "test" {
+			found = true
+			break
+		}
 	}
-	if _, ok := data["script_test"]; !ok {
-		t.Errorf("storage.json missing script_test key: %v", data)
+	if !found {
+		t.Errorf("storage.json missing script with script_name=test: %v", string(raw))
 	}
 	if err := store.Close(); err != nil {
 		t.Errorf("store.Close: %v", err)

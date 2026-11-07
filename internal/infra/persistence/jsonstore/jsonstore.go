@@ -1,11 +1,9 @@
-// Package jsonstore is template of a simple key-value store persisted to a JSON file.
-// It emulates a database: Get/Set/Delete/Close methods match what a real
-// store would have, so swapping in a real database won't affect commands.
+// Package jsonstore is an append-only JSONL store. Each Set call appends a
+// single JSON line to the file. Reading is handled externally by consumers.
 package jsonstore
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -13,126 +11,64 @@ import (
 	"github.com/Galdoba/lazyam3/internal/infra/logging"
 )
 
-// Store is a thread-safe in-memory key-value store
-// that is flushed to a JSON file on Close/Save.
+// Store is a thread-safe append-only JSONL store.
+// Each Set call appends a single JSON line to the file.
 type Store struct {
 	path   string
-	mu     sync.RWMutex
-	data   map[string]any
-	closed bool
+	mu     sync.Mutex
+	file   *os.File
 	logger *logging.Logger
 }
 
-// New opens (or creates on first Save) the store at the given path.
-// If the file exists, data is loaded into memory.
+// New opens (or creates) the store at the given path in append mode.
 func New(path string, logger *logging.Logger) (*Store, error) {
 	if path == "" {
 		return nil, fmt.Errorf("store path is empty")
 	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open store file: %w", err)
+	}
 	s := &Store{
 		path:   path,
-		data:   make(map[string]any),
+		file:   file,
 		logger: logger,
-	}
-	if err := s.load(); err != nil {
-		return nil, err
 	}
 	return s, nil
 }
 
-func (s *Store) load() error {
-	raw, err := os.ReadFile(s.path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil // new empty store
-	}
-	if err != nil {
-		return fmt.Errorf("failed to read store file: %w", err)
-	}
-	if len(raw) == 0 {
-		return nil
-	}
-	if err := json.Unmarshal(raw, &s.data); err != nil {
-		return fmt.Errorf("failed to unmarshal store file: %w", err)
-	}
-	return nil
-}
-
-// Get returns the value and whether the key exists.
-func (s *Store) Get(key string) (any, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	v, ok := s.data[key]
-	return v, ok
-}
-
-// Set writes a value. Changes are in-memory; to persist,
-// call Save explicitly or rely on Close during Shutdown.
-func (s *Store) Set(key string, value any) error {
+// Set appends a value as a single JSON line.
+// The key parameter is retained for signature compatibility but not used.
+func (s *Store) Set(_ string, value any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed {
+	if s.file == nil {
 		return fmt.Errorf("store is closed")
 	}
-	s.data[key] = value
-	return nil
-}
-
-// Delete removes a key. Missing key is not an error.
-func (s *Store) Delete(key string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.data, key)
-}
-
-// Keys returns a slice of keys (order is not guaranteed).
-func (s *Store) Keys() []string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	keys := make([]string, 0, len(s.data))
-	for k := range s.data {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-// Len returns the number of entries.
-func (s *Store) Len() int {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return len(s.data)
-}
-
-// Save flushes the current contents to the file.
-func (s *Store) Save() error {
-	s.mu.RLock()
-	snapshot := make(map[string]any, len(s.data))
-	for k, v := range s.data {
-		snapshot[k] = v
-	}
-	s.mu.RUnlock()
-
-	raw, err := json.MarshalIndent(snapshot, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal store: %w", err)
-	}
-	if err := os.WriteFile(s.path, raw, 0o644); err != nil {
-		return fmt.Errorf("failed to write store file: %w", err)
-	}
-	if s.logger != nil {
-		s.logger.Debug("store saved entries", "count", len(s.data))
+	enc := json.NewEncoder(s.file)
+	if err := enc.Encode(value); err != nil {
+		return fmt.Errorf("failed to encode store entry: %w", err)
 	}
 	return nil
 }
 
-// Close saves data and marks the store as closed.
-// Idempotent.
+// Close syncs and closes the file. Idempotent.
 func (s *Store) Close() error {
-	if s == nil || s.closed {
+	if s == nil {
 		return nil
 	}
-	s.closed = true
-	if s.logger != nil {
-		s.logger.Debug("store closed and saved")
+	if s.file == nil {
+		return nil
 	}
-	return s.Save()
+	if s.logger != nil {
+		s.logger.Debug("store closed and synced")
+	}
+	if err := s.file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync store file: %w", err)
+	}
+	if err := s.file.Close(); err != nil {
+		return fmt.Errorf("failed to close store file: %w", err)
+	}
+	s.file = nil
+	return nil
 }

@@ -244,14 +244,6 @@ func (p *Pipeline) captureProcessingHistory(matches []doneMatch) bool {
 			p.logger.Debug("processing history stored", "key", key)
 		}
 	}
-	if !abort {
-		if err := p.store.Save(); err != nil {
-			p.logger.Warn("store save failed, aborting transaction", "error", err)
-			abort = true
-		} else if p.logger != nil {
-			p.logger.Debug("processing history saved")
-		}
-	}
 	return abort
 }
 
