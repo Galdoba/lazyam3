@@ -11,3 +11,4 @@
 | [0007](0007-configuration-loading.md) | Configuration Loading | accepted | 2026-11-07 | cross-package |
 | [0008](0008-event-system-design.md) | Event System Design | accepted | 2026-11-07 | cross-package |
 | [0009](0009-jsonl-append-semantics.md) | JSONL Append-Only Storage | accepted | 2026-11-08 | cross-package |
+| [0010](0010-monotonic-prt-timestamp-generator.md) | Monotonic PRT Timestamp Generator | accepted | 2026-11-08 | cross-package |

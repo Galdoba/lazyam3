@@ -44,6 +44,7 @@ The ingest domain transforms raw physical media files into structured, validated
 | **Rational** | A fraction (numerator / denominator) used for frame rate and duration. | "fraction", "ratio" |
 | **ValidationIssue** | A quality concern found during ingest (resolution, bitrate, duration, duplicates). | "warning", "alert" |
 | **Organizer** | Domain port interface for scanning a directory into a MediaUnit. | "ingester" (informal) |
+| **SyntheticID** | Fallback product ID (9999) assigned when a filename stem has no leading digits. | "synthetic ID" |
 | **Product ID** | Numeric identifier extracted from the beginning of a filename stem. | "ID", "product number" |
 | **File rank** | Ordering priority: video-containing=0, audio-only=1, subtitle-only=2, other=3. | "kind rank", "priority" |
 | **Sidecar** | External subtitle file (`.srt`, `.ass`, `.ssa`) that ffprobe cannot probe. | "external subtitle" |
@@ -96,7 +97,7 @@ The ingest domain transforms raw physical media files into structured, validated
 
 - **MediaUnit** — aggregate root. Represents one product across its physical files.
   - Key invariants: all files share the same Product ID; `Filenames[0]` is the primary media file (highest file rank).
-  - Fields: `ID` (int64), `Filenames` ([]string), `Streams` (map[string]Stream), `Validation` (ValidationIssues), `PRTTimestamp` (string, pipeline-provided).
+  - Fields: `ID` (int64), `Filenames` ([]string), `Streams` (map[string]Stream), `Validation` (ValidationIssues), `PRTTimestamp` (string, pipeline-provided), `Synthetic` (bool, true when ID was synthetically assigned).
   
 - **Stream** — describes a single media stream.
   - Key invariants: `coordinate()` uniquely identifies a stream within a unit; duration is stored as a Rational (milliseconds).
@@ -124,7 +125,7 @@ The ingest domain transforms raw physical media files into structured, validated
 
 ## 8. Acceptance Criteria
 
-- [ ] `ExtractID` correctly parses product IDs from filenames with various formats (numeric, underscore suffix, hyphen suffix, no extension) and rejects non-digit-prefixed stems.
+- [ ] `ExtractID` correctly parses product IDs from filenames with various formats (numeric, underscore suffix, hyphen suffix, no extension) and returns SyntheticID (9999) for non-digit-prefixed stems.
 - [ ] `ParseStreams` correctly maps ffprobe JSON to domain `Stream` objects for video, audio, and subtitle streams.
 - [ ] `ValidateMediaUnit` detects all validation rules: resolution below SD, low bitrate (video <100 kbps, audio <32 kbps), negative duration, duration inconsistency (>10%), and duplicate coordinates.
 - [ ] `NewMediaUnit` orders files by kind rank (video > audio > subtitle > data), filters data-only files, assigns `FileIndex`, and validates ID consistency.

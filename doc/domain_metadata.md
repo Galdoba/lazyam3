@@ -23,8 +23,9 @@ The metadata domain provides a catalog lookup service for resolving product IDs 
 ## 3. Boundaries & Interactions
 
 - **Inbound interactions:** 
-  - `New(path string) (*Repository, error)` — infrastructure constructor; reads, parses, and validates the JSON catalog. Fails fast on missing, broken, or empty files.
-  - `Repository.FindByID(id int64) (*Product, error)` — the domain port. Acquires a read lock, searches the tree, prunes, and flattens.
+  - `New(logger *logging.Logger, path string) (*Repository, error)` — infrastructure constructor; reads, parses, and validates the JSON catalog. Fails fast on missing, broken, or empty files.
+  - `ProductRepository.FindByID(id int64) (*Product, error)` — the domain port. Implemented by infrastructure `Repository.FindByID`, which acquires a read lock, searches the tree, prunes, and flattens.
+  - `Repository.Reload() (bool, error)` — infrastructure method that stats the metadata file and reloads if the modification time changed.
   - `Root.FindByID(id int64, d Descendants) (*Found, bool)` — pure tree search on the loaded JSON structure.
   - `FoundToProduct(*Found) *Product` — pure flattening function that maps a pruned subtree to a domain DTO.
 - **Outbound interactions:** 
@@ -148,8 +149,10 @@ The metadata domain provides a catalog lookup service for resolving product IDs 
 
 ## 9. Open Questions
 
-- [ ] Should the domain expose a `Product.WithPrimaryFile() Stream` convenience method, or should the application layer derive this from `Streams` by selecting the first video stream? (Currently not implemented.)
 - [ ] Should `PersonsItem` (directors, actors) be mapped to a field on `Product`, or is discarding them acceptable? Currently stored in JSON but never used.
 - [ ] The `int64` → `int` conversion for `SeasonNumber` and `EpisodeNumber` uses a direct `int(i)` cast, which could overflow on 32-bit systems for very large values. Should this use `int(i)` with a bounds check or switch to `int64` throughout?
-- [ ] Should `SeasonEp` be populated for `movie.episode` kinds as well, or is it intentionally exclusive to `series.season.episode`?
-- [ ] The movies-first search order means a movie and series sharing the same ID would resolve to the movie. Is this ordering intentional, or should it be configurable?
+
+## 9. Resolved Questions
+
+- [x] `SeasonEp` for `movie.episode` — resolved: `SeasonEp` is only set for `KindSeriesEpisode` in `FoundToProduct`; it is not set for `KindMovieEpisode`.
+- [x] Movies-first search order — resolved: movies are searched first in `Root.FindByID`, then series. The ordering is intentional, not configurable.

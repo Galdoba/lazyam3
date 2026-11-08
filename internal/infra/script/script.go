@@ -55,6 +55,8 @@ func (r *Renderer) Render(sc dscript.Script) error {
 	if err := os.Chmod(sc.Destination, r.mode); err != nil {
 		return fmt.Errorf("set script mode %q: %w", sc.Destination, err)
 	}
-	r.logger.Info("script rendered", "path", sc.Destination)
+	if r.logger != nil {
+		r.logger.Info("script rendered", "path", sc.Destination)
+	}
 	return nil
 }

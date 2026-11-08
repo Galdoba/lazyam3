@@ -1,8 +1,10 @@
 {
-  "current_problem": "storage-jsonl-appending",
+  "current_problem": "code-review-blockers",
   "last_completed_stage": "wrap-up",
-  "last_completed_document": "0009-jsonl-append-semantics.md",
-  "proposed_next_stage": "research",
-  "updated_at": "2026-11-08T00:30:00Z",
-  "proposed_next_document": "research.md"
+  "last_completed_document": "adr/0010-monotonic-prt-timestamp-generator.md",
+  "proposed_next_stage": "none",
+  "updated_at": "2026-11-08T05:08:57Z",
+  "proposed_next_document": "none",
+  "facts_mean": 4.8,
+  "tasks_count": 5
 }

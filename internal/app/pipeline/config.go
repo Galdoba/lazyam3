@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Galdoba/lazyam3/internal/domain/callname"
@@ -140,9 +141,21 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	}, nil
 }
 
+var prtMu sync.Mutex
+
+var lastPRTSec int64
+
 func newPRTTimestamp() string {
-	time.Sleep(time.Second) // TODO: need to make it more go linter friendly and idiomatic
-	return time.Now().Format("060102150405")
+	prtMu.Lock()
+	defer prtMu.Unlock()
+
+	sec := time.Now().Unix()
+	if sec <= lastPRTSec {
+		sec = lastPRTSec + 1
+	}
+	lastPRTSec = sec
+
+	return time.Unix(sec, 0).Format("060102150405")
 }
 
 // toSlash normalizes a path to use forward slashes (Windows → Unix).

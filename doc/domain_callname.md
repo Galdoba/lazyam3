@@ -46,8 +46,8 @@ The callname domain constructs self-documenting filenames for both input (source
 | **CallName** | The self-documenting filename string derived from `ScriptInput.String()`. | "renamed filename", "call filename" |
 | **PRT** | Pipeline Run Timestamp — a 12-digit UTC timestamp prefixed with "PRT" (e.g. `PRT260928200000`). | "pipeline timestamp", "run ID" |
 | **Base** | The transliterated `SeriesTitle` of the product, first character uppercase. | "show name", "title base" |
-| **SeasonTag** | Zero-padded season number (e.g. `"s01"`), or empty for movies. | "season identifier" |
-| **EpisodeTag** | Zero-padded episode number (e.g. `"e06"`), or empty for movies/seasons. | "episode identifier" |
+| **SeasonTag** | For input names, the combined season+episode tag (e.g. `"s01e26"`, `"s01"`, `"e06"`), or empty for movies. | "season identifier" |
+| **EpisodeTag** | Empty for input names (combined tag lives in `SeasonTag`). | "episode identifier (unused in input naming)" |
 | **FileTags** | Per-file suffixes extracted from the original filename (e.g. `["rus", "Russkii", "Forsirovannye"]`). | "filename tags", "file descriptors" |
 | **HSUB** | Hardsub file — a subtitle file whose name contains the configured hardsub tag. | "hard subtitle", "burned subtitle" |
 | **layoutTag** | Channel-layout suffix used in output filenames ("20"=stereo, "51"=5.1, "70"=7.1, "10"=mono). | "audio layout", "channel suffix" |
@@ -59,7 +59,7 @@ The callname domain constructs self-documenting filenames for both input (source
 - **Given** a `Product` with `SeriesTitle="Игра лицевых"`, `SeasonNumber=1`, `EpisodeNumber=26`
 - **And** a source file `12345.mp4` with timestamp `260928200000`
 - **When** `BuildInputName(product, "12345.mp4", "260928200000")` is called
-- **Then** a `ScriptInput` is returned with `Base="Igra_licevyh"`, `SeasonTag="s01"`, `EpisodeTag="e26"`, `PRT="PRT260928200000"`
+- **Then** a `ScriptInput` is returned with `Base="Igra_licevyh"`, `SeasonTag="s01e26"`, `EpisodeTag=""`, `PRT="PRT260928200000"`
 - **And** `String()` produces `"Igra_licevyh_s01e26_PRT260928200000_id12345.mp4"`
 
 ### Scenario 2: Build input names for a multi-file unit (video + external subtitle)
@@ -73,10 +73,10 @@ The callname domain constructs self-documenting filenames for both input (source
 - **Given** a `Product` (series, season 1, episode 1) and a `MediaUnit` with video, 2 audio streams (stereo Russian, 5.1 English), and 1 subtitle stream
 - **When** `PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "", 12345)` is called
 - **Then** 4 `PredictedOutput` entries are returned:
-  - Video: `/mnt/ROOT/EDIT/Show_s01/Show_s01_01_PRT261001120000_HD.mp4`
-  - Audio 0: `/mnt/ROOT/EDIT/Show_s01/Show_s01_01_PRT261001120000_HD_AUDIO00_RUS20.m4a`
-  - Audio 1: `/mnt/ROOT/EDIT/Show_s01/Show_s01_01_PRT261001120000_HD_AUDIO01_ENG51.m4a`
-  - Subtitle: `/mnt/ROOT/EDIT/Show_s01/Show_s01_01_PRT261001120000_HD.srt`
+  - Video: `/mnt/ROOT/EDIT/Show_s01/Show_s01_01_PRT261001120000_id12345_HD.mp4`
+  - Audio 0: `/mnt/ROOT/EDIT/Show_s01/Show_s01_01_PRT261001120000_id12345_HD_AUDIO00_RUS20.m4a`
+  - Audio 1: `/mnt/ROOT/EDIT/Show_s01/Show_s01_01_PRT261001120000_id12345_HD_AUDIO01_ENG51.m4a`
+  - Subtitle: `/mnt/ROOT/EDIT/Show_s01/Show_s01_01_PRT261001120000_id12345_HD.srt`
 
 ### Scenario 4: Predict output files for a movie (no season/episode)
 - **Given** a `Product` with `Kind="movie"`, `SeriesTitle="Movie Title"`
@@ -107,9 +107,9 @@ The callname domain constructs self-documenting filenames for both input (source
 ## 6. High-Level Data Model (Key Entities)
 
 - **ScriptInput** — DTO for building input call names.
-  - Fields: `ID` (int64), `Base` (string, transliterated SeriesTitle), `SeasonTag` (string, e.g. `"s01"`), `EpisodeTag` (string, e.g. `"e06"`), `PRT` (string, pipeline run timestamp), `OriginalName` (string, source filename), `FileTags` ([]string, per-file descriptors).
+  - Fields: `ID` (int64), `Base` (string, transliterated SeriesTitle), `SeasonTag` (string, combined season+episode tag for input names e.g. `"s01e26"`), `EpisodeTag` (string, always empty for input names), `PRT` (string, pipeline run timestamp), `OriginalName` (string, source filename), `FileTags` ([]string, per-file descriptors).
   - Key invariants: `ID > 0`, `Base != ""` (unless empty SeriesTitle), `PRT` matches `^PRT\d{12}$`, `FileTags` derived from filename stem after ID.
-  - `String()` assembles the call name: `{Base}_{SeasonTag}{EpisodeTag}_PRT{id}_id{ID}[-{FileTags}]{ext}`.
+  - `String()` assembles the call name: `{Base}_{SeasonTag}{EpisodeTag}_{PRT}_id{ID}[-{FileTags}]{ext}`.
 
 - **PredictedOutput** — DTO for a predicted rendering output file.
   - Fields: `Path` (string, full absolute path), `MediaType` (string: "video", "audio", "subtitle"), `Language` (string, IANA language tag), `Layout` (string, channel-layout suffix), `AudioIndex` (int, zero-based among audio outputs), `HsubFile` (string, hardsub subtitle filename for video).
@@ -119,11 +119,11 @@ The callname domain constructs self-documenting filenames for both input (source
 
 - **Translit subsystem** (`callname/translit/`) — Cyrillic transliteration engine.
   - `String(input, ...TranslitterOption) string` — main entry point, transliterates input using configurable options.
-  - `TranslitterOption` — functional options: `RegisterLow()` (lowercase, no title case), `RegisterHigh()` (uppercase), `KeepRegister()` (preserve case), `Short_SE_Form()` (convert `_1_sezon` → `_s1`), `KeepUnderscoreRepetitions()` (preserve consecutive underscores).
+  - `TranslitterOption` — functional options: `RegisterLow()` (lowercase, no title case), `RegisterHigh()` (uppercase), `KeepRegister()` (preserve case), `Short_SE_Form()` (convert `_1_sezon` → `_s1`), `KeepUnderscoreRepetitions()` (preserve case — misnamed; sets keepRegister like `KeepRegister()`).
   - `literals.go` — default map converting Cyrillic glyphs to Latin (а→a, б→b, в→v, etc.) and punctuation to underscores.
   - `options.go` — functional option pattern for configuring transliteration behavior.
 
-- **ExtractID** — pure function that parses the leading-digit product ID from a filename stem. Returns an error if no leading digits exist.
+- **ExtractID** — pure function that parses the leading-digit product ID from a filename stem. Returns `ingest.SyntheticID` (no error) if no leading digits exist.
 
 **Relationships:**
 - ScriptInput 1—1 PredictedOutput (both derive from Product + MediaUnit)
@@ -144,7 +144,7 @@ The callname domain constructs self-documenting filenames for both input (source
 - [ ] `BuildInputNames` maps all files in a MediaUnit, failing fast if any file produces an error.
 - [ ] `extractFileTags` correctly parses tags from filename stems (e.g. `"12345-rus_Russkii"` → `["rus", "Russkii"]`), handles empty stems, missing tags, and trailing underscores.
 - [ ] `ScriptInput.validate` rejects inputs with missing ID, empty Base, missing PRT, or invalid PRT format (not matching `^PRT\d{12}$`).
-- [ ] `ScriptInput.String()` assembles the correct call name format: `{Base}_{SeasonTag}{EpisodeTag}_PRT{id}_id{ID}[-{file_tags}]{ext}`.
+- [ ] `ScriptInput.String()` assembles the correct call name format: `{Base}_{SeasonTag}{EpisodeTag}_{PRT}_id{ID}[-{file_tags}]{ext}`.
 - [ ] `PredictOutputs` produces the correct number and type of outputs (1 video, N audio, 0/1 subtitle) for any MediaUnit.
 - [ ] `PredictOutputs` sorts streams deterministically by `(FileIndex, Index)` before generating predictions.
 - [ ] `PredictOutputs` correctly applies layout tags to audio filenames ("20", "51", "70", "10") based on `ingest.Layout`.
@@ -154,7 +154,7 @@ The callname domain constructs self-documenting filenames for both input (source
 - [ ] `PredictOutputs` for movies omits season/episode tags from directory and filename.
 - [ ] `deriveOutBase` correctly transliterates Cyrillic SeriesTitle to ASCII (e.g. "Игра лицевых" → "Igra_licevyh"), preserves Latin titles with first-character uppercase ("Test Show" → "Test_show").
 - [ ] `deriveNameTag` returns correct season/episode tag combinations: "s01e06", "s01", "e06", or "" (movie).
-- [ ] `ExtractID` parses leading digits from filenames, handles extensions, and rejects non-digit-prefixed names.
+- [ ] `ExtractID` parses leading digits from filenames, handles extensions, and returns `ingest.SyntheticID` (not an error) for non-digit-prefixed names.
 - [ ] `NewPRT` generates timestamps in `PRTYYMMDDHHmmss` format matching the regex `^PRT\d{12}$`.
 - [ ] Translit subsystem: `String()` correctly transliterates Cyrillic titles, applies title case by default, squashes consecutive underscores, and respects functional options.
 - [ ] Integration tests pass for all synthetic scenarios: series episode, movie, season-only, multi-audio, hardsub, empty base.

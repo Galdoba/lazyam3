@@ -33,7 +33,7 @@ The script domain generates bash/ffmpeg rendering scripts from structured inputs
 - **Dependencies:**
   - `domain/script` imports `domain/ingest` (for `Stream`, `StreamKind`, `Layout` types).
   - `domain/script` imports `domain/metadata` (for `Product` type).
-  - `domain/script` imports `callname` (for `PredictedOutput` type).
+  - `domain/script` imports `domain/callname` (for `PredictedOutput` type).
 
 ## 4. Ubiquitous Language
 
@@ -43,13 +43,13 @@ The script domain generates bash/ffmpeg rendering scripts from structured inputs
 | **Script** | The rendered bash script ready to be written to disk. Contains `Destination` path and `Content` (bash text). | "rendering script", "output script" |
 | **Environment** | Filesystem paths used by the generated script (buffer, in_progress, done, notifications, target root, archive). | "env", "paths" |
 | **StreamSelection** | Rules for selecting specific streams from input files. | "stream filter", "selection" |
-| **PredictedOutput** | A predicted output file with `SourceFile`, `Directory`, `Filename`, and `IsVideo` fields. Produced by callname. | "prediction", "output prediction" |
+| **PredictedOutput** | A predicted output file with `Path`, `MediaType`, `Language`, `Layout`, `AudioIndex`, and `HsubFile` fields. Produced by callname. | "prediction", "output prediction" |
 | **audioTrack** | Internal representation of a selected audio track for filter generation. | "audio track" (internal) |
 | **Renderer** | Domain port interface: `Render(Script) error`. Implemented by infrastructure. | "renderer port", "materializer" |
 | **Placeholder** | Template substitution token in `|=key=|` format. All placeholders must be resolved before the script is returned. | "template token", "variable" |
 | **HSUB** | Hardsub subtitle — an `.srt` file burned into video using ffmpeg's `subtitles=` filter. Detected via config tag. | "hardsub", "burned subtitle" |
 | **SRT** | External subtitle file (`.srt`, `.ass`, `.ssa`) copied alongside rendered video. Not burned in. | "soft subtitle", "external subtitle" |
-| **Layout** | Audio channel configuration: `stereo`, `surround51`, `surround71`, `mono`. Maps to a numeric suffix for output filenames. | "channel layout", "audio layout" |
+| **Layout** | Audio channel configuration: `stereo`, `mono`, `5.1`, `7.1`. Maps to a numeric suffix for output filenames. | "channel layout", "audio layout" |
 | **YADIF** | "Yet Another DeInterlaced Filter" — applied when any video stream is interlaced. | "deinterlace", "yadif filter" |
 | **Ready file** | A `.ready` marker file placed in the output directory after rendering (e.g., `Show_HD.ready`). | "marker", "completion signal" |
 
@@ -119,19 +119,22 @@ The script domain generates bash/ffmpeg rendering scripts from structured inputs
 
 - **ScriptConfig** — aggregate input DTO. Assembled by the application layer from ingest, metadata, callname, and environment sources.
   - Key invariants: at least one video stream required; selections must reference existing streams; destination and environment paths must be non-empty.
-  - Fields: `Filenames` ([]string), `Streams` ([]ingest.Stream), `SRT` (string), `HSUBFile` (string), `Product` (metadata.Product), `StreamSelections` ([]StreamSelection), `Predictions` ([]callname.PredictedOutput), `CallNames` (map[string]string), `NameTag` (string), `SeasonDir` (string), `PRTTimestamp` (string), `Env` (Environment), `Destination` (string).
+  - Fields: `Filenames` ([]string), `Streams` ([]ingest.Stream), `SRT` (string), `HSUBFile` (string), `Product` (metadata.Product), `StreamSelections` ([]StreamSelection), `Predictions` ([]callname.PredictedOutput), `CallNames` (map[string]string), `NameTag` (string), `SeasonDir` (string), `PRTTimestamp` (string), `Env` (Environment), `Destination` (string), `ScriptName` (string), `FfmpegBinary` (string), `Harsub` (HarsubConfig).
 
 - **Script** — output DTO. The rendered bash script.
   - Fields: `Destination` (string), `Content` (string).
 
 - **Environment** — filesystem paths used by the generated script.
-  - Fields: `Buffer`, `InProgress`, `Done`, `Notifications`, `Archive`, `TargetRoot` (all string), `Priority` (int).
+  - Fields: `Buffer`, `InProgress`, `Done`, `Notifications`, `Archive`, `TargetRoot`, `MetadataDir` (all string), `Priority` (int).
 
 - **StreamSelection** — rules for selecting specific streams.
   - Fields: `InputIndex` (int), `StreamIndex` (int), `Kind` (string: "v", "a", or "s").
 
 - **audioTrack** — internal helper for audio filter generation.
   - Fields: `StreamIndex` (int), `Language` (string), `Layout` (string), `Suffix` (string, e.g., "AUDIO_00_RUS20").
+
+- **HarsubConfig** — hardsub burn-in parameters for the ffmpeg subtitles filter. Zero values fall back to built-in defaults.
+  - Fields: `OriginalSize`, `FontName`, `FontSize`, `PrimaryColour`, `SecondaryColour`, `OutlineColour`, `BackColour`, `Underline`, `StrikeOut`, `ScaleX`, `ScaleY`, `Spacing`, `Angle`, `BorderStyle`, `Outline`, `Shadow`, `Alignment`, `MarginL`, `MarginR`, `MarginV`, `Encoding`. Has `FilterString()` method returning the ffmpeg subtitles filter string.
 
 - **Renderer** — domain port interface: `Render(Script) error`. Implemented by infrastructure (creates parent directories, writes file, sets permissions to 0o755).
 
