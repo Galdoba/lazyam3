@@ -1,10 +1,9 @@
 {
-  "current_problem": "code-review-blockers",
-  "last_completed_stage": "wrap-up",
-  "last_completed_document": "adr/0010-monotonic-prt-timestamp-generator.md",
-  "proposed_next_stage": "none",
-  "updated_at": "2026-11-08T05:08:57Z",
-  "proposed_next_document": "none",
-  "facts_mean": 4.8,
-  "tasks_count": 5
+  "current_problem": "app-infra-coupling",
+  "last_completed_stage": "research",
+  "last_completed_document": "research.md",
+  "proposed_next_stage": "plan",
+  "updated_at": "2026-11-08T07:45:11Z",
+  "proposed_next_document": "plan.md",
+  "facts_mean": 4.33
 }
