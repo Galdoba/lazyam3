@@ -45,7 +45,7 @@ func TestPredictOutputs(t *testing.T) {
 		},
 	}
 
-	outputs := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "hardsub", 12345)
+	outputs := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "hardsub")
 
 	if len(outputs) != 4 {
 		t.Fatalf("PredictOutputs() returned %d outputs, want 4 (video + 2 audio + 1 subtitle)", len(outputs))
@@ -109,7 +109,7 @@ func TestPredictOutputs_Movie(t *testing.T) {
 		},
 	}
 
-	outputs := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "", 999)
+	outputs := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "")
 
 	if len(outputs) != 2 {
 		t.Fatalf("PredictOutputs() returned %d outputs, want 2 (video + 1 audio)", len(outputs))
@@ -144,7 +144,7 @@ func TestPredictOutputs_OnlySeason(t *testing.T) {
 		},
 	}
 
-	outputs := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "", 100)
+	outputs := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "")
 
 	if len(outputs) == 0 {
 		t.Fatal("PredictOutputs() returned no outputs")
@@ -229,7 +229,7 @@ func TestPredictOutputs_HSUBDetection(t *testing.T) {
 		},
 	}
 
-	outputs := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "hardsub", 12345)
+	outputs := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "hardsub")
 	if len(outputs) == 0 {
 		t.Fatal("PredictOutputs() returned no outputs")
 	}
@@ -330,7 +330,7 @@ func TestPredictOutputs_DefaultAudioLang(t *testing.T) {
 		},
 	}
 
-	outputs := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "", 12345)
+	outputs := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "")
 
 	if len(outputs) < 2 {
 		t.Fatal("PredictOutputs() returned too few outputs")
@@ -362,7 +362,7 @@ func TestPredictOutputs_EmptyBase(t *testing.T) {
 		},
 	}
 
-	outputs := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "", 12345)
+	outputs := PredictOutputs(product, unit, "/mnt/ROOT/EDIT", "")
 
 	if len(outputs) == 0 {
 		t.Fatal("PredictOutputs() returned no outputs")

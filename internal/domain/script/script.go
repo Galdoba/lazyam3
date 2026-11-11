@@ -329,7 +329,7 @@ func derivePredictionsFromStreams(product metadata.Product, streams []ingest.Str
 		Streams:      streamMap,
 		PRTTimestamp: prtTimestamp,
 	}
-	return callname.PredictOutputs(product, unit, targetRoot, "", product.ID)
+	return callname.PredictOutputs(product, unit, targetRoot, "")
 }
 
 // firstVideoPath returns the path of the first video prediction, or the first

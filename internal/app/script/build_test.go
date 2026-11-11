@@ -89,7 +89,7 @@ func realConfig(t *testing.T) (dscript.ScriptConfig, string, string) {
 
 	// Predict outputs (drives naming).
 	unit.PRTTimestamp = timestamp
-	predictions := callname.PredictOutputs(*prod, unit, filepath.Join(envRoot, "target"), "", prod.ID)
+	predictions := callname.PredictOutputs(*prod, unit, filepath.Join(envRoot, "target"), "")
 
 	// Resolve SRT/HSUB to call names.
 	srtOrig := "12254-rus_Russkii.srt"

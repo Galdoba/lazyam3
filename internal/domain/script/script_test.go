@@ -603,11 +603,6 @@ func TestDerivePredictionsFromStreams(t *testing.T) {
 		t.Errorf("first prediction MediaType = %q, want 'video'", preds[0].MediaType)
 	}
 
-	// Check that product ID is embedded in output path (via _id12254)
-	if !strings.Contains(preds[0].Path, "_id12254") {
-		t.Errorf("prediction path does not contain product ID: %q", preds[0].Path)
-	}
-
 	// Check season directory prefix
 	if !strings.Contains(preds[0].Path, "_s01") {
 		t.Errorf("prediction path does not contain season tag: %q", preds[0].Path)
@@ -643,14 +638,14 @@ func TestBuildScript(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           12254,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 12254)
+	}, "/mnt/ROOT/EDIT", "")
 
 	cfg := ScriptConfig{
 		Filenames:    []string{"12254.mp4"},
 		Streams:      []ingest.Stream{videoStream, audioStream},
 		Product:      prod,
 		Predictions:  preds,
-		CallNames:    map[string]string{"12254.mp4": "Arliss_s01e06_PRT261023110725_id12254.mp4"},
+		CallNames:    map[string]string{"12254.mp4": "Arliss_s01e06_PRT261023110725.mp4"},
 		NameTag:      "_s01e06",
 		SeasonDir:    "_s01",
 		PRTTimestamp: "261023110725",
@@ -711,15 +706,15 @@ func TestBuildScript_WithSRT(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           12254,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 12254)
+	}, "/mnt/ROOT/EDIT", "")
 
 	cfg := ScriptConfig{
 		Filenames:    []string{"12254.mp4", "12254-rus.srt"},
 		Streams:      []ingest.Stream{videoStream, srtStream},
-		SRT:          "Arliss_s01e06_PRT261023110725_id12254_rus_Russkii.srt",
+		SRT:          "Arliss_s01e06_PRT261023110725_rus_Russkii.srt",
 		Product:      prod,
 		Predictions:  preds,
-		CallNames:    map[string]string{"12254.mp4": "Arliss_s01e06_PRT261023110725_id12254.mp4"},
+		CallNames:    map[string]string{"12254.mp4": "Arliss_s01e06_PRT261023110725.mp4"},
 		NameTag:      "_s01e06",
 		SeasonDir:    "_s01",
 		PRTTimestamp: "261023110725",
@@ -762,15 +757,15 @@ func TestBuildScript_WithHSUB(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           12254,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 12254)
+	}, "/mnt/ROOT/EDIT", "")
 
 	cfg := ScriptConfig{
 		Filenames:   []string{"12254.mp4"},
 		Streams:     []ingest.Stream{videoStream},
-		HSUBFile:    "Arliss_s01e06_PRT261023110725_id12254_hardsub.srt",
+		HSUBFile:    "Arliss_s01e06_PRT261023110725_hardsub.srt",
 		Product:     prod,
 		Predictions: preds,
-		CallNames:   map[string]string{"12254.mp4": "Arliss_s01e06_PRT261023110725_id12254.mp4"},
+		CallNames:   map[string]string{"12254.mp4": "Arliss_s01e06_PRT261023110725.mp4"},
 		NameTag:     "_s01e06",
 		SeasonDir:   "_s01",
 		Env: Environment{
@@ -809,14 +804,14 @@ func TestBuildScript_WithInterlaced(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           12254,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 12254)
+	}, "/mnt/ROOT/EDIT", "")
 
 	cfg := ScriptConfig{
 		Filenames:    []string{"12254.mp4"},
 		Streams:      []ingest.Stream{videoStream},
 		Product:      prod,
 		Predictions:  preds,
-		CallNames:    map[string]string{"12254.mp4": "Arliss_s01e06_PRT261023110725_id12254.mp4"},
+		CallNames:    map[string]string{"12254.mp4": "Arliss_s01e06_PRT261023110725.mp4"},
 		NameTag:      "_s01e06",
 		SeasonDir:    "_s01",
 		PRTTimestamp: "261023110725",
@@ -859,7 +854,7 @@ func TestBuildScript_DerivePredictionsFallback(t *testing.T) {
 		Filenames:    []string{"99.mp4"},
 		Streams:      []ingest.Stream{videoStream, audioStream},
 		Product:      prod,
-		CallNames:    map[string]string{"99.mp4": "TestShow_s02e03_PRT261023110725_id99.mp4"},
+		CallNames:    map[string]string{"99.mp4": "TestShow_s02e03_PRT261023110725.mp4"},
 		NameTag:      "_s02e03",
 		SeasonDir:    "_s02",
 		PRTTimestamp: "261023110725",
@@ -961,15 +956,15 @@ func TestBuildScript_OutputElements(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           42,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 42)
+	}, "/mnt/ROOT/EDIT", "")
 
 	cfg := ScriptConfig{
 		Filenames:    []string{"42.mp4", "42-rus.srt"},
 		Streams:      []ingest.Stream{videoStream, audioStream, srtStream},
-		SRT:          "TestShow_s01e01_PRT261023110725_id42_rus_Russkii.srt",
+		SRT:          "TestShow_s01e01_PRT261023110725_rus_Russkii.srt",
 		Product:      prod,
 		Predictions:  preds,
-		CallNames:    map[string]string{"42.mp4": "TestShow_s01e01_PRT261023110725_id42.mp4", "42-rus.srt": "TestShow_s01e01_PRT261023110725_id42_rus_Russkii.srt"},
+		CallNames:    map[string]string{"42.mp4": "TestShow_s01e01_PRT261023110725.mp4", "42-rus.srt": "TestShow_s01e01_PRT261023110725_rus_Russkii.srt"},
 		NameTag:      "_s01e01",
 		SeasonDir:    "_s01",
 		PRTTimestamp: "261023110725",
@@ -1038,7 +1033,7 @@ func TestBuildScript_EnvironmentVariables(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           1,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 1)
+	}, "/mnt/ROOT/EDIT", "")
 
 	env := Environment{
 		Buffer:        "/custom/buffer",
@@ -1055,7 +1050,7 @@ func TestBuildScript_EnvironmentVariables(t *testing.T) {
 		Streams:      []ingest.Stream{videoStream},
 		Product:      prod,
 		Predictions:  preds,
-		CallNames:    map[string]string{"1.mp4": "EnvTest_s01e01_PRT261023110725_id1.mp4"},
+		CallNames:    map[string]string{"1.mp4": "EnvTest_s01e01_PRT261023110725.mp4"},
 		NameTag:      "_s01e01",
 		SeasonDir:    "_s01",
 		PRTTimestamp: "261023110725",
@@ -1199,14 +1194,14 @@ func TestBuildScript_MultipleAudioTracks(t *testing.T) {
 			"[0:a:1]": audio2,
 		},
 	}
-	preds := callname.PredictOutputs(prod, mediaUnit, "/mnt/ROOT/EDIT", "", 200)
+	preds := callname.PredictOutputs(prod, mediaUnit, "/mnt/ROOT/EDIT", "")
 
 	cfg := ScriptConfig{
 		Filenames:    []string{"200.mp4"},
 		Streams:      []ingest.Stream{videoStream, audio1, audio2},
 		Product:      prod,
 		Predictions:  preds,
-		CallNames:    map[string]string{"200.mp4": "MultiLang_s01e01_PRT261023110725_id200.mp4"},
+		CallNames:    map[string]string{"200.mp4": "MultiLang_s01e01_PRT261023110725.mp4"},
 		NameTag:      "_s01e01",
 		SeasonDir:    "_s01",
 		PRTTimestamp: "261023110725",
@@ -1319,14 +1314,14 @@ func TestBuildScript_PredictableOutput(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           300,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 300)
+	}, "/mnt/ROOT/EDIT", "")
 
 	cfg1 := ScriptConfig{
 		Filenames:    []string{"300.mp4"},
 		Streams:      []ingest.Stream{videoStream},
 		Product:      prod,
 		Predictions:  preds,
-		CallNames:    map[string]string{"300.mp4": "Deterministic_s01e01_PRT261023110725_id300.mp4"},
+		CallNames:    map[string]string{"300.mp4": "Deterministic_s01e01_PRT261023110725.mp4"},
 		NameTag:      "_s01e01",
 		SeasonDir:    "_s01",
 		PRTTimestamp: "261023110725",
@@ -1373,14 +1368,14 @@ func TestBuildScript_ReadyFilePath(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           400,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 400)
+	}, "/mnt/ROOT/EDIT", "")
 
 	cfg := ScriptConfig{
 		Filenames:    []string{"400.mp4"},
 		Streams:      []ingest.Stream{videoStream},
 		Product:      prod,
 		Predictions:  preds,
-		CallNames:    map[string]string{"400.mp4": "ReadyTest_s01e01_PRT261023110725_id400.mp4"},
+		CallNames:    map[string]string{"400.mp4": "ReadyTest_s01e01_PRT261023110725.mp4"},
 		NameTag:      "_s01e01",
 		SeasonDir:    "_s01",
 		PRTTimestamp: "261023110725",
@@ -1458,7 +1453,7 @@ func TestBuildScript_EmptyPredictionsFallback(t *testing.T) {
 		Filenames:    []string{"500.mp4"},
 		Streams:      []ingest.Stream{videoStream, audioStream},
 		Product:      prod,
-		CallNames:    map[string]string{"500.mp4": "FallbackTest_s01e01_PRT261023110725_id500.mp4"},
+		CallNames:    map[string]string{"500.mp4": "FallbackTest_s01e01_PRT261023110725.mp4"},
 		NameTag:      "_s01e01",
 		SeasonDir:    "_s01",
 		PRTTimestamp: "261023110725",
@@ -1504,14 +1499,14 @@ func TestBuildScript_MovieProduct(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           600,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 600)
+	}, "/mnt/ROOT/EDIT", "")
 
 	cfg := ScriptConfig{
 		Filenames:    []string{"600.mp4"},
 		Streams:      []ingest.Stream{videoStream},
 		Product:      prod,
 		Predictions:  preds,
-		CallNames:    map[string]string{"600.mp4": "MovieTitle_PRT261023110725_id600.mp4"},
+		CallNames:    map[string]string{"600.mp4": "MovieTitle_PRT261023110725.mp4"},
 		NameTag:      "",
 		SeasonDir:    "",
 		PRTTimestamp: "261023110725",
@@ -1559,7 +1554,7 @@ func TestBuildScript_EnvironmentVariables_Unique(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           700,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 700)
+	}, "/mnt/ROOT/EDIT", "")
 
 	// Use paths that are unlikely to appear by accident
 	cfg := ScriptConfig{
@@ -1567,7 +1562,7 @@ func TestBuildScript_EnvironmentVariables_Unique(t *testing.T) {
 		Streams:      []ingest.Stream{videoStream},
 		Product:      prod,
 		Predictions:  preds,
-		CallNames:    map[string]string{"700.mp4": "EnvUnique_s01e01_PRT261023110725_id700.mp4"},
+		CallNames:    map[string]string{"700.mp4": "EnvUnique_s01e01_PRT261023110725.mp4"},
 		NameTag:      "_s01e01",
 		SeasonDir:    "_s01",
 		PRTTimestamp: "261023110725",
@@ -1625,9 +1620,9 @@ func TestBuildScript_CallNamesUsed(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           800,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 800)
+	}, "/mnt/ROOT/EDIT", "")
 
-	callName := "CallNameTest_s01e01_PRT261023110725_id800.mp4"
+	callName := "CallNameTest_s01e01_PRT261023110725.mp4"
 	cfg := ScriptConfig{
 		Filenames:    []string{"original_800.mp4"},
 		Streams:      []ingest.Stream{videoStream},
@@ -1682,14 +1677,14 @@ func TestBuildScript_ReadyFile_DirectoryMatch(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           900,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 900)
+	}, "/mnt/ROOT/EDIT", "")
 
 	cfg := ScriptConfig{
 		Filenames:    []string{"900.mp4"},
 		Streams:      []ingest.Stream{videoStream},
 		Product:      prod,
 		Predictions:  preds,
-		CallNames:    map[string]string{"900.mp4": "ReadyDirTest_s01e01_PRT261023110725_id900.mp4"},
+		CallNames:    map[string]string{"900.mp4": "ReadyDirTest_s01e01_PRT261023110725.mp4"},
 		NameTag:      "_s01e01",
 		SeasonDir:    "_s01",
 		PRTTimestamp: "261023110725",
@@ -1730,9 +1725,9 @@ func TestBuildScript_FfmpegBinary(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           900,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 900)
+	}, "/mnt/ROOT/EDIT", "")
 
-	callName := "FfmpegTest_s01e01_PRT261023110725_id900.mp4"
+	callName := "FfmpegTest_s01e01_PRT261023110725.mp4"
 
 	// Custom ffmpeg path
 	cfg := ScriptConfig{
@@ -1780,9 +1775,9 @@ func TestBuildScript_FfmpegBinaryFallback(t *testing.T) {
 	preds := callname.PredictOutputs(prod, ingest.MediaUnit{
 		ID:           950,
 		PRTTimestamp: "261023110725",
-	}, "/mnt/ROOT/EDIT", "", 950)
+	}, "/mnt/ROOT/EDIT", "")
 
-	callName := "FfmpegFallback_s01e01_PRT261023110725_id950.mp4"
+	callName := "FfmpegFallback_s01e01_PRT261023110725.mp4"
 
 	// Empty ffmpeg binary — should fallback to "ffmpeg"
 	cfg := ScriptConfig{

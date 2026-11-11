@@ -32,8 +32,7 @@ type PredictedOutput struct {
 // produce for the given media unit.  It derives the same naming logic
 // as the script domain (video, audio, SRT) without depending on it.
 // hardsubTag is a filename substring that marks sidecar subtitles as hardsub.
-// prodID is the product ID, used in output filenames as _idN.
-func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot, hardsubTag string, prodID int64) []PredictedOutput {
+func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot, hardsubTag string) []PredictedOutput {
 	streams := make([]ingest.Stream, 0, len(unit.Streams))
 	for _, s := range unit.Streams {
 		streams = append(streams, s)
@@ -63,14 +62,11 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot,
 		targetDir = path.Join(targetRoot, baseName)
 	}
 
-	// OUTBASE = baseName + nameTag + "_PRT" + timestamp + "_idN"
-	// (e.g. Belaya_koroleva_s01_01_PRT261001120000_id12345)
+	// OUTBASE = baseName + nameTag + "_PRT" + timestamp
+	// (e.g. Belaya_koroleva_s01_01_PRT261001120000)
 	outBase := baseName + nameTag
 	if unit.PRTTimestamp != "" {
 		outBase = outBase + "_PRT" + unit.PRTTimestamp
-	}
-	if prodID > 0 {
-		outBase += fmt.Sprintf("_id%d", prodID)
 	}
 
 	// Detect hardsub: a subtitle file whose name contains the hardsub tag.

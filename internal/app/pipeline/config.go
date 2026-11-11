@@ -60,7 +60,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	// touched, so predictions drive all downstream logic.
 	timestamp := newPRTTimestamp()
 	unit.PRTTimestamp = timestamp
-	predictions := callname.PredictOutputs(prod, unit, renderRoot, hardsubTag, prod.ID)
+	predictions := callname.PredictOutputs(prod, unit, renderRoot, hardsubTag)
 
 	// Build call names for all unit files (original filename → call name).
 	callNames, err := callname.BuildInputNames(prod, unit.Filenames, timestamp)

@@ -24,7 +24,7 @@ func TestScriptInput_String(t *testing.T) {
 				OriginalName: "12345.mp4",
 				FileTags:     []string{"rus", "Russkii", "Forsirovannye"},
 			},
-			expected: "Igra_lzhecov_s01e26_PRT260928200000_id12345-rus_Russkii_Forsirovannye.mp4",
+			expected: "Igra_lzhecov_s01e26_PRT260928200000-rus_Russkii_Forsirovannye.mp4",
 		},
 		{
 			name: "no season/episode, no file tags",
@@ -34,7 +34,7 @@ func TestScriptInput_String(t *testing.T) {
 				PRT:          "PRT261001120000",
 				OriginalName: "999.mkv",
 			},
-			expected: "Movie_PRT261001120000_id999.mkv",
+			expected: "Movie_PRT261001120000.mkv",
 		},
 		{
 			name: "with file tags only",
@@ -47,7 +47,7 @@ func TestScriptInput_String(t *testing.T) {
 				OriginalName: "100-video.mp4",
 				FileTags:     []string{"eng", "original"},
 			},
-			expected: "Show_s02e05_PRT261015080000_id100-eng_original.mp4",
+			expected: "Show_s02e05_PRT261015080000-eng_original.mp4",
 		},
 		{
 			name: "only season tag, no episode",
@@ -57,7 +57,7 @@ func TestScriptInput_String(t *testing.T) {
 				SeasonTag: "s03",
 				PRT:       "PRT261020000000",
 			},
-			expected: "Series_s03_PRT261020000000_id50",
+			expected: "Series_s03_PRT261020000000",
 		},
 		{
 			name: "only episode tag, no season",
@@ -67,17 +67,17 @@ func TestScriptInput_String(t *testing.T) {
 				EpisodeTag: "e10",
 				PRT:        "PRT261020000000",
 			},
-			expected: "Series_e10_PRT261020000000_id50",
+			expected: "Series_e10_PRT261020000000",
 		},
 		{
 			name:     "empty base with season/episode",
 			input:    ScriptInput{},
-			expected: "__id0",
+			expected: "_",
 		},
 		{
 			name:     "empty base produces flat output",
 			input:    ScriptInput{ID: 12345, PRT: "PRT260928200000", OriginalName: "12345.mp4"},
-			expected: "_PRT260928200000_id12345.mp4",
+			expected: "_PRT260928200000.mp4",
 		},
 	}
 

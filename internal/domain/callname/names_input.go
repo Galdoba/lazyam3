@@ -7,9 +7,9 @@
 // Examples
 // ScriptInput
 // original_names: [12345.mp4, 12345-rus_Russkii_Forsirovannye.srt]
-// Igra_lzhecov_s01e26_PRT260928200000_id12345.mp4
-// Igra_lzhecov_s01e26_PRT260928200000_id12345-rus_Russkii_Forsirovannye.srt
-// Igra_lzhecov_s01e26_PRT260928200000_id{original_name}//
+// Igra_lzhecov_s01e26_PRT260928200000.mp4
+// Igra_lzhecov_s01e26_PRT260928200000-rus_Russkii_Forsirovannye.srt
+// Igra_lzhecov_s01e26_PRT260928200000//
 package callname
 
 import (
@@ -39,7 +39,6 @@ func (si ScriptInput) String() string {
 		s += "_" + si.SeasonTag + si.EpisodeTag
 	}
 	s += "_" + si.PRT
-	s += fmt.Sprintf("_id%d", si.ID)
 	if len(si.FileTags) > 0 {
 		s += "-" + strings.Join(si.FileTags, "_")
 	}
