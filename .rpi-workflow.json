@@ -1,9 +1,8 @@
 {
-  "current_problem": "app-infra-coupling",
-  "last_completed_stage": "research",
-  "last_completed_document": "research.md",
-  "proposed_next_stage": "plan",
-  "updated_at": "2026-11-08T07:45:11Z",
-  "proposed_next_document": "plan.md",
-  "facts_mean": 4.33
+  "current_problem": "remove-id-from-output-filenames",
+  "last_completed_stage": "implement",
+  "last_completed_document": "implementation.md",
+  "proposed_next_stage": "wrap-up",
+  "updated_at": "2026-11-11T10:38:31Z",
+  "proposed_next_document": "none"
 }
