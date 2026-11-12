@@ -206,6 +206,29 @@ func TestPredictScriptName_EmptyTimestamp(t *testing.T) {
 	}
 }
 
+func TestPredictScriptName_UniversalNaming(t *testing.T) {
+	product := metadata.Product{
+		ID:            12345,
+		Kind:          metadata.KindSeries,
+		SeriesTitle:   "Show",
+		SeasonNumber:  intPtr(1),
+		EpisodeNumber: intPtr(1),
+	}
+
+	unit := ingest.MediaUnit{
+		ID:           12345,
+		Filenames:    []string{"12345.mp4"},
+		PRTTimestamp: "261001120000",
+	}
+
+	scriptPath := PredictScriptName(product, unit, "//192.168.31.4/buffer/IN", "hardsub", "999999999999")
+
+	expected := "//192.168.31.4/buffer/IN/Show_s01e01_PRT261001120000.sh"
+	if scriptPath != expected {
+		t.Errorf("PredictScriptName() with UNC root = %q, want %q", scriptPath, expected)
+	}
+}
+
 func TestPredictOutputs_HSUBDetection(t *testing.T) {
 	product := metadata.Product{
 		ID:            12345,

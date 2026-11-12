@@ -28,6 +28,17 @@ type PredictedOutput struct {
 	HsubFile string
 }
 
+// joinPreserveUNC joins path components using path.Join, preserving a leading
+// "//" UNC prefix on the root (e.g. "//server/share/root" → "//server/share/root/dir/file").
+func joinPreserveUNC(root string, subpath string) string {
+	isUnc := strings.HasPrefix(root, "//")
+	joined := path.Join(root, subpath)
+	if isUnc && strings.HasPrefix(joined, "/") && !strings.HasPrefix(joined, "//") {
+		return "//" + joined[1:]
+	}
+	return joined
+}
+
 // PredictOutputs returns the set of files the rendering pipeline will
 // produce for the given media unit.  It derives the same naming logic
 // as the script domain (video, audio, SRT) without depending on it.
@@ -57,9 +68,9 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot,
 	// e.g. /mnt/ROOT/EDIT/Belaya_koroleva_s01
 	var targetDir string
 	if seasonDir != "" {
-		targetDir = path.Join(targetRoot, baseName+seasonDir)
+		targetDir = joinPreserveUNC(targetRoot, baseName+seasonDir)
 	} else {
-		targetDir = path.Join(targetRoot, baseName)
+		targetDir = joinPreserveUNC(targetRoot, baseName)
 	}
 
 	// OUTBASE = baseName + nameTag + "_PRT" + timestamp
@@ -76,7 +87,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot,
 
 	// Video: always one output.
 	video := PredictedOutput{
-		Path:      path.Join(targetDir, outBase+"_HD.mp4"),
+		Path:      joinPreserveUNC(targetDir, outBase+"_HD.mp4"),
 		MediaType: "video",
 		HsubFile:  hsubFile,
 	}
@@ -94,7 +105,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot,
 		}
 		layout := layoutTag(s.ChannelLayout)
 		outputs = append(outputs, PredictedOutput{
-			Path:       path.Join(targetDir, fmt.Sprintf("%s_HD_AUDIO%02d_%s%s.m4a", outBase, audioIdx, strings.ToUpper(lang), layout)),
+			Path:       joinPreserveUNC(targetDir, fmt.Sprintf("%s_HD_AUDIO%02d_%s%s.m4a", outBase, audioIdx, strings.ToUpper(lang), layout)),
 			MediaType:  "audio",
 			Language:   lang,
 			Layout:     layout,
@@ -107,7 +118,7 @@ func PredictOutputs(product metadata.Product, unit ingest.MediaUnit, targetRoot,
 	for _, s := range streams {
 		if s.Kind == ingest.StreamKindSubtitle {
 			outputs = append(outputs, PredictedOutput{
-				Path:      path.Join(targetDir, outBase+"_HD.srt"),
+				Path:      joinPreserveUNC(targetDir, outBase+"_HD.srt"),
 				MediaType: "subtitle",
 			})
 			break
@@ -213,5 +224,5 @@ func PredictScriptName(product metadata.Product, unit ingest.MediaUnit, targetRo
 		scriptName = baseName + "_" + nameTag + "_PRT" + timestamp
 	}
 
-	return path.Join(targetRoot, scriptName+".sh")
+	return joinPreserveUNC(targetRoot, scriptName+".sh")
 }

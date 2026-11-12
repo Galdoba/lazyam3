@@ -49,7 +49,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	// video/audio files will land after the script runs.
 	renderRoot := toSlash(executorPaths["target"])
 	if renderRoot == "" {
-		renderRoot = path.Join(toSlash(root), "target")
+		renderRoot = joinPreserveUNC(toSlash(root), "target")
 	}
 
 	// Predict script destination uses the generator output directory.
@@ -108,7 +108,7 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 	}
 	archive := toSlash(executorPaths["archive"])
 	if archive == "" {
-		archive = toSlash(filepath.Join(root, "archive"))
+		archive = joinPreserveUNC(toSlash(root), "archive")
 	}
 
 	// Metadata dir uses the executor's buffer path so marker lines reference
@@ -164,6 +164,17 @@ func toSlash(path string) string {
 		return ""
 	}
 	return filepath.ToSlash(path)
+}
+
+// joinPreserveUNC joins root and subpath using path.Join, preserving a leading
+// "//" UNC prefix (e.g. "//server/share/root" → "//server/share/root/target").
+func joinPreserveUNC(root string, subpath string) string {
+	isUnc := strings.HasPrefix(root, "//")
+	joined := path.Join(root, subpath)
+	if isUnc && strings.HasPrefix(joined, "/") && !strings.HasPrefix(joined, "//") {
+		return "//" + joined[1:]
+	}
+	return joined
 }
 
 // EnsureEnvDirs creates the work-directory tree under the output root that

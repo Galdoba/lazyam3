@@ -50,9 +50,9 @@ func TestPathBuilder_canonicalWindowsDriveLetter(t *testing.T) {
 func TestPathBuilder_canonicalUncPath(t *testing.T) {
 	b := NewPathBuilder("//server/share/root")
 	got := b.Canonical("dir", "file.mp4")
-	// path.Join collapses leading // to / for UNC paths
-	if got != "/server/share/root/dir/file.mp4" {
-		t.Errorf("Canonical() with UNC path = %q, want %q", got, "/server/share/root/dir/file.mp4")
+	// UNC paths must preserve the leading // prefix.
+	if got != "//server/share/root/dir/file.mp4" {
+		t.Errorf("Canonical() with UNC path = %q, want %q", got, "//server/share/root/dir/file.mp4")
 	}
 }
 

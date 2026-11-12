@@ -3,6 +3,7 @@ package platform
 import (
 	"path"
 	"path/filepath"
+	"strings"
 )
 
 // PathBuilder constructs paths in a platform-agnostic way.
@@ -27,7 +28,13 @@ func (b PathBuilder) native(components ...string) string {
 	return filepath.Join(b.root, filepath.Join(components...))
 }
 
-// Canonical joins path components using forward slashes, regardless of OS.
+// Canonical joins path components using forward slashes, regardless of OS,
+// preserving a leading "//" UNC prefix on the root.
 func (b PathBuilder) Canonical(components ...string) string {
-	return path.Join(b.root, path.Join(components...))
+	isUnc := strings.HasPrefix(b.root, "//")
+	got := path.Join(b.root, path.Join(components...))
+	if isUnc && strings.HasPrefix(got, "/") && !strings.HasPrefix(got, "//") {
+		return "//" + got[1:]
+	}
+	return got
 }
