@@ -107,6 +107,7 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 
 		p := pipeline.NewPipeline(pipeline.Options{
 			Logger: modules.Logger.Group("pipeline"),
+			Status: platform.NewStatusWriter(),
 			Ingest: ingest.New(ffprobeBinary,
 				modules.Logger.Group("ingest")),
 			Metadata: mdRepo,

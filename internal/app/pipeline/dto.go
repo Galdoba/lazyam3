@@ -20,10 +20,16 @@ type Logger interface {
 	Error(msg string, args ...any)
 }
 
+// StatusWriter is the status bar port used by the pipeline.
+type StatusWriter interface {
+	Write(status string)
+}
+
 // Options configures the Pipeline at construction time.
 type Options struct {
 	// Infra
 	Logger Logger
+	Status StatusWriter
 	Events chan PipelineEvent
 	Store  *jsonstore.Store // processing history store (optional; nil when disabled)
 

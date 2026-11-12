@@ -29,6 +29,7 @@ const (
 // Pipeline orchestrates the media processing workflow.
 type Pipeline struct {
 	logger     Logger
+	status     StatusWriter
 	in         ingest.Organizer
 	md         metadata.ProductRepository
 	rd         script.Renderer
@@ -67,6 +68,7 @@ func NewPipeline(opts Options) *Pipeline {
 	}
 	return &Pipeline{
 		logger:         opts.Logger,
+		status:         opts.Status,
 		in:             opts.Ingest,
 		md:             opts.Metadata,
 		rd:             opts.Renderer,
@@ -127,14 +129,22 @@ func (p *Pipeline) Run(ctx context.Context) (RunOutput, error) {
 		}
 
 		if p.dormancyPeriod > 0 {
-			timer := time.NewTimer(p.dormancyPeriod)
-			select {
-			case <-ctx.Done():
-				total.Processed += out.Processed
-				total.Failed += out.Failed
-				timer.Stop()
-				return total, ctx.Err()
-			case <-timer.C:
+			deadline := time.Now().Add(p.dormancyPeriod)
+			for {
+				if err := ctx.Err(); err != nil {
+					total.Processed += out.Processed
+					total.Failed += out.Failed
+					return total, err
+				}
+				remaining := time.Until(deadline)
+				if remaining <= 0 {
+					break
+				}
+				if p.status != nil {
+					h, m, s := int(remaining/time.Hour), int((remaining%time.Hour)/time.Minute), int((remaining%time.Minute)/time.Second)
+					p.status.Write(fmt.Sprintf("dormant: %02d:%02d:%02d", h, m, s))
+				}
+				time.Sleep(time.Second)
 			}
 		} else {
 			select {
@@ -156,6 +166,9 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 	}
 
 	p.logger.Debug("scan")
+	if p.status != nil {
+		p.status.Write("scanning...")
+	}
 	log, ok := p.logger.(*logging.Logger)
 	opts := fso.DefaultOptions()
 	if ok {
@@ -205,6 +218,9 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 		if len(snap.FilesIn(d.Path)) == 0 {
 			continue
 		}
+		if p.status != nil {
+			p.status.Write("processing: " + filepath.Base(d.Path))
+		}
 		p.logger.Debug("unit loop entry", "dir", d.Path, "files", len(snap.FilesIn(d.Path)))
 		initialFiles := make([]string, 0, len(snap.FilesIn(d.Path)))
 		for _, f := range snap.FilesIn(d.Path) {
@@ -220,6 +236,9 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 	}
 
 	p.emit(EventScanDone, 0, nil)
+	if p.status != nil {
+		p.status.Write("scan complete")
+	}
 	return out, nil
 }
 
