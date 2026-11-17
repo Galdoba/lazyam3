@@ -49,7 +49,8 @@ type Pipeline struct {
 
 	statusPath string
 
-	store *jsonstore.Store
+	store      *jsonstore.Store
+	errorStore *jsonstore.Store
 }
 
 // NewPipeline creates a new Pipeline instance.
@@ -58,10 +59,7 @@ func NewPipeline(opts Options) *Pipeline {
 	if pollInterval <= 0 {
 		pollInterval = defaultPollInterval
 	}
-	statusPath := ""
-	if opts.CFG.Storage.Path != "" {
-		statusPath = toSlash(filepath.Join(filepath.Dir(opts.CFG.Storage.Path), "status.json"))
-	}
+	statusPath := toSlash(opts.CFG.Storage.StatusPath)
 	pb := opts.PathBuilder
 	if pb.IsEmpty() {
 		pb = platform.NewPathBuilder(opts.Destination)
@@ -86,6 +84,7 @@ func NewPipeline(opts Options) *Pipeline {
 		pathBuilder: pb,
 		statusPath:  statusPath,
 		store:       opts.Store,
+		errorStore:  opts.ErrorStore,
 	}
 }
 
@@ -198,18 +197,7 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 		matches = []doneMatch{}
 		snap.SanitizeablePaths = []string{}
 	}
-	if len(snap.SanitizeablePaths) > 0 {
-		if err := snap.Sanitize(); err != nil {
-			p.logger.Warn("sanitize failed", "error", err)
-		} else {
-			p.logger.Debug("sanitized empty dirs", "count", len(snap.SanitizeablePaths))
-			for _, m := range matches {
-				if err := os.Remove(m.donePath); err != nil && !errors.Is(err, os.ErrNotExist) {
-					p.logger.Warn("remove done file failed", "path", m.donePath, "error", err)
-				}
-			}
-		}
-	}
+	p.commitMarkers(snap, matches, metaDir)
 
 	for _, d := range dirs {
 		if err := ctx.Err(); err != nil {
@@ -239,7 +227,33 @@ func (p *Pipeline) RunOnce(ctx context.Context) (RunOutput, error) {
 	if p.status != nil {
 		p.status.Write("scan complete")
 	}
+	p.writeStatus(out)
 	return out, nil
+}
+
+// commitMarkers finalizes the executed units: it removes the consumed source
+// directories, then removes the .done marker and the error sidecar of every
+// committed match. An aborted transaction has nothing to commit, so both the
+// markers and the sidecars stay for the next pass.
+func (p *Pipeline) commitMarkers(snap *fso.Snapshot, matches []doneMatch, metaDir string) {
+	if len(snap.SanitizeablePaths) == 0 {
+		return
+	}
+	if err := snap.Sanitize(); err != nil {
+		p.logger.Warn("sanitize failed", "error", err)
+		return
+	}
+	p.logger.Debug("sanitized empty dirs", "count", len(snap.SanitizeablePaths))
+	for _, m := range matches {
+		if err := os.Remove(m.donePath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			p.logger.Warn("remove done file failed", "path", m.donePath, "error", err)
+		}
+		sn, _ := m.payload["script_name"].(string)
+		sidecar := filepath.Join(metaDir, sn+".err")
+		if err := os.Remove(sidecar); err != nil && !errors.Is(err, os.ErrNotExist) {
+			p.logger.Warn("remove sidecar failed", "path", sidecar, "error", err)
+		}
+	}
 }
 
 // captureProcessingHistory stores processing history to the store.
@@ -262,8 +276,42 @@ func (p *Pipeline) captureProcessingHistory(matches []doneMatch) bool {
 		if p.logger != nil {
 			p.logger.Debug("processing history stored", "key", key)
 		}
+		if p.errorStore != nil {
+			errText, found := p.readErrorSidecar(sn, p.pathBuilder.Canonical("metadata"))
+			if found {
+				entry := map[string]any{
+					"script_name": sn,
+					"source_dir":  payload["source_dir"],
+					"error_text":  errText,
+					"timestamp":   time.Now().UTC().Format(time.RFC3339),
+				}
+				if err := p.errorStore.Set("errors", entry); err != nil {
+					p.logger.Warn("error store set failed, aborting transaction", "key", "errors", "error", err)
+					abort = true
+					break
+				}
+			} else if p.logger != nil {
+				p.logger.Debug("no error sidecar, error store entry skipped", "key", key)
+			}
+		}
 	}
 	return abort
+}
+
+// readErrorSidecar reads the <script_name>.err sidecar from metadataDir.
+// The second return value reports whether the sidecar exists; a missing
+// sidecar means the render produced no error log, so no entry is recorded.
+func (p *Pipeline) readErrorSidecar(scriptName, metadataDir string) (string, bool) {
+	sidecar := filepath.Join(metadataDir, scriptName+".err")
+	data, err := os.ReadFile(sidecar)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false
+	}
+	if err != nil {
+		p.logger.Warn("error sidecar read failed", "path", sidecar, "error", err)
+		return "", true
+	}
+	return string(data), true
 }
 
 // processUnit runs the full chain for one media unit directory.

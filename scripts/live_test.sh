@@ -43,7 +43,7 @@ kill "$PID" 2>/dev/null || true
 wait "$PID" 2>/dev/null || true
 
 echo "reload log lines:"
-grep -i "metadata reloaded\|metadata reload failed" "$TEST_GROUND/lazyam.log" || echo "  (no reload lines)"
+grep -i "metadata reloaded\|metadata reload failed" "$TEST_GROUND/lazyam3.log" || echo "  (no reload lines)"
 rm -f "$METADATA_COPY"
 
 # ── 5. print file tree ────────────────────────────────────────────────

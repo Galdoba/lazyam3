@@ -1486,3 +1486,399 @@ func TestPipeline_StorageJsonAfterRunOnce(t *testing.T) {
 		t.Errorf("store.Close: %v", err)
 	}
 }
+
+func TestPipeline_ErrorStore_Errored(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	absEmptyDir, err := filepath.Abs(emptyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeDoneFile(t, metaDir, "testerr.done", absEmptyDir)
+	errSidecar := filepath.Join(metaDir, "test.err")
+	if err := os.WriteFile(errSidecar, []byte("ffmpeg error: non-monotonic timestamps"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	storePath := filepath.Join(t.TempDir(), "storage.json")
+	store, err := jsonstore.New(storePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	errStorePath := filepath.Join(t.TempDir(), "errors.json")
+	errStore, err := jsonstore.New(errStorePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
+	p.store = store
+	p.errorStore = errStore
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	raw, err := os.ReadFile(errStorePath)
+	if err != nil {
+		t.Fatalf("read errors.json: %v", err)
+	}
+	found := false
+	entries := 0
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		payload := map[string]any{}
+		if err := json.Unmarshal([]byte(line), &payload); err != nil {
+			t.Fatalf("parse jsonl line: %v", err)
+		}
+		entries++
+		if payload["script_name"] == "test" && payload["error_text"] == "ffmpeg error: non-monotonic timestamps" {
+			found = true
+			if payload["source_dir"] != absEmptyDir {
+				t.Errorf("error store entry source_dir = %v, want %q", payload["source_dir"], absEmptyDir)
+			}
+			if ts, ok := payload["timestamp"].(string); !ok || ts == "" {
+				t.Errorf("error store entry timestamp = %v, want a non-empty timestamp", payload["timestamp"])
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("error store missing errored entry: %v", string(raw))
+	}
+	if entries != 1 {
+		t.Errorf("error store entries = %d, want 1: %v", entries, string(raw))
+	}
+	if err := store.Close(); err != nil {
+		t.Errorf("store.Close: %v", err)
+	}
+	if err := errStore.Close(); err != nil {
+		t.Errorf("errStore.Close: %v", err)
+	}
+}
+
+func TestPipeline_ErrorStore_Clean(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	absEmptyDir, err := filepath.Abs(emptyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeDoneFile(t, metaDir, "testclean.done", absEmptyDir)
+
+	storePath := filepath.Join(t.TempDir(), "storage.json")
+	store, err := jsonstore.New(storePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	errStorePath := filepath.Join(t.TempDir(), "errors.json")
+	errStore, err := jsonstore.New(errStorePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
+	p.store = store
+	p.errorStore = errStore
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	raw, err := os.ReadFile(errStorePath)
+	if err != nil {
+		t.Fatalf("read errors.json: %v", err)
+	}
+	if strings.TrimSpace(string(raw)) != "" {
+		t.Errorf("error store must stay empty for a clean render, got: %v", string(raw))
+	}
+	if err := store.Close(); err != nil {
+		t.Errorf("store.Close: %v", err)
+	}
+	if err := errStore.Close(); err != nil {
+		t.Errorf("errStore.Close: %v", err)
+	}
+}
+
+func TestPipeline_ErrorStore_PreChangePayload(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	absEmptyDir, err := filepath.Abs(emptyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	donePath := filepath.Join(metaDir, "old.done")
+	if err := os.WriteFile(donePath, []byte(`{"source_dir": "`+absEmptyDir+`", "unit_id": 1}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	storePath := filepath.Join(t.TempDir(), "storage.json")
+	store, err := jsonstore.New(storePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	errStorePath := filepath.Join(t.TempDir(), "errors.json")
+	errStore, err := jsonstore.New(errStorePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
+	p.store = store
+	p.errorStore = errStore
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	raw, err := os.ReadFile(errStorePath)
+	if err != nil {
+		t.Fatalf("read errors.json: %v", err)
+	}
+	// Pre-change payload lacks script_name, so no sidecar can be found and no
+	// error store entry is written.
+	if strings.TrimSpace(string(raw)) != "" {
+		t.Errorf("error store must stay empty without an error sidecar, got: %v", string(raw))
+	}
+	rawStore, err := os.ReadFile(storePath)
+	if err != nil {
+		t.Fatalf("read storage.json: %v", err)
+	}
+	if strings.TrimSpace(string(rawStore)) == "" {
+		t.Errorf("processing history must still be stored for a pre-change payload, got: %v", string(rawStore))
+	}
+	if err := store.Close(); err != nil {
+		t.Errorf("store.Close: %v", err)
+	}
+	if err := errStore.Close(); err != nil {
+		t.Errorf("errStore.Close: %v", err)
+	}
+}
+
+func TestPipeline_ErrorStore_SidecarRemovedAfterSuccess(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	absEmptyDir, err := filepath.Abs(emptyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	donePath := writeDoneFile(t, metaDir, "testrem.done", absEmptyDir)
+	errSidecar := filepath.Join(metaDir, "test.err")
+	if err := os.WriteFile(errSidecar, []byte("error"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	storePath := filepath.Join(t.TempDir(), "storage.json")
+	store, err := jsonstore.New(storePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	errStorePath := filepath.Join(t.TempDir(), "errors.json")
+	errStore, err := jsonstore.New(errStorePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
+	p.store = store
+	p.errorStore = errStore
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if pathExists(donePath) {
+		t.Errorf("done file %q should be removed after success", donePath)
+	}
+	if pathExists(errSidecar) {
+		t.Errorf("sidecar %q should be removed after success", errSidecar)
+	}
+	if err := store.Close(); err != nil {
+		t.Errorf("store.Close: %v", err)
+	}
+	if err := errStore.Close(); err != nil {
+		t.Errorf("errStore.Close: %v", err)
+	}
+}
+
+func TestPipeline_ErrorStore_SidecarKeptAfterAbort(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	absEmptyDir, err := filepath.Abs(emptyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	donePath := writeDoneFile(t, metaDir, "testabort.done", absEmptyDir)
+	errSidecar := filepath.Join(metaDir, "test.err")
+	if err := os.WriteFile(errSidecar, []byte("error"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	storePath := filepath.Join(t.TempDir(), "storage_fail.json")
+	store, err := jsonstore.New(storePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("store.Close: %v", err)
+	}
+	errStorePath := filepath.Join(t.TempDir(), "errors.json")
+	errStore, err := jsonstore.New(errStorePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
+	p.store = store
+	p.errorStore = errStore
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if !pathExists(donePath) {
+		t.Errorf("done file %q should survive store failure", donePath)
+	}
+	if !pathExists(errSidecar) {
+		t.Errorf("sidecar %q should survive store failure", errSidecar)
+	}
+	if err := errStore.Close(); err != nil {
+		t.Errorf("errStore.Close: %v", err)
+	}
+}
+
+func TestPipeline_ErrorStore_SkippedWhenUnconfigured(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	absEmptyDir, err := filepath.Abs(emptyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeDoneFile(t, metaDir, "testskip.done", absEmptyDir)
+
+	storePath := filepath.Join(t.TempDir(), "storage.json")
+	store, err := jsonstore.New(storePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
+	p.store = store
+	p.errorStore = nil // unconfigured
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Errorf("store.Close: %v", err)
+	}
+}
+
+func TestPipeline_ErrorStore_NotWrittenWhenMainStoreFails(t *testing.T) {
+	root, emptyDir := emptyDirFixture(t)
+	absEmptyDir, err := filepath.Abs(emptyDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dest := t.TempDir()
+	metaDir := filepath.Join(dest, "metadata")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeDoneFile(t, metaDir, "testatomic.done", absEmptyDir)
+	errSidecar := filepath.Join(metaDir, "test.err")
+	if err := os.WriteFile(errSidecar, []byte("error"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	storePath := filepath.Join(t.TempDir(), "storage_fail.json")
+	store, err := jsonstore.New(storePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("store.Close: %v", err)
+	}
+	errStorePath := filepath.Join(t.TempDir(), "errors.json")
+	errStore, err := jsonstore.New(errStorePath, nil)
+	if err != nil {
+		t.Fatalf("jsonstore.New: %v", err)
+	}
+	events := make(chan PipelineEvent, 100)
+	p := newTestPipeline(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{}},
+		&fakeRepo{products: map[int64]*metadata.Product{}},
+		&fakeRenderer{}, events, false)
+	p.destination = dest
+	p.pathBuilder = platform.NewPathBuilder(dest)
+	p.store = store
+	p.errorStore = errStore
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+	raw, err := os.ReadFile(errStorePath)
+	if err != nil {
+		t.Fatalf("read errors.json: %v", err)
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		t.Errorf("error store should not be written when main store fails, got: %v", line)
+	}
+	if err := errStore.Close(); err != nil {
+		t.Errorf("errStore.Close: %v", err)
+	}
+}

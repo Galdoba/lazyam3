@@ -16,3 +16,7 @@
 | [0012](0012-remove-id-from-output-filenames.md) | Remove ID from Output Filenames, Use PRT as Unique Identifier | accepted | 2026-11-09 | cross-package |
 | [0013](0013-remove-prodid-from-predictoutputs-signature.md) | Remove prodID Parameter from PredictOutputs Signature | accepted | 2026-11-11 | cross-package |
 | [0014](0014-status-writer-interface-location.md) | StatusWriter Interface Location | accepted | 2026-11-12 | cross-package |
+| [0015](0015-error-log-redirection-through-metadata-sidecar.md) | Error Log Redirection Through The Metadata Sidecar | accepted | 2026-11-17 | cross-package |
+| [0016](0016-error-store-records-only-renders-with-an-error-log.md) | Error Store Records Only Renders That Produced An Error Log | accepted | 2026-11-17 | cross-package |
+| [0017](0017-two-naming-families-with-one-outbase-derivation.md) | Two Naming Families With One OUTBASE Derivation | accepted | 2026-11-17 | cross-package |
+| [0018](0018-mandatory-writable-paths-fail-fast-at-startup.md) | Mandatory Writable Paths, Fail Fast At Startup | accepted | 2026-11-17 | architectural |

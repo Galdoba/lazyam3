@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/Galdoba/lazyam3/internal/infra/cache"
@@ -29,6 +30,10 @@ type AppModules struct {
 	storeOnce sync.Once
 	store     *jsonstore.Store
 	storeErr  error
+
+	errorStoreOnce sync.Once
+	errorStore     *jsonstore.Store
+	errorStoreErr  error
 }
 
 // New creates an empty container. Init populates it after flag parsing.
@@ -84,6 +89,33 @@ func (m *AppModules) Store() (*jsonstore.Store, error) {
 	return m.store, m.storeErr
 }
 
+// ErrorStore returns the error log store, creating it on first access.
+// The path is mandatory; opening it eagerly fails fast on an unwritable path.
+// Returns the same error on subsequent calls if initialization failed.
+func (m *AppModules) ErrorStore() (*jsonstore.Store, error) {
+	m.errorStoreOnce.Do(func() {
+		if m.Logger == nil {
+			m.errorStoreErr = fmt.Errorf("app modules not initialized: call Init first")
+			return
+		}
+		m.errorStore, m.errorStoreErr = jsonstore.New(m.Config.Storage.ErrorStorePath, m.Logger)
+	})
+	return m.errorStore, m.errorStoreErr
+}
+
+// EnsureStatusFile opens the status file for writing and closes it,
+// verifying it can be opened before processing starts.
+func (m *AppModules) EnsureStatusFile() error {
+	if m.Logger == nil {
+		return fmt.Errorf("app modules not initialized: call Init first")
+	}
+	f, err := os.OpenFile(m.Config.Storage.StatusPath, os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return fmt.Errorf("failed to open status file: %w", err)
+	}
+	return f.Close()
+}
+
 // Shutdown closes everything that was actually created.
 // Order: resources first (store), then logger — so the logger can
 // write shutdown errors. Idempotent.
@@ -95,6 +127,9 @@ func (m *AppModules) Shutdown() error {
 
 	if m.store != nil {
 		errs = append(errs, m.store.Close())
+	}
+	if m.errorStore != nil {
+		errs = append(errs, m.errorStore.Close())
 	}
 	if m.Logger != nil {
 		errs = append(errs, m.Logger.Close())

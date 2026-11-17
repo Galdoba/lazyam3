@@ -84,10 +84,13 @@ func BuildScript(cfg ScriptConfig) (Script, error) {
 	content = replaceAll(content, "buffer", cfg.Env.Buffer)
 	content = replaceAll(content, "in_progress", cfg.Env.InProgress)
 	content = replaceAll(content, "done", cfg.Env.Done)
-	content = replaceAll(content, "notifications", cfg.Env.Notifications)
 	content = replaceAll(content, "archive", cfg.Env.Archive)
 	content = replaceAll(content, "mkdir_target", mkdirTarget)
-	content = replaceAll(content, "ready_file", buildReadyFile(predictions))
+	content = replaceAll(content, "outbase", renderOutBase(predictions))
+	content = replaceAll(content, "script_name", cfg.ScriptName)
+	content = replaceAll(content, "target_dir", path.Dir(firstVideoPath(predictions)))
+	content = replaceAll(content, "metadata_dir", cfg.Env.MetadataDir)
+	content = replaceAll(content, "copy_from_in_progress", buildCopyFromInProgress(predictions))
 	// Fallback to "ffmpeg" when not configured.
 	ffmpegBinary := cfg.FfmpegBinary
 	if ffmpegBinary == "" {
@@ -294,19 +297,43 @@ func buildMKDirTarget(predictions []callname.PredictedOutput) string {
 	return `mkdir -p "` + dir + `"`
 }
 
-// buildReadyFile generates the touch command for the .ready file.
-// The .ready file is created in the same directory as the video output.
-func buildReadyFile(predictions []callname.PredictedOutput) string {
+// renderOutBase derives the primary render output base name from the
+// first video prediction, with its extension stripped. Returns "" when
+// no predictions are available.
+func renderOutBase(predictions []callname.PredictedOutput) string {
 	if len(predictions) == 0 {
 		return ""
 	}
 	videoPath := firstVideoPath(predictions)
-	// Derive .ready filename from video path: replace .mp4 with .ready
 	base := path.Base(videoPath)
 	ext := path.Ext(base)
-	base = base[:len(base)-len(ext)]
-	readyPath := path.Join(path.Dir(videoPath), base+".ready")
-	return `touch "` + readyPath + `"`
+	return base[:len(base)-len(ext)]
+}
+
+// buildTargetDir returns the target directory for the primary render output.
+func buildTargetDir(predictions []callname.PredictedOutput) string {
+	if len(predictions) == 0 {
+		return ""
+	}
+	return path.Dir(firstVideoPath(predictions))
+}
+
+// buildCopyFromInProgress generates the post-render block that copies the
+// error log (if present) into the target directory and metadata sidecar,
+// then places the ready marker. It exits zero for clean renders so the
+// `&&` chain survives.
+func buildCopyFromInProgress(predictions []callname.PredictedOutput) string {
+	if len(predictions) == 0 {
+		return ""
+	}
+	outBase := renderOutBase(predictions)
+	targetDir := buildTargetDir(predictions)
+	return fmt.Sprintf(`OUTBASE="%s" && \
+   if [ -f "${IN_PROGRESS}/${SOURCE}.#err" ]; then \
+       cp -f "${IN_PROGRESS}/${SOURCE}.#err" "%s/${OUTBASE}.#err"; \
+       cp -f "${IN_PROGRESS}/${SOURCE}.#err" "${METADATA_DIR}/${SCRIPT_NAME}.err"; \
+   fi && \
+touch "%s/${OUTBASE}.ready"`, outBase, targetDir, targetDir)
 }
 
 // derivePredictionsFromStreams builds PredictedOutput from Product + Streams.

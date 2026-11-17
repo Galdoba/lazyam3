@@ -21,6 +21,10 @@ var requiredConfigFields = []string{
 	"paths.generator.input_directory",
 	"paths.generator.output_directory",
 	"paths.generator.metadata_path",
+	"logger.path",
+	"storage.path",
+	"storage.error_store_path",
+	"storage.status_path",
 }
 
 // requiredExecutorPaths lists the executor path keys that must be present and non-empty.
@@ -83,7 +87,9 @@ type HardsubRules struct {
 // Storage holds store settings. Currently only the path to the JSON file;
 // when replacing jsonstore with a real database, DSN, timeouts, etc. will be added here.
 type Storage struct {
-	Path string `toml:"path"`
+	Path           string `toml:"path"`
+	ErrorStorePath string `toml:"error_store_path"`
+	StatusPath     string `toml:"status_path"`
 }
 
 // PipelineConfig holds pipeline-level settings.
@@ -164,7 +170,9 @@ func defaultCFG() Config {
 			TimestampFormat: "06-01-02 15:04:05.000",
 		},
 		Storage: Storage{
-			Path: "/path/to/lazyam3/storage.json",
+			Path:           "/path/to/lazyam3/storage.json",
+			ErrorStorePath: "/path/to/lazyam3/errors.json",
+			StatusPath:     "/path/to/lazyam3/status.json",
 		},
 		ScriptGeneration: ScriptGeneration{
 			Hardsub: HardsubRules{
@@ -209,6 +217,18 @@ func (c Config) Validate() error {
 	case "debug", "info", "warn", "error":
 	default:
 		return fmt.Errorf("logger.level: invalid value %q (want debug, info, warn or error)", c.Logger.Level)
+	}
+	if c.Logger.Path == "" {
+		return fmt.Errorf("logger.path is required")
+	}
+	if c.Storage.Path == "" {
+		return fmt.Errorf("storage.path is required")
+	}
+	if c.Storage.ErrorStorePath == "" {
+		return fmt.Errorf("storage.error_store_path is required")
+	}
+	if c.Storage.StatusPath == "" {
+		return fmt.Errorf("storage.status_path is required")
 	}
 	if c.Paths.Generator.InputDirectory == "" {
 		return fmt.Errorf("paths.generator.input_directory is required")

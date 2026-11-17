@@ -361,27 +361,43 @@ func TestBuildMKDirTarget(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// buildReadyFile
+// buildCopyFromInProgress
 // ---------------------------------------------------------------------------
 
-func TestBuildReadyFile(t *testing.T) {
-	got := buildReadyFile(nil)
-	if got != "" {
-		t.Errorf("buildReadyFile(nil) = %q, want empty", got)
-	}
-
-	got = buildReadyFile([]callname.PredictedOutput{})
-	if got != "" {
-		t.Errorf("buildReadyFile([]) = %q, want empty", got)
-	}
-
+func TestBuildCopyFromInProgress(t *testing.T) {
 	preds := []callname.PredictedOutput{
 		{MediaType: "video", Path: "/mnt/ROOT/EDIT/Show/H_HD.mp4"},
 	}
-	got = buildReadyFile(preds)
-	want := `touch "/mnt/ROOT/EDIT/Show/H_HD.ready"`
+	got := buildCopyFromInProgress(preds)
+	want := `OUTBASE="H_HD" && \
+   if [ -f "${IN_PROGRESS}/${SOURCE}.#err" ]; then \
+       cp -f "${IN_PROGRESS}/${SOURCE}.#err" "/mnt/ROOT/EDIT/Show/${OUTBASE}.#err"; \
+       cp -f "${IN_PROGRESS}/${SOURCE}.#err" "${METADATA_DIR}/${SCRIPT_NAME}.err"; \
+   fi && \
+touch "/mnt/ROOT/EDIT/Show/${OUTBASE}.ready"`
 	if got != want {
-		t.Errorf("buildReadyFile() = %q, want %q", got, want)
+		t.Errorf("buildCopyFromInProgress() = %q, want %q", got, want)
+	}
+}
+
+func TestBuildCopyFromInProgress_Empty(t *testing.T) {
+	if buildCopyFromInProgress(nil) != "" {
+		t.Error("buildCopyFromInProgress(nil) want empty")
+	}
+	if buildCopyFromInProgress([]callname.PredictedOutput{}) != "" {
+		t.Error("buildCopyFromInProgress([]) want empty")
+	}
+}
+
+func TestBuildTargetDir(t *testing.T) {
+	preds := []callname.PredictedOutput{
+		{MediaType: "video", Path: "/mnt/ROOT/EDIT/Show/H_HD.mp4"},
+	}
+	if got := buildTargetDir(preds); got != "/mnt/ROOT/EDIT/Show" {
+		t.Errorf("buildTargetDir() = %q, want /mnt/ROOT/EDIT/Show", got)
+	}
+	if buildTargetDir(nil) != "" {
+		t.Error("buildTargetDir(nil) want empty")
 	}
 }
 
@@ -996,7 +1012,6 @@ func TestBuildScript_OutputElements(t *testing.T) {
 		{"mkdir target", "mkdir -p"},
 		{"priority", "PRIORITY="},
 		{"archive", "ARCHIVE="},
-		{"notifications", "NOTIFICATIONS="},
 	}
 
 	for _, chk := range checks {
@@ -1142,26 +1157,30 @@ func TestBuildSRTSection_EdgeCases(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// TestBuildReadyFile_edge_cases
+// renderOutBase
 // ---------------------------------------------------------------------------
 
-func TestBuildReadyFile_EdgeCases(t *testing.T) {
-	// Different file extensions
+func TestRenderOutBase(t *testing.T) {
+	if renderOutBase(nil) != "" {
+		t.Error("renderOutBase(nil) want empty")
+	}
+
 	tests := []struct {
 		name string
 		path string
 		want string
 	}{
-		{"mp4", "/mnt/ROOT/EDIT/H_HD.mp4", `touch "/mnt/ROOT/EDIT/H_HD.ready"`},
-		{"mkv", "/mnt/ROOT/EDIT/H_HD.mkv", `touch "/mnt/ROOT/EDIT/H_HD.ready"`},
+		{"mp4", "/mnt/ROOT/EDIT/H_HD.mp4", "H_HD"},
+		{"mkv", "/mnt/ROOT/EDIT/H_HD.mkv", "H_HD"},
+		{"dots in base", "/mnt/ROOT/EDIT/S01E06.HD_v2.mkv", "S01E06.HD_v2"},
+		{"no extension", "/mnt/ROOT/EDIT/H_HD", "H_HD"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			preds := []callname.PredictedOutput{{MediaType: "video", Path: tt.path}}
-			got := buildReadyFile(preds)
-			if got != tt.want {
-				t.Errorf("buildReadyFile(%q) = %q, want %q", tt.path, got, tt.want)
+			if got := renderOutBase(preds); got != tt.want {
+				t.Errorf("renderOutBase(%q) = %q, want %q", tt.path, got, tt.want)
 			}
 		})
 	}
@@ -1588,7 +1607,6 @@ func TestBuildScript_EnvironmentVariables_Unique(t *testing.T) {
 		"/unique/buffer/path",
 		"/unique/in_progress/path",
 		"/unique/done/path",
-		"/unique/notifications/path",
 		"/unique/archive/path",
 	}
 	for _, p := range uniquePaths {

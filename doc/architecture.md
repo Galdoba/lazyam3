@@ -198,6 +198,18 @@ Infrastructure provides concrete implementations of domain ports and the outside
 | `internal/infra/cache` | In-memory cache | — |
 | `internal/infra/commands` | `CMDProcess` (CLI command; wires app + domain) | `app`, `domain/ingest` |
 
+### Storage: Processing History and Error Log Store
+
+The pipeline writes processing history to a JSONL store keyed by unit id. Entries carry `source_dir`, `unit_id`, `script_name`, `product_name`, `created_at`, `initial_files`, and `created_files`.
+
+An error-log store (configured via `error_store_path`) records rendering failures. When a unit finishes and a `.done` marker appears in the metadata directory, the pipeline reads the `<script_name>.err` sidecar from the metadata directory. Only when that sidecar exists — the render actually produced an ffmpeg/fflite error log — does it write an entry `{script_name, source_dir, error_text, timestamp}`; a clean render adds nothing, so every entry in the store is a real failure. The write happens only after the main processing-history store write succeeds — if the main store write aborts, the error-store entry is not written (atomicity guarantee).
+
+**Mandatory writable paths:** the log file (`logger.path`), both JSON stores (`storage.path`, `storage.error_store_path`), and the JSON status file (`storage.status_path`) are mandatory configuration. Each is opened for writing at startup; an empty or unopenable path is an infrastructure error that aborts startup before any processing. The status file (written after each scan pass with running totals) is no longer derived from the storage path.
+
+**Naming families:**
+- Target directory artifacts share the render base name (`OUTBASE`): `<OUTBASE>.#err` and `<OUTBASE>.ready`.
+- Metadata directory artifacts use the operator's script name (`SCRIPT_NAME`, the exception to the OUTBASE family): `<SCRIPT_NAME>.processing`, `<SCRIPT_NAME>.done`, and `<SCRIPT_NAME>.err` (the error-log sidecar).
+
 ### Key Implementation: metadata.Repository
 
 ```go

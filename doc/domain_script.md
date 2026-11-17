@@ -115,6 +115,13 @@ The script domain generates bash/ffmpeg rendering scripts from structured inputs
 - **Then** the `SOURCE` variable uses the call name, not the original filename
 - **And** the `|=source=|` placeholder resolves to the call name
 
+### Scenario 11: Error-log copy and ready marker naming families
+- **Given** a `ScriptConfig` with predictions and a non-empty `ScriptName`
+- **When** `BuildScript(cfg)` is called
+- **Then** the `|=copy_from_in_progress=|` placeholder resolves to a block that copies `${IN_PROGRESS}/${SOURCE}.#err` to `<OUTBASE>.#err` in the target directory and to `<SCRIPT_NAME>.err` in the metadata directory, then touches `<OUTBASE>.ready`
+- **And** the target artifacts (`.#err`, `.ready`) share the render base name (`OUTBASE`) derived from the first video prediction
+- **And** the metadata artifacts (`.processing`, `.done`, `.err`) use `SCRIPT_NAME` (the operator's script name), the exception to the OUTBASE naming family
+
 ## 6. High-Level Data Model (Key Entities)
 
 - **ScriptConfig** — aggregate input DTO. Assembled by the application layer from ingest, metadata, callname, and environment sources.
@@ -167,6 +174,7 @@ The script domain generates bash/ffmpeg rendering scripts from structured inputs
 - [ ] SRT move/section/cleanup generate correct shell lines; section uses prediction filename when available.
 - [ ] Target directory creation generates `mkdir -p` with prediction directory; falls back to first prediction's directory.
 - [ ] Ready file generation creates `touch` with `.ready` suffix derived from the video prediction filename.
+- [ ] Error-log copy block: guarded by `-f "${IN_PROGRESS}/${SOURCE}.#err"` test, copies to target as `<OUTBASE>.#err` and to metadata as `<SCRIPT_NAME>.err` (full text, copy not move); clean render exits zero so the `&&` chain survives.
 - [ ] Unresolved placeholder detection correctly identifies `|=key=|` patterns; returns nil when no placeholders remain.
 - [ ] Placeholder substitution replaces `|=key=|` with value; no partial matches or double-substitution.
 - [ ] `BuildScript` with call names uses the call name as `SOURCE`, not the original filename.

@@ -92,6 +92,15 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 			return fmt.Errorf("failed to initialize store: %w", err)
 		}
 
+		errorStore, err := modules.ErrorStore()
+		if err != nil {
+			return fmt.Errorf("failed to initialize error store: %w", err)
+		}
+
+		if err := modules.EnsureStatusFile(); err != nil {
+			return err
+		}
+
 		destination := nonEmpty(c.String(pathOut), cfg.Paths.GeneratorOutput())
 		if destination == "" {
 			logger.Error("output directory required (flag or config field)")
@@ -115,6 +124,7 @@ func cmdProcessAction(modules *app.AppModules) cli.ActionFunc {
 				scriptinfra.WithLogger(modules.Logger.Group("renderer"))),
 			Events:         events,
 			Store:          store,
+			ErrorStore:     errorStore,
 			SourceDir:      sourceDir,
 			Destination:    destination,
 			DryRun:         false,

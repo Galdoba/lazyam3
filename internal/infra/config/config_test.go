@@ -184,6 +184,33 @@ func TestConfig_ValidateMissingExecutorPath(t *testing.T) {
 	}
 }
 
+func TestConfig_ValidateEmptyWritablePaths(t *testing.T) {
+	base := defaultCFG()
+	tests := []struct {
+		name string
+		mut  func(cfg *Config)
+	}{
+		{"logger.path", func(cfg *Config) { cfg.Logger.Path = "" }},
+		{"storage.path", func(cfg *Config) { cfg.Storage.Path = "" }},
+		{"storage.error_store_path", func(cfg *Config) { cfg.Storage.ErrorStorePath = "" }},
+		{"storage.status_path", func(cfg *Config) { cfg.Storage.StatusPath = "" }},
+	}
+	for _, tc := range tests {
+		cfg := base
+		tc.mut(&cfg)
+		if err := cfg.Validate(); err == nil {
+			t.Errorf("Validate() with empty %s: want error, got nil", tc.name)
+		}
+	}
+}
+
+func TestDefaultConfig_StatusPath(t *testing.T) {
+	cfg := defaultCFG()
+	if cfg.Storage.StatusPath != "/path/to/lazyam3/status.json" {
+		t.Errorf("Storage.StatusPath = %q, want %q", cfg.Storage.StatusPath, "/path/to/lazyam3/status.json")
+	}
+}
+
 func TestDefaultConfig_ExecutorMapSeeded(t *testing.T) {
 	cfg := defaultCFG()
 	if cfg.Paths.Executor == nil {
@@ -313,6 +340,58 @@ func TestScriptGeneration_HardsubTag(t *testing.T) {
 	cfg := defaultCFG()
 	if cfg.ScriptGeneration.Hardsub.Tag != "Forsirovannye" {
 		t.Errorf("ScriptGeneration.Hardsub.Tag = %q, want %q", cfg.ScriptGeneration.Hardsub.Tag, "Forsirovannye")
+	}
+}
+
+func TestDefaultConfig_ErrorStorePath(t *testing.T) {
+	cfg := defaultCFG()
+	if cfg.Storage.ErrorStorePath != "/path/to/lazyam3/errors.json" {
+		t.Errorf("Storage.ErrorStorePath = %q, want %q", cfg.Storage.ErrorStorePath, "/path/to/lazyam3/errors.json")
+	}
+}
+
+func TestLoad_ErrorStorePathConfigured(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("LAZYAM3_CONFIG", "")
+	t.Setenv("LAZYAM3_CONFIG_PATH", "")
+	toml := `[paths.generator]
+input_directory = '/home/user/lazyam3/input'
+output_directory = '/home/user/lazyam3/output'
+metadata_path = '/home/user/lazyam3/metadata.json'
+
+[storage]
+path = '/home/user/lazyam3/storage.json'
+error_store_path = '/home/user/lazyam3/errors.json'
+`
+	path := writeConfig(t, toml)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() with error_store_path: want nil error, got %v", err)
+	}
+	if cfg.Storage.ErrorStorePath != "/home/user/lazyam3/errors.json" {
+		t.Errorf("Storage.ErrorStorePath = %q, want %q", cfg.Storage.ErrorStorePath, "/home/user/lazyam3/errors.json")
+	}
+}
+
+func TestLoad_ErrorStorePathUnset(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("LAZYAM3_CONFIG", "")
+	t.Setenv("LAZYAM3_CONFIG_PATH", "")
+	toml := `[paths.generator]
+input_directory = '/home/user/lazyam3/input'
+output_directory = '/home/user/lazyam3/output'
+metadata_path = '/home/user/lazyam3/metadata.json'
+
+[storage]
+path = '/home/user/lazyam3/storage.json'
+`
+	path := writeConfig(t, toml)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() without error_store_path: want nil error, got %v", err)
+	}
+	if cfg.Storage.ErrorStorePath != "/path/to/lazyam3/errors.json" {
+		t.Errorf("Storage.ErrorStorePath = %q, want default placeholder %q", cfg.Storage.ErrorStorePath, "/path/to/lazyam3/errors.json")
 	}
 }
 

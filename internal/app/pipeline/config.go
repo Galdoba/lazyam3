@@ -168,7 +168,7 @@ func toSlash(path string) string {
 
 // joinPreserveUNC joins root and subpath using path.Join, preserving a leading
 // "//" UNC prefix (e.g. "//server/share/root" → "//server/share/root/target").
-func joinPreserveUNC(root string, subpath string) string {
+func joinPreserveUNC(root, subpath string) string {
 	isUnc := strings.HasPrefix(root, "//")
 	joined := path.Join(root, subpath)
 	if isUnc && strings.HasPrefix(joined, "/") && !strings.HasPrefix(joined, "//") {

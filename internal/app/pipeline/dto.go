@@ -28,10 +28,11 @@ type StatusWriter interface {
 // Options configures the Pipeline at construction time.
 type Options struct {
 	// Infra
-	Logger Logger
-	Status StatusWriter
-	Events chan PipelineEvent
-	Store  *jsonstore.Store // processing history store (optional; nil when disabled)
+	Logger     Logger
+	Status     StatusWriter
+	Events     chan PipelineEvent
+	Store      *jsonstore.Store // processing history store (optional; nil when disabled)
+	ErrorStore *jsonstore.Store // error log store; only renders with an error sidecar are recorded
 
 	// Domain ports
 	Ingest   ingest.Organizer
