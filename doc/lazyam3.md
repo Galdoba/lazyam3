@@ -40,19 +40,15 @@ Language of rendering script generation. Types: `Script`, `ScriptConfig`, `Strea
 │       └── main.go                 # entry point: AppModules → config/logger → commands
 │
 ├── doc/
+│   ├── adr/                        # architecture decision records (INDEX.md is the catalog)
 │   ├── architecture.md             # architecture overview and development guidelines
+│   ├── code_review.md              # review findings
+│   ├── dashboard-analytics-vision.md
 │   ├── domain_callname.md          # callname domain details
 │   ├── domain_ingest.md            # ingest domain details
 │   ├── domain_metadata.md          # metadata domain details
 │   ├── domain_script.md            # script domain details
-│   ├── feature_index.md            # human-readable feature summary
-│   ├── feature_list.json           # machine-readable feature backlog
-│   ├── HANDOFF.md
-│   ├── INDEX.md
-│   ├── lazyam3.md                  # this file
-│   ├── NOTES.md
-│   ├── PROGRESS.md
-│   └── BACKLOG.md
+│   └── lazyam3.md                  # this file
 │
 ├── internal/
 │   ├── app/                        # APPLICATION LAYER: orchestration, works on ports and DTOs
@@ -83,10 +79,15 @@ Language of rendering script generation. Types: `Script`, `ScriptConfig`, `Strea
 │   └── presentation/
 │       └── tui/                    # bubbletea TUI model (not wired into cmd yet)
 │
+├── openspec/                       # change/spec workflow (see AGENTS.md)
+│   ├── changes/                    # active changes; archive/ holds the completed ones
+│   └── specs/                      # standing capability specs
+│
 ├── scripts/                        # helper scripts and standalone tools
 │   ├── asses/                      # JSON querying tool (gjson)
 │   ├── find/
-│   └── live_test.sh
+│   ├── live_test.sh                # clean end-to-end pass
+│   └── live_test_2.sh              # pass with planted error logs, asserts the stores
 │
 ├── testdata/
 │   ├── metadata.json               # product catalog snapshot

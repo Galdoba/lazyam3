@@ -2,9 +2,13 @@
 
 Go 1.26 CLI application: a media processing pipeline tool (ingest → metadata resolution → script generation → rendering).
 
-## Current Feature
+## Feature Workflow
 
-read `.rpi-workflow.json` to understand what is the current RPI step. If asked to work load apropriate rpi-* skill for next phase.
+Work is tracked as OpenSpec changes. Run `openspec list --json` for active changes and `openspec status --change "<name>" --json` for the next artifact. Load the matching `openspec-*` skill for the phase: propose, continue, apply-change, verify-change, archive-change.
+
+- `openspec/changes/<name>/` holds the change's proposal, design, tasks, and delta specs
+- `openspec/specs/` holds the standing capability specs; the delta specs merge there at archive
+- `doc/adr/` holds durable decisions (`doc/adr/INDEX.md` is the catalog)
 
 ## Live Test
 
@@ -16,9 +20,11 @@ read `.rpi-workflow.json` to understand what is the current RPI step. If asked t
 
 Run before/after any pipeline change to verify end-to-end behavior.
 
+`scripts/live_test_2.sh` — same test ground, but plants an error log beside three of the nine scripts before one `process --once`, then asserts what each store and directory received. Run it for anything that touches error reporting or storage.
+
 ## Documentation
 
-Full catalog: `doc/INDEX.md`. 
+Full catalog: `doc/adr/INDEX.md` for decisions, plus the topic docs in `doc/`.
 
 ## Commands
 
@@ -56,9 +62,9 @@ platform (internal/platform/*)     ← Stateless services (no domain deps)
 ## Project Rules
 
 ### Workflow
-- Work one feature at a time; the current feature is defined in **Current Feature** above
-- RPI stands for Research -> Plan -> Implement
-- Implementation of current feature/problem MUST be done in it's own branch
+- Work one feature at a time; the current change is defined in **Feature Workflow** above
+- An OpenSpec change is the unit of work: propose it before implementing, verify it before archiving
+- Implementation of the current change MUST be done in it's own branch
 - Agent SHOULD commit, but MUST NOT push
 
 ### Code
