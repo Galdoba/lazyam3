@@ -1,0 +1,92 @@
+# lazyam3 — пример конфигурационного файла
+#
+# Загрузчик читает файл через appcontext/configmanager (TOML),
+# затем переменные окружения, затем встроенные значения по умолчанию.
+# CLI-флаги (--source-root, --target-root, --ffprobe-path, --metadata-path,
+# --dormancy) переопределяют всё вышеперечисленное.
+#
+# Обязательные поля (отмечены *) должны быть заполнены пользователем;
+# при их отсутствии программа завершается с ошибкой DefaultConfigError.
+
+# ──────────────────────────────────────────────
+# Пути приложения
+# ──────────────────────────────────────────────
+
+[paths]
+
+# Пути, используемые генератором скриптов (lazyam3 CLI).
+[paths.generator]
+input_directory  = "/path/to/lazyam3/incoming"    # * каталог входящих медиафайлов
+output_directory = "/path/to/lazyam3/output"      # * каталог выходных скриптов
+metadata_path    = "/path/to/lazyam3/metadata.json"  # * путь к JSON-каталогу метаданных
+ffprobe_binary   = "ffprobe"                      # путь к бинарнику ffprobe (по умолч.: "ffprobe")
+
+# Пути, встроенные в генерируемые скрипты для исполнителя.
+[paths.executor]
+buffer        = "/path/to/lazyam3/output"         # временная зона обработки
+in_progress   = "/path/to/lazyam3/output"         # зона активных задач
+done          = "/path/to/lazyam3/output"         # зона завершённых задач
+notifications = "/path/to/lazyam3/output"         # зона уведомлений
+archive       = "/path/to/lazyam3/output/archive" # архив
+target        = "/path/to/lazyam3/output/target"  # целевая зона
+
+# ──────────────────────────────────────────────
+# Логирование
+# ──────────────────────────────────────────────
+
+[logger]
+level              = "info"                      # уровень: trace, debug, info, warn, error
+path               = "/path/to/lazyam3/lazyam3.log"  # * файл логов; пустой — только stdout
+terminal           = true                        # выводить логи в терминал
+format             = "text"                      # "json" или "text" (только для терминала)
+color              = true                        # раскрашивать уровень в терминальном выводе
+format_text        = "{time} [{level}] {module}: {message} {attrs}"  # шаблон текстового вывода
+timestamp_format   = "06-01-02 15:04:05.000"     # Go time layout для {time}; пустой — стандартный
+
+# ──────────────────────────────────────────────
+# Хранилище
+# ──────────────────────────────────────────────
+
+[storage]
+path           = "/path/to/lazyam3/storage.json"   # * основной JSON-файл хранилища
+error_store_path = "/path/to/lazyam3/errors.json"  # * файл хранилища ошибок
+status_path    = "/path/to/lazyam3/status.json"    # * файл состояния
+
+# ──────────────────────────────────────────────
+# Генерация скриптов
+# ──────────────────────────────────────────────
+
+[script_generation]
+ffmpeg_binary = "ffmpeg"  # путь к бинарнику ffmpeg (по умолч.: "ffmpeg")
+
+# Правила определения hardsub-субтитров и параметры burn-in.
+[script_generation.hardsub]
+tag               = "Forsirovannye"        # тег в имени файла, маркирующий sidecar-субтитры как hardsub
+original_size     = "1920x1080"            # оригинальное разрешение видео для ffmpeg subtitles filter
+font_name         = "Segoe UI"             # имя шрифта
+font_size         = 19.4                   # размер шрифта
+primary_colour    = "&H00EBEBEB"           # основной цвет (BBGGRR)
+secondary_colour  = "&H000000FF"           # вторичный цвет
+outline_colour    = "&H00000000"           # цвет контура
+back_colour       = "&H80000000"           # цвет фона
+underline         = 0                      # подчёркивание (0/1)
+strike_out        = 0                      # зачёркивание (0/1)
+scale_x           = 1.0                    # масштаб по X
+scale_y           = 1.0                    # масштаб по Y
+spacing           = 0                      # межстрочный интервал
+angle             = 0                      # угол наклона (градусы)
+border_style      = 1                      # стиль рамки
+outline           = 0.5                    # толщина контура
+shadow            = 0                      # тень (0/1)
+alignment         = 2                      # выравнивание
+margin_l          = 5                      # левый отступ
+margin_r          = 5                      # правый отступ
+margin_v          = 20                     # вертикальный отступ
+encoding          = 1                      # кодировка
+
+# ──────────────────────────────────────────────
+# Конвейер (pipeline)
+# ──────────────────────────────────────────────
+
+[pipeline]
+dormancy_period = 0  # секунды простоя между сканированиями; 0 = отключено (режим polling)
