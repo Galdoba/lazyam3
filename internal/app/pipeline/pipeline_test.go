@@ -668,6 +668,7 @@ func TestFindSRT(t *testing.T) {
 		{[]string{"a.mp4", "a.srt"}, "hardsub", "a.srt", ""},
 		{[]string{"a.mp4", "a_hardsub.srt"}, "", "a_hardsub.srt", ""},
 		{[]string{"a.mp4", "a_hardsub.srt"}, "hardsub", "", "a_hardsub.srt"},
+		{[]string{"a.mp4", "a-rus.srt", "a-rus_Forsirovannye.srt"}, "Forsirovannye", "a-rus.srt", "a-rus_Forsirovannye.srt"},
 		{[]string{"a.mp4"}, "", "", ""},
 		{nil, "", "", ""},
 	}

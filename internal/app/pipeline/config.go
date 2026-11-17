@@ -68,19 +68,12 @@ func buildScriptConfig(unit ingest.MediaUnit, prod metadata.Product, root string
 		return script.ScriptConfig{}, fmt.Errorf("build call names for unit %d: %w", unit.ID, err)
 	}
 
-	// Derive SRT from original filenames, HSUBFile from predictions.
-	srt, _ := findSubtitle(unit.Filenames, hardsubTag)
-	hsubFile := ""
-	for _, p := range predictions {
-		if p.MediaType == "video" {
-			hsubFile = p.HsubFile
-			break
-		}
-	}
+	// Derive SRT and HSUB from original filenames.
+	srt, hsub := findSubtitle(unit.Filenames, hardsubTag)
 
 	// Resolve SRT and HSUB file paths to their call names.
 	srtCall := callNames[srt]
-	hsubCall := callNames[hsubFile]
+	hsubCall := callNames[hsub]
 
 	// Generate script filename using compact naming format (e.g. Show_s01e06_PRT261023120000.sh).
 	destination := callname.PredictScriptName(prod, unit, scriptRoot, hardsubTag, timestamp)

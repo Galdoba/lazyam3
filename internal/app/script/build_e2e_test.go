@@ -78,13 +78,26 @@ func TestBuildAndExecute_RealInputs(t *testing.T) {
 		t.Errorf("audio outputs = %v, want 2 files", matches)
 	}
 
-	// Buffer must be drained; in_progress must be empty.
+	// Buffer must be drained; in_progress may hold only a .ready marker.
 	for _, dir := range []string{"buffer", "in_progress"} {
 		entries, err := os.ReadDir(filepath.Join(envRoot, dir))
 		if err != nil {
 			t.Fatalf("read %s: %v", dir, err)
 		}
 		if len(entries) != 0 {
+			if dir == "in_progress" {
+				// Only .ready is expected; everything else is a drain failure.
+				for _, e := range entries {
+					if !strings.HasSuffix(e.Name(), ".ready") {
+						names := make([]string, 0, len(entries))
+						for _, e := range entries {
+							names = append(names, e.Name())
+						}
+						t.Errorf("%s not drained (only .ready expected): %v", dir, names)
+					}
+				}
+				continue
+			}
 			names := make([]string, 0, len(entries))
 			for _, e := range entries {
 				names = append(names, e.Name())

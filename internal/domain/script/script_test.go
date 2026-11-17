@@ -374,6 +374,7 @@ func TestBuildCopyFromInProgress(t *testing.T) {
        cp -f "${IN_PROGRESS}/${SOURCE}.#err" "/mnt/ROOT/EDIT/Show/${OUTBASE}.#err"; \
        cp -f "${IN_PROGRESS}/${SOURCE}.#err" "${METADATA_DIR}/${SCRIPT_NAME}.err"; \
    fi && \
+touch "${IN_PROGRESS}/${SCRIPT_NAME}.ready" && \
 touch "/mnt/ROOT/EDIT/Show/${OUTBASE}.ready"`
 	if got != want {
 		t.Errorf("buildCopyFromInProgress() = %q, want %q", got, want)

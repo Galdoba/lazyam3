@@ -333,6 +333,7 @@ func buildCopyFromInProgress(predictions []callname.PredictedOutput) string {
        cp -f "${IN_PROGRESS}/${SOURCE}.#err" "%s/${OUTBASE}.#err"; \
        cp -f "${IN_PROGRESS}/${SOURCE}.#err" "${METADATA_DIR}/${SCRIPT_NAME}.err"; \
    fi && \
+touch "${IN_PROGRESS}/${SCRIPT_NAME}.ready" && \
 touch "%s/${OUTBASE}.ready"`, outBase, targetDir, targetDir)
 }
 
