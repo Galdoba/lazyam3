@@ -20,3 +20,4 @@
 | [0016](0016-error-store-records-only-renders-with-an-error-log.md) | Error Store Records Only Renders That Produced An Error Log | accepted | 2026-11-17 | cross-package |
 | [0017](0017-two-naming-families-with-one-outbase-derivation.md) | Two Naming Families With One OUTBASE Derivation | accepted | 2026-11-17 | cross-package |
 | [0018](0018-mandatory-writable-paths-fail-fast-at-startup.md) | Mandatory Writable Paths, Fail Fast At Startup | accepted | 2026-11-17 | architectural |
+| [0019](0019-input-name-grammar-owned-by-ingest.md) | Input Name Grammar Owned By Ingest | accepted | 2026-11-18 | cross-package |

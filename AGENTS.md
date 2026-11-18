@@ -22,6 +22,8 @@ Run before/after any pipeline change to verify end-to-end behavior.
 
 `scripts/live_test_2.sh` — same test ground, but plants an error log beside three of the nine scripts before one `process --once`, then asserts what each store and directory received. Run it for anything that touches error reporting or storage.
 
+`scripts/full_test.sh` — one gate that runs build, vet, `go test -race -cover ./...`, `golangci-lint run ./...`, then both live tests in order. It reports PASS or FAIL per step and keeps each step's log in a temp directory. Run it before archiving a change.
+
 ## Documentation
 
 Full catalog: `doc/adr/INDEX.md` for decisions, plus the topic docs in `doc/`.
@@ -35,6 +37,7 @@ go vet ./...                         # Static analysis
 golangci-lint run ./...              # Lint (strict gate: exit 1 on any issue; config in .golangci.yml)
 go run ./cmd/lazyam3                 # Run CLI
 go run ./cmd/lazyam3 process --help  # Process command help
+./scripts/full_test.sh               # Full gate: unit suite plus both live runs
 ```
 
 ## Architecture Overview

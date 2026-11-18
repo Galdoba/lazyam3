@@ -18,12 +18,10 @@ import (
 	"strings"
 
 	"github.com/Galdoba/lazyam3/internal/domain/callname/translit"
-	"github.com/Galdoba/lazyam3/internal/domain/ingest"
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
 )
 
 type ScriptInput struct {
-	ID           int64    `json:"id"`
 	Base         string   `json:"base"`
 	SeasonTag    string   `json:"season_tag"`
 	EpisodeTag   string   `json:"episode_tag"`
@@ -71,9 +69,6 @@ func extractFileTags(stem string) []string {
 }
 
 func (si ScriptInput) validate() error {
-	if si.ID == 0 {
-		return fmt.Errorf("id must be set")
-	}
 	if si.Base == "" {
 		return fmt.Errorf("base must be set")
 	}
@@ -90,23 +85,7 @@ func (si ScriptInput) validate() error {
 func BuildInputName(product metadata.Product, originalFilename, timestamp string) (ScriptInput, error) {
 	stem, _ := splitExtension(originalFilename)
 
-	idStr := ""
-	for _, r := range stem {
-		if r >= '0' && r <= '9' {
-			idStr += string(r)
-		} else {
-			break
-		}
-	}
-	var id int64
-	if idStr != "" {
-		fmt.Sscanf(idStr, "%d", &id) //nolint:errcheck // best-effort
-	} else {
-		id = ingest.SyntheticID
-	}
-
 	si := ScriptInput{
-		ID:           id,
 		Base:         deriveOutBase(product),
 		SeasonTag:    deriveNameTag(product),
 		PRT:          "PRT" + timestamp,
@@ -114,41 +93,6 @@ func BuildInputName(product metadata.Product, originalFilename, timestamp string
 		FileTags:     extractFileTags(stem),
 	}
 	return si, si.validate()
-}
-
-// ExtractID parses the product ID from an original filename (leading digits
-// of the stem). Handles the bare-ID format only.
-//
-// ID extraction is being moved to the callname subdomain; ingest.ExtractID
-// will be deprecated once callers migrate here. Copied into callname
-// for domain purity — no callname → ingest dependency.
-func ExtractID(filename string) (int64, error) {
-	name := filename
-	if idx := len(filename) - 1; idx >= 0 {
-		for idx >= 0 && filename[idx] != '.' {
-			idx--
-		}
-		if idx >= 0 {
-			name = filename[:idx]
-		}
-	}
-
-	if len(name) == 0 || name[0] < '0' || name[0] > '9' {
-		return ingest.SyntheticID, nil
-	}
-
-	var digits string
-	for _, r := range name {
-		if r >= '0' && r <= '9' {
-			digits += string(r)
-		} else {
-			break
-		}
-	}
-
-	var id int64
-	fmt.Sscanf(digits, "%d", &id) //nolint:errcheck // best-effort
-	return id, nil
 }
 
 // BuildCallNames builds call names for all files in a MediaUnit.

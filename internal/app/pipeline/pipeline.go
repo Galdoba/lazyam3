@@ -324,7 +324,8 @@ func (p *Pipeline) processUnit(ctx context.Context, dir string, initialFiles []s
 	}
 	p.logger.Debug("ingest complete", "unit_id", unit.ID, "streams", len(unit.Streams))
 	if unit.Synthetic {
-		p.logger.Warn("using synthetic product ID (filename had no leading digits)", "id", unit.ID)
+		p.logger.Warn("file names did not agree on one product identity, unit is unidentified",
+			"dir", dir, "unit_id", unit.ID)
 	}
 	prod, err := p.md.FindByID(unit.ID)
 	if err != nil {

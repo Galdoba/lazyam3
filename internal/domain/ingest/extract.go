@@ -1,33 +1,60 @@
 package ingest
 
 import (
-	"fmt"
-	"strings"
+	"strconv"
 )
 
-// ExtractID parses the product ID from a filename stem (name without extension).
-// The stem must start with a digit sequence — that sequence is the ID.
-// When the stem does not start with a digit, returns SyntheticID (9999).
+// extractID decides the product identity that a set of candidate file names
+// claims. It never returns an error: a name either claims an ID or claims
+// nothing.
 //
-// NOTE: ID extraction is being moved to the callname subdomain. This will be
-// deprecated once callers migrate to callname.ExtractID.
-func ExtractID(filename string) (int64, error) {
-	name := strings.SplitN(filename, ".", 2)[0]
-
-	if len(name) == 0 || name[0] < '0' || name[0] > '9' {
-		return SyntheticID, nil
-	}
-
-	var digits string
-	for _, r := range name {
-		if r >= '0' && r <= '9' {
-			digits += string(r)
-		} else {
-			break
+// Accepted name form is "<digits> [ '-' tag [ '_' tag ]* ] [ '.' extension ]".
+// The leading digit run must end at '-', '.' or the end of the name; digits
+// followed directly by any other character make the name claim nothing.
+// A claim is a positive number, so a literal "0" stem claims nothing and 0 is
+// reserved for "no identity".
+//
+// The result is the unanimous claim: every candidate name must claim the same
+// ID. If any candidate claims nothing, or the candidates claim different IDs,
+// the result is 0 and no candidate's claim is adopted on its own.
+//
+// Candidate names are filtered before the call. Extraction only answers whether
+// the names it was given agree; it never decides who is asked.
+func extractID(candidateNames ...string) int64 {
+	var id int64
+	for i, name := range candidateNames {
+		claim := claimedID(name)
+		if claim == 0 {
+			return 0
+		}
+		if i == 0 {
+			id = claim
+			continue
+		}
+		if claim != id {
+			return 0
 		}
 	}
+	return id
+}
 
-	var id int64
-	fmt.Sscanf(digits, "%d", &id) //nolint:errcheck // best-effort
-	return id, nil
+// claimedID returns the product ID a single file name claims, or 0 when it
+// claims none.
+func claimedID(filename string) int64 {
+	end := 0
+	for end < len(filename) && filename[end] >= '0' && filename[end] <= '9' {
+		end++
+	}
+	if end == 0 {
+		return 0
+	}
+	if end < len(filename) && filename[end] != '-' && filename[end] != '.' {
+		return 0
+	}
+
+	id, err := strconv.ParseInt(filename[:end], 10, 64)
+	if err != nil {
+		return 0
+	}
+	return id
 }

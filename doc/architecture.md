@@ -86,7 +86,7 @@ type Renderer interface {
 
 ```go
 // domain/ingest
-func ExtractID(filename string) (int64, error)                        // "63603.mp4" → 63603
+func extractID(candidateNames ...string) int64   // package-private; "63603.mp4", "63603.mkv" → 63603, any disagreement or unclaimed candidate → 0
 func ParseStreams(ffprobeJSON []byte) ([]Stream, error)               // ffprobe JSON → []Stream
 func ValidateMediaUnit(streams []Stream) ValidationIssues             // domain validation rules
 func (s Stream) Coordinate() string                                   // ffmpeg selector "[0:a:1]"

@@ -18,7 +18,7 @@ The ingest domain transforms raw physical media files into structured, validated
   - **Script** — consumes the ingest unit's streams and filenames to build rendering scripts.
   - **ffprobe (external)** — the only external system; its JSON output is the raw input to the domain.
   - **Filesystem (OS)** — the source of physical files; accessed through infrastructure, never by the domain.
-- **Key business rules:** A product ID is extracted from the filename stem (digits at the start). All files within a single unit must share the same ID. Streams are parsed from ffprobe JSON and validated against quality thresholds (resolution, bitrate, duration consistency). Files that contain only non-media streams (e.g. attachment data) are silently filtered out.
+- **Key business rules:** A product identity is read from the candidate file names of a unit: a name claims an ID when its stem starts with digits and that digit run is followed by `-`, `.`, or the end of the stem. The unit identity is that claim only when every candidate name claims the same one; when any candidate claims nothing, or the claims differ, the unit has no identity (`0`) and is still built successfully. Streams are parsed from ffprobe JSON and validated against quality thresholds (resolution, bitrate, duration consistency). Files that contain only non-media streams (e.g. attachment data) are silently filtered out.
 
 ## 3. Boundaries & Interactions
 
@@ -44,8 +44,8 @@ The ingest domain transforms raw physical media files into structured, validated
 | **Rational** | A fraction (numerator / denominator) used for frame rate and duration. | "fraction", "ratio" |
 | **ValidationIssue** | A quality concern found during ingest (resolution, bitrate, duration, duplicates). | "warning", "alert" |
 | **Organizer** | Domain port interface for scanning a directory into a MediaUnit. | "ingester" (informal) |
-| **SyntheticID** | Fallback product ID (9999) assigned when a filename stem has no leading digits. | "synthetic ID" |
-| **Product ID** | Numeric identifier extracted from the beginning of a filename stem. | "ID", "product number" |
+| **Unidentified unit** | A unit whose candidate names agreed on no product ID; its identity is `0`, a value no name can claim. | "no identity", "identity 0" |
+| **Product ID** | Numeric claim a candidate name makes at the start of its stem, adopted as the unit identity only when every candidate claims it. | "ID", "product number" |
 | **File rank** | Ordering priority: video-containing=0, audio-only=1, subtitle-only=2, other=3. | "kind rank", "priority" |
 | **Sidecar** | External subtitle file (`.srt`, `.ass`, `.ssa`) that ffprobe cannot probe. | "external subtitle" |
 
@@ -88,16 +88,16 @@ The ingest domain transforms raw physical media files into structured, validated
 - **Then** the data-only file is excluded from `Filenames` and its streams are not included
 - **And** the MediaUnit is returned successfully (not an error)
 
-### Scenario 7: Inconsistent product IDs across files
+### Scenario 7: Candidate names that disagree resolve to no identity
 - **Given** files `63603.mp4` and `99999.mp4` in the same directory
 - **When** `NewMediaUnit(data)` is called
-- **Then** an error is returned indicating inconsistent IDs
+- **Then** the unit is built successfully with `ID=0`, `Synthetic=true`, and neither claim adopted
 
 ## 6. High-Level Data Model (Key Entities)
 
 - **MediaUnit** — aggregate root. Represents one product across its physical files.
-  - Key invariants: all files share the same Product ID; `Filenames[0]` is the primary media file (highest file rank).
-  - Fields: `ID` (int64), `Filenames` ([]string), `Streams` (map[string]Stream), `Validation` (ValidationIssues), `PRTTimestamp` (string, pipeline-provided), `Synthetic` (bool, true when ID was synthetically assigned).
+  - Key invariants: the unit identity is the claim all candidate names agree on, or `0` when they disagree or claim nothing; `Filenames[0]` is the primary media file (highest file rank).
+  - Fields: `ID` (int64), `Filenames` ([]string), `Streams` (map[string]Stream), `Validation` (ValidationIssues), `PRTTimestamp` (string, pipeline-provided), `Synthetic` (bool, true when the candidate names agreed on no product ID).
   
 - **Stream** — describes a single media stream.
   - Key invariants: `coordinate()` uniquely identifies a stream within a unit; duration is stored as a Rational (milliseconds).
@@ -125,10 +125,10 @@ The ingest domain transforms raw physical media files into structured, validated
 
 ## 8. Acceptance Criteria
 
-- [ ] `ExtractID` correctly parses product IDs from filenames with various formats (numeric, underscore suffix, hyphen suffix, no extension) and returns SyntheticID (9999) for non-digit-prefixed stems.
+- [ ] `extractID` claims an ID only for the accepted shape (`<digits> [ '-' tag [ '_' tag ]* ] [ '.' extension ]`: numeric, hyphen suffix, no extension) and claims nothing for an underscore suffix, letters directly after the digits, a non-digit-prefixed stem, or a literal `0`; it returns the claim only when every candidate name agrees, otherwise `0`, and never an error.
 - [ ] `ParseStreams` correctly maps ffprobe JSON to domain `Stream` objects for video, audio, and subtitle streams.
 - [ ] `ValidateMediaUnit` detects all validation rules: resolution below SD, low bitrate (video <100 kbps, audio <32 kbps), negative duration, duration inconsistency (>10%), and duplicate coordinates.
-- [ ] `NewMediaUnit` orders files by kind rank (video > audio > subtitle > data), filters data-only files, assigns `FileIndex`, and validates ID consistency.
+- [ ] `NewMediaUnit` orders files by kind rank (video > audio > subtitle > data), filters data-only files, assigns `FileIndex`, and resolves the unit identity by unanimity without an error path.
 - [ ] `sortUnitFiles` produces deterministic ordering: video-containing files first, lexicographic within each rank group.
 - [ ] `Stream.coordinate()` produces correct ffmpeg-style selectors (e.g. `[0:v:0]`, `[1:a:2]`).
 - [ ] Subtitle sidecar files (`.srt`, `.ass`, `.ssa`) are handled gracefully by infrastructure (probing failure is not a fatal error).

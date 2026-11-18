@@ -4,12 +4,6 @@ import (
 	"fmt"
 )
 
-const (
-	// SyntheticID is the fallback product ID assigned when a filename
-	// does not start with a digit (no product ID could be extracted).
-	SyntheticID int64 = 9999
-)
-
 // MediaUnit aggregates all information about a single media product:
 // its physical files, streams across those files, and validation issues.
 type MediaUnit struct {
@@ -18,7 +12,7 @@ type MediaUnit struct {
 	Streams      map[string]Stream
 	Validation   ValidationIssues
 	PRTTimestamp string // pipeline-provided timestamp for output file naming (e.g. "261023120000")
-	Synthetic    bool   // true when ID was synthetically assigned (filename had no leading digits)
+	Synthetic    bool   // true when the candidate names agreed on no product ID
 }
 
 func newMediaUnit() MediaUnit {
@@ -41,15 +35,12 @@ func NewMediaUnit(data map[string][]byte) (MediaUnit, error) {
 	filenames := collectMediaFiles(parsed)
 	streams, _ := buildStreams(parsed, filenames)
 
-	id, synthetic, err := resolveID(filenames)
-	if err != nil {
-		return MediaUnit{}, err
-	}
+	id := extractID(filenames...)
 
 	mu.Filenames = filenames
 	mu.Streams = streams
 	mu.ID = id
-	mu.Synthetic = synthetic
+	mu.Synthetic = id == 0
 
 	return mu, nil
 }
@@ -89,26 +80,6 @@ func buildStreams(parsed map[string][]Stream, filenames []string) (map[string]St
 
 // resolveID extracts product IDs from filenames, checks consistency, and
 // returns the unit ID along with whether it was synthetically assigned.
-func resolveID(filenames []string) (int64, bool, error) {
-	id := int64(0)
-	synthetic := false
-	for _, filename := range filenames {
-		fid, err := ExtractID(filename)
-		if err != nil {
-			return 0, false, err
-		}
-		if id != 0 && id != fid {
-			return 0, false, fmt.Errorf("inconsistent IDs: %d and %d in same unit", id, fid)
-		}
-		if id == 0 {
-			id = fid
-			if fid == SyntheticID {
-				synthetic = true
-			}
-		}
-	}
-	return id, synthetic, nil
-}
 
 // ValidationIssues accumulates problems found during ingest.
 type ValidationIssues []ValidationIssue

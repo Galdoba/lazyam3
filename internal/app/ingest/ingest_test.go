@@ -46,11 +46,23 @@ func TestIngest_RealFiles(t *testing.T) {
 	}
 }
 
-func TestIngest_Synthetic(t *testing.T) {
+func TestIngest_FixtureIdentity(t *testing.T) {
 	syntheticDir := filepath.Join("..", "..", "..", "testdata", "synthetic")
 	_, err := os.Stat(syntheticDir)
 	if os.IsNotExist(err) {
 		t.Skip("synthetic testdata not available")
+	}
+
+	wantIDs := map[string]int64{
+		"bad-name":              0,
+		"bad-name-2":            0,
+		"embedded-sub":          63580,
+		"hardsub-with-subtitle": 12254,
+		"multi-audio":           26360,
+		"multi-lang-audio":      12187,
+		"simple-unit":           63574,
+		"with-non-media":        65002,
+		"with-subtitles":        65003,
 	}
 
 	entries, err := os.ReadDir(syntheticDir)
@@ -81,8 +93,15 @@ func TestIngest_Synthetic(t *testing.T) {
 				t.Error("Expected at least one video stream")
 			}
 
-			if mu.ID == 0 {
-				t.Error("Expected non-zero ID")
+			wantID, ok := wantIDs[dir.Name()]
+			if !ok {
+				t.Fatalf("no expected identity for fixture %q", dir.Name())
+			}
+			if mu.ID != wantID {
+				t.Errorf("ID = %d, want %d", mu.ID, wantID)
+			}
+			if (mu.ID == 0) != mu.Synthetic {
+				t.Errorf("Synthetic = %v, want %v for ID %d", mu.Synthetic, mu.ID == 0, mu.ID)
 			}
 
 			if len(mu.Filenames) == 0 {
@@ -150,7 +169,10 @@ func TestIngest_NonMediaFilesSkipped(t *testing.T) {
 		t.Error("Expected at least one video stream")
 	}
 
-	if mu.ID == 0 {
-		t.Error("Expected non-zero ID")
+	if mu.ID != 0 {
+		t.Errorf("ID = %d, want 0 for a name that carries no claim", mu.ID)
+	}
+	if !mu.Synthetic {
+		t.Error("Synthetic = false, want true for an unidentified unit")
 	}
 }

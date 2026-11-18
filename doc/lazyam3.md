@@ -86,6 +86,7 @@ Language of rendering script generation. Types: `Script`, `ScriptConfig`, `Strea
 ├── scripts/                        # helper scripts and standalone tools
 │   ├── asses/                      # JSON querying tool (gjson)
 │   ├── find/
+│   ├── full_test.sh                # unit gate plus both live passes
 │   ├── live_test.sh                # clean end-to-end pass
 │   └── live_test_2.sh              # pass with planted error logs, asserts the stores
 │

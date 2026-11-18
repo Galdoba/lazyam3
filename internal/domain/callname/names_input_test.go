@@ -16,7 +16,6 @@ func TestScriptInput_String(t *testing.T) {
 		{
 			name: "full with season/episode and file tags",
 			input: ScriptInput{
-				ID:           12345,
 				Base:         "Igra_lzhecov",
 				SeasonTag:    "s01",
 				EpisodeTag:   "e26",
@@ -29,7 +28,6 @@ func TestScriptInput_String(t *testing.T) {
 		{
 			name: "no season/episode, no file tags",
 			input: ScriptInput{
-				ID:           999,
 				Base:         "Movie",
 				PRT:          "PRT261001120000",
 				OriginalName: "999.mkv",
@@ -39,7 +37,6 @@ func TestScriptInput_String(t *testing.T) {
 		{
 			name: "with file tags only",
 			input: ScriptInput{
-				ID:           100,
 				Base:         "Show",
 				SeasonTag:    "s02",
 				EpisodeTag:   "e05",
@@ -52,7 +49,6 @@ func TestScriptInput_String(t *testing.T) {
 		{
 			name: "only season tag, no episode",
 			input: ScriptInput{
-				ID:        50,
 				Base:      "Series",
 				SeasonTag: "s03",
 				PRT:       "PRT261020000000",
@@ -62,7 +58,6 @@ func TestScriptInput_String(t *testing.T) {
 		{
 			name: "only episode tag, no season",
 			input: ScriptInput{
-				ID:         50,
 				Base:       "Series",
 				EpisodeTag: "e10",
 				PRT:        "PRT261020000000",
@@ -76,7 +71,7 @@ func TestScriptInput_String(t *testing.T) {
 		},
 		{
 			name:     "empty base produces flat output",
-			input:    ScriptInput{ID: 12345, PRT: "PRT260928200000", OriginalName: "12345.mp4"},
+			input:    ScriptInput{PRT: "PRT260928200000", OriginalName: "12345.mp4"},
 			expected: "_PRT260928200000.mp4",
 		},
 	}
@@ -160,37 +155,46 @@ func TestScriptInput_validate(t *testing.T) {
 		errMsg  string
 	}{
 		{
-			name:    "valid input",
-			input:   ScriptInput{ID: 1, Base: "Show", PRT: "PRT260928200000"},
+			name: "valid input",
+			input: ScriptInput{
+				Base:         "Show",
+				SeasonTag:    "s01",
+				PRT:          "PRT260928200000",
+				OriginalName: "12345.mp4",
+				FileTags:     []string{"rus"},
+			},
 			wantErr: false,
 		},
 		{
-			name:    "missing ID",
-			input:   ScriptInput{Base: "Show", PRT: "PRT260928200000"},
-			wantErr: true,
-			errMsg:  "id must be set",
+			name: "no product identity is still valid",
+			input: ScriptInput{
+				Base:         "Show",
+				PRT:          "PRT260928200000",
+				OriginalName: "no_id_in_video.mp4",
+			},
+			wantErr: false,
 		},
 		{
 			name:    "missing base",
-			input:   ScriptInput{ID: 1, PRT: "PRT260928200000"},
+			input:   ScriptInput{PRT: "PRT260928200000"},
 			wantErr: true,
 			errMsg:  "base must be set",
 		},
 		{
 			name:    "missing PRT",
-			input:   ScriptInput{ID: 1, Base: "Show"},
+			input:   ScriptInput{Base: "Show"},
 			wantErr: true,
 			errMsg:  "PRT must be set",
 		},
 		{
 			name:    "invalid PRT format",
-			input:   ScriptInput{ID: 1, Base: "Show", PRT: "BAD"},
+			input:   ScriptInput{Base: "Show", PRT: "BAD"},
 			wantErr: true,
 			errMsg:  "PRT invalid",
 		},
 		{
 			name:    "PRT too short",
-			input:   ScriptInput{ID: 1, Base: "Show", PRT: "PRT123"},
+			input:   ScriptInput{Base: "Show", PRT: "PRT123"},
 			wantErr: true,
 			errMsg:  "PRT invalid",
 		},
@@ -239,7 +243,7 @@ func TestBuildInputName(t *testing.T) {
 			timestamp: "260928200000",
 			wantErr:   false,
 			validate: func(si ScriptInput) bool {
-				return si.ID == 12345 &&
+				return si.String() == "Igra_licevyh_s01e26_PRT260928200000.mp4" &&
 					si.SeasonTag == "s01e26" &&
 					si.PRT == "PRT260928200000"
 			},
@@ -251,7 +255,7 @@ func TestBuildInputName(t *testing.T) {
 			timestamp: "260928200000",
 			wantErr:   false,
 			validate: func(si ScriptInput) bool {
-				return si.ID == 9999
+				return si.String() == "Igra_licevyh_s01e26_PRT260928200000-no_digits.mp4"
 			},
 		},
 		{
@@ -265,13 +269,44 @@ func TestBuildInputName(t *testing.T) {
 			},
 		},
 		{
+			name: "product without identity builds a call name",
+			product: metadata.Product{
+				Kind:          metadata.KindSeries,
+				SeriesTitle:   "Игра лицевых",
+				SeasonNumber:  intPtr(1),
+				EpisodeNumber: intPtr(26),
+			},
+			filename:  "no_id_in_video.mp4",
+			timestamp: "260928200000",
+			wantErr:   false,
+			validate: func(si ScriptInput) bool {
+				return si.String() == "Igra_licevyh_s01e26_PRT260928200000-no_id_in_video.mp4"
+			},
+		},
+		{
+			name: "unidentified unit keeps its subtitle tags",
+			product: metadata.Product{
+				Kind:          metadata.KindSeries,
+				SeriesTitle:   "Игра лицевых",
+				SeasonNumber:  intPtr(1),
+				EpisodeNumber: intPtr(26),
+			},
+			filename:  "63603-rus.srt",
+			timestamp: "260928200000",
+			wantErr:   false,
+			validate: func(si ScriptInput) bool {
+				return len(si.FileTags) == 1 && si.FileTags[0] == "rus" &&
+					si.String() == "Igra_licevyh_s01e26_PRT260928200000-rus.srt"
+			},
+		},
+		{
 			name:      "movie product no season/episode",
 			product:   metadata.Product{ID: 999, Kind: metadata.KindMovie, SeriesTitle: "Movie Title"},
 			filename:  "999.mp4",
 			timestamp: "261001120000",
 			wantErr:   false,
 			validate: func(si ScriptInput) bool {
-				return si.SeasonTag == "" && si.EpisodeTag == "" && si.ID == 999
+				return si.SeasonTag == "" && si.EpisodeTag == ""
 			},
 		},
 		{
@@ -338,41 +373,6 @@ func TestBuildInputNames(t *testing.T) {
 	}
 	if !strings.HasSuffix(subName, ".srt") {
 		t.Errorf("Expected subtitle to end with .srt, got %q", subName)
-	}
-}
-
-func TestExtractID(t *testing.T) {
-	tests := []struct {
-		name     string
-		filename string
-		wantID   int64
-		wantErr  bool
-	}{
-		{"basic", "12345.mp4", 12345, false},
-		{"with extension", "99999.mkv", 99999, false},
-		{"no leading digit", "abc.mp4", 9999, false},
-		{"empty", "", 9999, false},
-		{"only extension", ".mp4", 9999, false},
-		{"large id", "9999999999999.mp4", 9999999999999, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ExtractID(tt.filename)
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("ExtractID(%q) expected error, got %d", tt.filename, got)
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("ExtractID(%q) unexpected error: %v", tt.filename, err)
-				return
-			}
-			if got != tt.wantID {
-				t.Errorf("ExtractID(%q) = %d, want %d", tt.filename, got, tt.wantID)
-			}
-		})
 	}
 }
 

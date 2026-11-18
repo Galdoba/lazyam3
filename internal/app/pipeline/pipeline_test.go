@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -100,9 +101,14 @@ func sourceRoot(t *testing.T) (string, string) {
 
 func newTestPipeline(t *testing.T, root string, in *fakeOrganizer, repo *fakeRepo, rd *fakeRenderer, events chan PipelineEvent, dryRun bool) *Pipeline {
 	t.Helper()
+	return newTestPipelineLog(t, root, in, repo, rd, events, dryRun, io.Discard)
+}
+
+func newTestPipelineLog(t *testing.T, root string, in *fakeOrganizer, repo *fakeRepo, rd *fakeRenderer, events chan PipelineEvent, dryRun bool, logOut io.Writer) *Pipeline {
+	t.Helper()
 	dest := t.TempDir()
 	return NewPipeline(Options{
-		Logger:        slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Logger:        slog.New(slog.NewTextHandler(logOut, nil)),
 		Ingest:        in,
 		Metadata:      repo,
 		Renderer:      rd,
@@ -511,18 +517,10 @@ func fileExists(path string) bool {
 	return false
 }
 
-func TestRunOnce_SyntheticID(t *testing.T) {
-	root, unitDir := sourceRoot(t)
-	// Create files with non-digit-named filenames.
-	for _, name := range []string{"no_id_in_video.mp4", "no_id_in_video-rus.srt"} {
-		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	events := make(chan PipelineEvent, 100)
-	rd := &fakeRenderer{}
-	syntheticUnit := ingest.MediaUnit{
-		ID:        ingest.SyntheticID,
+// unidentifiedUnit is a unit whose candidate names agreed on no product ID.
+func unidentifiedUnit() ingest.MediaUnit {
+	return ingest.MediaUnit{
+		ID:        0,
 		Synthetic: true,
 		Filenames: []string{"no_id_in_video.mp4", "no_id_in_video-rus.srt"},
 		Streams: map[string]ingest.Stream{
@@ -530,10 +528,23 @@ func TestRunOnce_SyntheticID(t *testing.T) {
 			"[1:s:0]": {FileIndex: 1, Index: 0, Kind: ingest.StreamKindSubtitle},
 		},
 	}
-	p := newTestPipeline(t, root,
-		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: syntheticUnit}},
-		&fakeRepo{}, // no product for 9999 → fallback
-		rd, events, false)
+}
+
+func TestRunOnce_UnidentifiedUnit(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	// Create files with names that carry no agreed claim.
+	for _, name := range []string{"no_id_in_video.mp4", "no_id_in_video-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{}
+	var log bytes.Buffer
+	p := newTestPipelineLog(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: unidentifiedUnit()}},
+		&fakeRepo{}, // no product for identity 0 → fallback
+		rd, events, false, &log)
 
 	out, err := p.RunOnce(context.Background())
 	if err != nil {
@@ -546,9 +557,45 @@ func TestRunOnce_SyntheticID(t *testing.T) {
 		t.Fatalf("expected 1 script, got %d", len(rd.scripts))
 	}
 
+	if !strings.Contains(log.String(), "file names did not agree on one product identity") {
+		t.Errorf("log = %q, want a warn about names not agreeing on one product identity", log.String())
+	}
+
 	evs := drainEvents(events)
-	if len(evs) != 2 || evs[0].Type != EventUnitDone || evs[0].ID != ingest.SyntheticID || evs[1].Type != EventScanDone {
-		t.Errorf("events = %+v, want [UnitDone(9999) ScanDone]", evs)
+	if len(evs) != 2 || evs[0].Type != EventUnitDone || evs[0].ID != 0 || evs[1].Type != EventScanDone {
+		t.Errorf("events = %+v, want [UnitDone(0) ScanDone]", evs)
+	}
+}
+
+func TestRunOnce_UnidentifiedUnitFallsBackToDirectoryName(t *testing.T) {
+	root, unitDir := sourceRoot(t)
+	for _, name := range []string{"no_id_in_video.mp4", "no_id_in_video-rus.srt"} {
+		if err := os.WriteFile(filepath.Join(unitDir, name), []byte("test"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := make(chan PipelineEvent, 100)
+	rd := &fakeRenderer{}
+	var log bytes.Buffer
+	p := newTestPipelineLog(t, root,
+		&fakeOrganizer{units: map[string]ingest.MediaUnit{unitDir: unidentifiedUnit()}},
+		&fakeRepo{},
+		rd, events, false, &log)
+
+	if _, err := p.RunOnce(context.Background()); err != nil {
+		t.Fatalf("RunOnce() error: %v", err)
+	}
+
+	scriptName := strings.TrimSuffix(filepath.Base(rd.scripts[0].Destination), filepath.Ext(rd.scripts[0].Destination))
+	artifact := readProcessingArtifact(t, filepath.Join(p.destination, "metadata"), scriptName)
+	if got := artifact["unit_id"]; fmt.Sprintf("%v", got) != "0" {
+		t.Errorf("processing artifact unit_id = %v, want 0", got)
+	}
+	if got := artifact["product_name"]; got != filepath.Base(unitDir) {
+		t.Errorf("processing artifact product_name = %v, want the source directory name", got)
+	}
+	if fb := fallbackProduct(filepath.Base(unitDir), 0); fb.ID != 0 {
+		t.Errorf("fallback product ID = %d, want 0", fb.ID)
 	}
 }
 

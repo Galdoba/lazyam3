@@ -6,40 +6,43 @@ import (
 
 func TestExtractID(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   string
-		want    int64
-		wantErr bool
+		name  string
+		input []string
+		want  int64
 	}{
-		{"pure numeric", "63603.mp4", 63603, false},
-		{"mkv extension", "63603.mkv", 63603, false},
-		{"underscore suffix", "63604_PRT251205.mp4", 63604, false},
-		{"hyphen suffix", "63603-rus_Russkii.srt", 63603, false},
-		{"underscore then digits", "63604_1080.mp4", 63604, false},
-		{"no extension", "63603", 63603, false},
-		{"single digit", "1.mp4", 1, false},
-		{"alpha prefix", "Copy 2 of 63604.mp4", SyntheticID, false},
-		{"empty", "", SyntheticID, false},
-		{"alpha only", "unknown.mp4", SyntheticID, false},
-		{"underscore first", "_63603.mp4", SyntheticID, false},
-		{"dot first", ".63603.mp4", SyntheticID, false},
+		{"pure numeric", []string{"63603.mp4"}, 63603},
+		{"mkv extension", []string{"63603.mkv"}, 63603},
+		{"underscore suffix", []string{"63604_PRT251205.mp4"}, 0},
+		{"hyphen suffix", []string{"63603-rus_Russkii.srt"}, 63603},
+		{"underscore then digits", []string{"63604_1080.mp4"}, 0},
+		{"no extension", []string{"63603"}, 63603},
+		{"single digit", []string{"1.mp4"}, 1},
+		{"alpha prefix", []string{"Copy 2 of 63604.mp4"}, 0},
+		{"empty", []string{""}, 0},
+		{"alpha only", []string{"unknown.mp4"}, 0},
+		{"underscore first", []string{"_63603.mp4"}, 0},
+		{"dot first", []string{".63603.mp4"}, 0},
+		{"tags with underscores", []string{"63597-rus_Russkii_Forsirovannye.srt"}, 63597},
+		{"short tag form", []string{"12254-rus_Russkii.srt"}, 12254},
+		{"language tag", []string{"65003-eng.srt"}, 65003},
+		{"letters after digits", []string{"12254rus.srt"}, 0},
+		{"literal zero stem", []string{"0.mp4"}, 0},
+		{"zero stem with underscore suffix", []string{"0_show.mp4"}, 0},
+		{"resolution prefix", []string{"1080p_Show.mp4"}, 0},
+		{"year prefix", []string{"2017_Show.mp4"}, 0},
+		{"no leading digits", []string{"no_id_in_video.mp4"}, 0},
+		{"unrelated document", []string{"something-unrelated.md"}, 0},
+		{"no candidates", []string{}, 0},
+		{"different claims void each other", []string{"12345.mp4", "12346.mp4"}, 0},
+		{"unclaimed candidate voids the claim", []string{"63603.mp4", "no_id_in_video.mp4"}, 0},
+		{"candidates agree", []string{"63603.mp4", "63603.mkv"}, 63603},
+		{"a second claim voids the first", []string{"63603.mp4", "12254-rus.srt"}, 0},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ExtractID(tt.input)
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("ExtractID(%q) expected error, got nil", tt.input)
-				}
-				return
-			}
-			if err != nil {
-				t.Errorf("ExtractID(%q) unexpected error: %v", tt.input, err)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("ExtractID(%q) = %d, want %d", tt.input, got, tt.want)
+			if got := extractID(tt.input...); got != tt.want {
+				t.Errorf("extractID(%q) = %d, want %d", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -289,7 +292,7 @@ func TestNewMediaUnit(t *testing.T) {
 				"63603_sub.srt":   []byte(subProbe),
 			},
 			wantErr:     false,
-			wantID:      63603,
+			wantID:      0,
 			wantFiles:   []string{"63603.mp4", "63603_audio.mkv", "63603_sub.srt"},
 			wantStreams: 3,
 		},
@@ -321,12 +324,37 @@ func TestNewMediaUnit(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "inconsistent IDs",
+			name: "conflicting claims resolve to no identity",
 			data: map[string][]byte{
 				"63603.mp4": []byte(videoProbe),
 				"99999.mp4": []byte(videoProbe),
 			},
-			wantErr: true,
+			wantErr:     false,
+			wantID:      0,
+			wantFiles:   []string{"63603.mp4", "99999.mp4"},
+			wantStreams: 2,
+		},
+		{
+			name: "unclaimed candidate voids the identity",
+			data: map[string][]byte{
+				"63603.mp4":          []byte(videoProbe),
+				"no_id_in_video.mp4": []byte(videoProbe),
+			},
+			wantErr:     false,
+			wantID:      0,
+			wantFiles:   []string{"63603.mp4", "no_id_in_video.mp4"},
+			wantStreams: 2,
+		},
+		{
+			name: "candidates that agree establish the identity",
+			data: map[string][]byte{
+				"63603.mp4": []byte(videoProbe),
+				"63603.mkv": []byte(videoProbe),
+			},
+			wantErr:     false,
+			wantID:      63603,
+			wantFiles:   []string{"63603.mkv", "63603.mp4"},
+			wantStreams: 2,
 		},
 		{
 			name: "only data files",
@@ -340,23 +368,23 @@ func TestNewMediaUnit(t *testing.T) {
 			wantStreams: 0,
 		},
 		{
-			name: "non-digit filename uses synthetic ID",
+			name: "non-digit filename is unidentified",
 			data: map[string][]byte{
 				"MyShow_E01.mp4": []byte(videoProbe),
 			},
 			wantErr:     false,
-			wantID:      SyntheticID,
+			wantID:      0,
 			wantFiles:   []string{"MyShow_E01.mp4"},
 			wantStreams: 1,
 		},
 		{
-			name: "mixed digit and non-digit filenames share synthetic ID",
+			name: "mixed digit and non-digit filenames resolve to no identity",
 			data: map[string][]byte{
 				"MyShow_E01.mp4":     []byte(videoProbe),
 				"MyShow_E01-rus.srt": []byte(subProbe),
 			},
 			wantErr:     false,
-			wantID:      SyntheticID,
+			wantID:      0,
 			wantFiles:   []string{"MyShow_E01.mp4", "MyShow_E01-rus.srt"},
 			wantStreams: 2,
 		},
@@ -378,11 +406,11 @@ func TestNewMediaUnit(t *testing.T) {
 			if mu.ID != tt.wantID {
 				t.Errorf("ID = %d, want %d", mu.ID, tt.wantID)
 			}
-			if tt.wantID == SyntheticID && !mu.Synthetic {
-				t.Errorf("Synthetic = false, want true for synthetic ID")
+			if tt.wantID == 0 && !mu.Synthetic {
+				t.Errorf("Synthetic = false, want true for an unidentified unit")
 			}
-			if tt.wantID != SyntheticID && mu.Synthetic {
-				t.Errorf("Synthetic = true, want false for normal ID")
+			if tt.wantID != 0 && mu.Synthetic {
+				t.Errorf("Synthetic = true, want false for an identified unit")
 			}
 			if len(mu.Filenames) != len(tt.wantFiles) {
 				t.Errorf("Filenames: got %d files, want %d", len(mu.Filenames), len(tt.wantFiles))
