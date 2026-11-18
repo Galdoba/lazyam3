@@ -342,3 +342,27 @@ func TestFindByID_CloneIsIndependent(t *testing.T) {
 		t.Error("original Series episode was mutated by the pruned copy")
 	}
 }
+
+func TestFoundToProduct_EmptyMovie(t *testing.T) {
+	found := &Found{Kind: mdomain.KindMovie, Data: Root{Movies: []MoviesItem{}}}
+	prod := FoundToProduct(found)
+	if prod != nil {
+		t.Error("FoundToProduct(empty movie) returned non-nil")
+	}
+}
+
+func TestFoundToProduct_EmptySeason(t *testing.T) {
+	found := &Found{Kind: mdomain.KindSeason, Data: Root{Series: []SeriesItem{SeriesItem{Id: 1, Seasons: []SeasonsItem{}}}}}
+	prod := FoundToProduct(found)
+	if prod != nil {
+		t.Error("FoundToProduct(empty season) returned non-nil")
+	}
+}
+
+func TestFoundToProduct_EmptyMovieEpisode(t *testing.T) {
+	found := &Found{Kind: mdomain.KindMovieEpisode, Data: Root{Movies: []MoviesItem{MoviesItem{Id: 1, Episodes: []EpisodesItem{}}}}}
+	prod := FoundToProduct(found)
+	if prod != nil {
+		t.Error("FoundToProduct(empty movie episode) returned non-nil")
+	}
+}

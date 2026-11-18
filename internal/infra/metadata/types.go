@@ -124,8 +124,13 @@ func (r *Root) FindByID(id int64, d Descendants) (*Found, bool) {
 	if r == nil {
 		return nil, false
 	}
+	if found, ok := findByMovie(r, id, d); ok {
+		return found, true
+	}
+	return findBySeries(r, id, d)
+}
 
-	// --- Movies ---
+func findByMovie(r *Root, id int64, d Descendants) (*Found, bool) {
 	for i := range r.Movies {
 		m := &r.Movies[i]
 		if m.Id == id {
@@ -143,8 +148,10 @@ func (r *Root) FindByID(id int64, d Descendants) (*Found, bool) {
 			}
 		}
 	}
+	return nil, false
+}
 
-	// --- Series ---
+func findBySeries(r *Root, id int64, d Descendants) (*Found, bool) {
 	for i := range r.Series {
 		s := &r.Series[i]
 		if s.Id == id {
@@ -175,7 +182,6 @@ func (r *Root) FindByID(id int64, d Descendants) (*Found, bool) {
 			}
 		}
 	}
-
 	return nil, false
 }
 
@@ -275,99 +281,119 @@ func FoundToProduct(f *Found) *mdomain.Product {
 	}
 	switch f.Kind {
 	case mdomain.KindSeries:
-		if len(f.Data.Series) == 0 {
-			return nil
-		}
-		s := f.Data.Series[0]
-		return &mdomain.Product{
-			ID:          s.Id,
-			Kind:        f.Kind,
-			Title:       s.Title,
-			SeriesTitle: s.Title,
-			Description: s.Description,
-			Genres:      s.Genres,
-			Countries:   s.Countries,
-			KinopoiskID: s.KinopoiskId,
-			IMDBID:      s.ImdbId,
-		}
+		return productFromSeries(f)
 	case mdomain.KindSeason:
-		if len(f.Data.Series) == 0 || len(f.Data.Series[0].Seasons) == 0 {
-			return nil
-		}
-		season := f.Data.Series[0].Seasons[0]
-		parent := f.Data.Series[0]
-		return &mdomain.Product{
-			ID:           season.Id,
-			Kind:         f.Kind,
-			Title:        season.Title,
-			ParentID:     &parent.Id,
-			SeasonNumber: intPtr(season.SeasonNumber),
-			SeriesTitle:  parent.Title,
-			Genres:       parent.Genres,
-			Countries:    parent.Countries,
-			KinopoiskID:  parent.KinopoiskId,
-			IMDBID:       parent.ImdbId,
-		}
+		return productFromSeason(f)
 	case mdomain.KindSeriesEpisode:
-		if len(f.Data.Series) == 0 || len(f.Data.Series[0].Seasons) == 0 {
-			return nil
-		}
-		series := f.Data.Series[0]
-		season := series.Seasons[0]
-		ep := season.Episodes[0]
-		parentID := season.Id
-		return &mdomain.Product{
-			ID:            ep.Id,
-			Kind:          f.Kind,
-			Title:         ep.Title,
-			Description:   ep.Description,
-			ParentID:      &parentID,
-			SeasonNumber:  intPtr(season.SeasonNumber),
-			EpisodeNumber: intPtr(ep.Number),
-			SeasonEp:      seasonEp(season.SeasonNumber, ep.Number),
-			SeriesTitle:   series.Title,
-			Genres:        series.Genres,
-			Countries:     series.Countries,
-			KinopoiskID:   series.KinopoiskId,
-			IMDBID:        series.ImdbId,
-		}
+		return productFromSeriesEpisode(f)
 	case mdomain.KindMovie:
-		if len(f.Data.Movies) == 0 {
-			return nil
-		}
-		m := f.Data.Movies[0]
-		return &mdomain.Product{
-			ID:          m.Id,
-			Kind:        f.Kind,
-			Title:       m.Title,
-			SeriesTitle: m.Title,
-			Description: m.Description,
-			Genres:      m.Genres,
-			Countries:   m.Countries,
-			KinopoiskID: m.KinopoiskId,
-			IMDBID:      m.ImdbId,
-		}
+		return productFromMovie(f)
 	case mdomain.KindMovieEpisode:
-		if len(f.Data.Movies) == 0 || len(f.Data.Movies[0].Episodes) == 0 {
-			return nil
-		}
-		m := f.Data.Movies[0]
-		ep := m.Episodes[0]
-		return &mdomain.Product{
-			ID:            ep.Id,
-			Kind:          f.Kind,
-			Title:         ep.Title,
-			Description:   ep.Description,
-			ParentID:      &m.Id,
-			EpisodeNumber: intPtr(ep.Number),
-			SeriesTitle:   m.Title,
-			Genres:        m.Genres,
-			Countries:     m.Countries,
-			KinopoiskID:   m.KinopoiskId,
-			IMDBID:        m.ImdbId,
-		}
+		return productFromMovieEpisode(f)
 	}
 	return nil
+}
+
+func productFromSeries(f *Found) *mdomain.Product {
+	if len(f.Data.Series) == 0 {
+		return nil
+	}
+	s := f.Data.Series[0]
+	return &mdomain.Product{
+		ID:          s.Id,
+		Kind:        f.Kind,
+		Title:       s.Title,
+		SeriesTitle: s.Title,
+		Description: s.Description,
+		Genres:      s.Genres,
+		Countries:   s.Countries,
+		KinopoiskID: s.KinopoiskId,
+		IMDBID:      s.ImdbId,
+	}
+}
+
+func productFromSeason(f *Found) *mdomain.Product {
+	if len(f.Data.Series) == 0 || len(f.Data.Series[0].Seasons) == 0 {
+		return nil
+	}
+	season := f.Data.Series[0].Seasons[0]
+	parent := f.Data.Series[0]
+	return &mdomain.Product{
+		ID:           season.Id,
+		Kind:         f.Kind,
+		Title:        season.Title,
+		ParentID:     &parent.Id,
+		SeasonNumber: intPtr(season.SeasonNumber),
+		SeriesTitle:  parent.Title,
+		Genres:       parent.Genres,
+		Countries:    parent.Countries,
+		KinopoiskID:  parent.KinopoiskId,
+		IMDBID:       parent.ImdbId,
+	}
+}
+
+func productFromSeriesEpisode(f *Found) *mdomain.Product {
+	if len(f.Data.Series) == 0 || len(f.Data.Series[0].Seasons) == 0 {
+		return nil
+	}
+	series := f.Data.Series[0]
+	season := series.Seasons[0]
+	ep := season.Episodes[0]
+	parentID := season.Id
+	return &mdomain.Product{
+		ID:            ep.Id,
+		Kind:          f.Kind,
+		Title:         ep.Title,
+		Description:   ep.Description,
+		ParentID:      &parentID,
+		SeasonNumber:  intPtr(season.SeasonNumber),
+		EpisodeNumber: intPtr(ep.Number),
+		SeasonEp:      seasonEp(season.SeasonNumber, ep.Number),
+		SeriesTitle:   series.Title,
+		Genres:        series.Genres,
+		Countries:     series.Countries,
+		KinopoiskID:   series.KinopoiskId,
+		IMDBID:        series.ImdbId,
+	}
+}
+
+func productFromMovie(f *Found) *mdomain.Product {
+	if len(f.Data.Movies) == 0 {
+		return nil
+	}
+	m := f.Data.Movies[0]
+	return &mdomain.Product{
+		ID:          m.Id,
+		Kind:        f.Kind,
+		Title:       m.Title,
+		SeriesTitle: m.Title,
+		Description: m.Description,
+		Genres:      m.Genres,
+		Countries:   m.Countries,
+		KinopoiskID: m.KinopoiskId,
+		IMDBID:      m.ImdbId,
+	}
+}
+
+func productFromMovieEpisode(f *Found) *mdomain.Product {
+	if len(f.Data.Movies) == 0 || len(f.Data.Movies[0].Episodes) == 0 {
+		return nil
+	}
+	m := f.Data.Movies[0]
+	ep := m.Episodes[0]
+	return &mdomain.Product{
+		ID:            ep.Id,
+		Kind:          f.Kind,
+		Title:         ep.Title,
+		Description:   ep.Description,
+		ParentID:      &m.Id,
+		EpisodeNumber: intPtr(ep.Number),
+		SeriesTitle:   m.Title,
+		Genres:        m.Genres,
+		Countries:     m.Countries,
+		KinopoiskID:   m.KinopoiskId,
+		IMDBID:        m.ImdbId,
+	}
 }
 
 func intPtr(i int64) *int {

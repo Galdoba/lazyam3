@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/Galdoba/lazyam3/internal/domain/metadata"
+	"github.com/Galdoba/lazyam3/internal/infra/config"
+	"github.com/Galdoba/lazyam3/internal/infra/logging"
 )
 
 func TestRepository_FindByID(t *testing.T) {
@@ -309,5 +311,70 @@ func TestRepository_Reload_Untouched(t *testing.T) {
 	}
 	if changed {
 		t.Error("expected changed=false when untouched")
+	}
+}
+
+func TestRepository_FindByID_NotInitialized(t *testing.T) {
+	repo := &Repository{root: nil, logger: nil}
+	prod, err := repo.FindByID(100)
+	if err == nil {
+		t.Error("expected error for uninitialized repository")
+	}
+	if prod != nil {
+		t.Error("expected nil product for uninitialized repository")
+	}
+}
+
+func TestRepository_Reload_StatError(t *testing.T) {
+	tmpDir := t.TempDir()
+	metaFile := filepath.Join(tmpDir, "metadata.json")
+
+	data := `{"series": [{"id": 100, "title": "Series A", "start_date": "2020-01-01T00:00:00Z", "mainGenre": "drama", "genres": [], "countries": [], "imdbId": "tt1", "kinopoiskId": "1"}], "movies": []}`
+	if err := os.WriteFile(metaFile, []byte(data), 0o644); err != nil {
+		t.Fatalf("failed to write test metadata: %v", err)
+	}
+
+	repo, err := New(nil, metaFile)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	if err := os.Remove(metaFile); err != nil {
+		t.Fatalf("failed to remove file: %v", err)
+	}
+
+	changed, err := repo.Reload()
+	if err == nil {
+		t.Error("expected error on stat failure, got nil")
+	}
+	if changed {
+		t.Error("expected changed=false on stat failure")
+	}
+}
+
+func TestRepository_New_WithLogger(t *testing.T) {
+	logger, err := logging.NewLogger(config.Logging{Terminal: true})
+	if err != nil {
+		t.Fatalf("NewLogger error: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	metaFile := filepath.Join(tmpDir, "metadata.json")
+	data := `{"series": [{"id": 100, "title": "Series A", "start_date": "2020-01-01T00:00:00Z", "mainGenre": "drama", "genres": [], "countries": [], "imdbId": "tt1", "kinopoiskId": "1"}], "movies": []}`
+	if err := os.WriteFile(metaFile, []byte(data), 0o644); err != nil {
+		t.Fatalf("failed to write test metadata: %v", err)
+	}
+
+	repo, err := New(logger, metaFile)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+	if repo == nil {
+		t.Fatal("expected repo")
+	}
+
+	_, err = repo.FindByID(99999)
+	if err == nil {
+		t.Error("expected not found error")
 	}
 }
