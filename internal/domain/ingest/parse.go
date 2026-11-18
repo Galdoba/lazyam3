@@ -50,9 +50,6 @@ type Disp struct {
 	Descriptions   int `json:"descriptions"`
 }
 
-// TagMap represents key-value tags in a stream.
-type TagMap map[string]string
-
 // ParseStreams parses ffprobe JSON output into domain Stream objects.
 func parseStreams(ffprobeJSON []byte) ([]Stream, error) {
 	// TODO: rework
