@@ -28,6 +28,27 @@ Run before/after any pipeline change to verify end-to-end behavior.
 
 Full catalog: `doc/adr/INDEX.md` for decisions, plus the topic docs in `doc/`.
 
+## Go Tooling (gopls MCP)
+
+The `gopls_mcp` server is the preferred way to inspect Go code. Agent MUST use it instead of `grep`/`glob`/`view` scanning whenever the question is about Go symbols, and fall back to text search only for prose, config, or non-Go files. These tools are the main agent's own responsibility — delegating Go work to a subagent is not an acceptable substitute.
+
+| Task | Use |
+|---|---|
+| Workspace/package overview | `go_workspace`, `go_package_api` |
+| Find a symbol or API surface | `go_search`, `go_file_context` |
+| Where is it used / blast radius before refactoring | `go_symbol_references` |
+| Edit errors, vet, lint feedback | `go_diagnostics` |
+| Rename across the module | `go_rename_symbol` (never manual multi-file rename) |
+| Dependency/security audit | `go_vulncheck` |
+
+Rules:
+- Read a file only after `go_file_context` or `go_search` has identified it as relevant
+- Call `go_diagnostics` after every edit to a Go file and fix issues in files you changed
+- Use `go_rename_symbol` for any rename; verify the reported edits before running tests
+- `go_vulncheck ./...` before archiving a change
+- Never hand a Go search, reference lookup, or rename to a subagent
+- MCP Go tools do not replace `go build`, `go test`, or `golangci-lint` — they complement, not gate, the shell gate in **Commands** below
+
 ## Commands
 
 ```bash
@@ -69,6 +90,8 @@ platform (internal/platform/*)     ← Stateless services (no domain deps)
 - An OpenSpec change is the unit of work: propose it before implementing, verify it before archiving
 - Implementation of the current change MUST be done in it's own branch
 - Agent SHOULD commit, but MUST NOT push
+- Subagents are forbidden: no `agent_dispatch`, no `agent_send`, no delegated searches or reviews
+- The main agent MUST do every Go inspection, edit, and rename itself through `gopls_mcp`
 
 ### Code
 - Domains are pure — no imports from infra or app
@@ -78,6 +101,7 @@ platform (internal/platform/*)     ← Stateless services (no domain deps)
 - Infrastructure failures fail fast
 - Simple solutions MUST examined first
 - Analyze the problem before solving it
+- Symbol-level Go work MUST go through `gopls_mcp` (see **Go Tooling (gopls MCP)**); text search is the fallback, not the default
 - Make only minimal code edits
 - No comments in code unless really needed
 - Do NOT fix the bugs which unrelated to current feature
