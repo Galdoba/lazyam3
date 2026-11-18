@@ -22,3 +22,4 @@
 | [0018](0018-mandatory-writable-paths-fail-fast-at-startup.md) | Mandatory Writable Paths, Fail Fast At Startup | accepted | 2026-11-17 | architectural |
 | [0019](0019-input-name-grammar-owned-by-ingest.md) | Input Name Grammar Owned By Ingest | accepted | 2026-11-18 | cross-package |
 | [0020](0020-ingest-carries-stream-facts-it-does-not-validate.md) | Ingest Carries Stream Facts It Does Not Validate | accepted | 2026-11-18 | domain |
+| [0021](0021-metadata-carries-product-facts-it-does-not-classify.md) | Metadata Carries Product Facts It Does Not Classify | accepted | 2026-11-18 | domain |
